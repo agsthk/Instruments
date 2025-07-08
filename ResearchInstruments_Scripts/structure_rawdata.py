@@ -77,7 +77,7 @@ def structure_2btech(raw_dir, struct_dir, inst, source):
                                schema=schema,
                                ignore_errors=True)
             try:
-                data.collect()
+                data = data.collect()
             except pl.exceptions.SchemaError:
                 data = pl.scan_csv(raw_path,
                                    has_header=False,
@@ -85,7 +85,7 @@ def structure_2btech(raw_dir, struct_dir, inst, source):
                                    ignore_errors=True,
                                    skip_rows=1)
                 try:
-                    data.collect()
+                    data = data.collect()
                 except:
                     continue
                 else:
@@ -101,18 +101,24 @@ def structure_2btech(raw_dir, struct_dir, inst, source):
         # Drops rows not matching provided schema
         # data = data.filter(~pl.all_horizontal(pl.all().is_null()))
         data = data.drop_nulls()
+        # Stops structuring logs with no real data
+        if data.is_empty():
+            continue
         # Defines instrument datetime
-        data = data.select(
+        data = data.lazy().select(
             pl.concat_str(
                 [pl.col("date"), pl.col("time").str.strip_chars()],
                 separator=" "
                 ).str.to_datetime(
-                    "%d/%m/%y %H:%M:%S"
+                    "%d/%m/%y %H:%M:%S",
+                    strict=False
                     ).dt.replace_time_zone(
                         time_zone="MST"
                         ).alias("mst_datetime"),
             pl.exclude("date", "time", "index")
             )
+        # Drops rows where datetime could not be determined
+        data = data.drop_nulls()
         # Defines UTC and local datetime
         data = data.select(
             pl.col("mst_datetime").dt.convert_time_zone(
@@ -123,7 +129,6 @@ def structure_2btech(raw_dir, struct_dir, inst, source):
                 ).alias("local_datetime"),
             pl.exclude("mst_datetime")
             ).collect()
-        print(raw_path)
         local_start = data["local_datetime"].min().strftime("%Y%m%d_%H%M%S")
         local_stop = data["local_datetime"].max().strftime("%Y%m%d_%H%M%S")
         
@@ -146,4 +151,3 @@ for inst in ["2BTech_202", "2BTech_205_A","2BTech_205_B", "2BTech_405nm"]:
             structure_2btech(RAW_DATA_DIR, STRUCT_DATA_DIR, inst, source)
         except FileNotFoundError:
             continue
- 
