@@ -23,7 +23,7 @@ STRUCT_DATA_DIR = RAW_DATA_DIR.replace("Raw", "Structured")
 if not os.path.exists(STRUCT_DATA_DIR):
     os.makedirs(STRUCT_DATA_DIR)
 
-def structure_2b_o3(raw_dir, struct_dir, inst, source):
+def structure_2btech(raw_dir, struct_dir, inst, source):
     
     # Path to directory containing raw data from declared instrument and source
     raw_dir = os.path.join(raw_dir,
@@ -39,19 +39,35 @@ def structure_2b_o3(raw_dir, struct_dir, inst, source):
         # PLAN: Create a text file that lists the files that have already been structured and read it in here
         pass
     
-    schemas = [{"o3_ppb": pl.Float64(),
-                "temp_C": pl.Float64(),
-                "press_mbar": pl.Float64(),
-                "flow_ccm": pl.Float64(),
-                "date": pl.String(),
-                "time": pl.String()},
-               {"index": pl.Int64(),
-                "o3_ppb": pl.Float64(),
-                "temp_C": pl.Float64(),
-                "press_mbar": pl.Float64(),
-                "flow_ccm": pl.Float64(),
-                "date": pl.String(),
-                "time": pl.String()}]
+    if inst == "2BTech_405nm":
+        schemas = [{"no2_ppb": pl.Float64(),
+                    "no_ppb": pl.Float64(),
+                    "nox_ppb": pl.Float64(),
+                    "cell_temp_C": pl.Float64(),
+                    "cell_press_mbar": pl.Float64(),
+                    "cell_flow_ccm": pl.Float64(),
+                    "o3_flow_ccm": pl.Float64(),
+                    "photodiode_voltage_V": pl.Float64(),
+                    "o3_voltage_V": pl.Float64(),
+                    "scrubber_temp_C": pl.Float64(),
+                    "error_byte": pl.String(),
+                    "date": pl.String(),
+                    "time": pl.String(),
+                    "status": pl.Int64()}]
+    else:
+        schemas = [{"o3_ppb": pl.Float64(),
+                    "temp_C": pl.Float64(),
+                    "press_mbar": pl.Float64(),
+                    "flow_ccm": pl.Float64(),
+                    "date": pl.String(),
+                    "time": pl.String()},
+                   {"index": pl.Int64(),
+                    "o3_ppb": pl.Float64(),
+                    "temp_C": pl.Float64(),
+                    "press_mbar": pl.Float64(),
+                    "flow_ccm": pl.Float64(),
+                    "date": pl.String(),
+                    "time": pl.String()}]
     
     for file in os.listdir(raw_dir):
         raw_path = os.path.join(raw_dir, file)
@@ -74,7 +90,8 @@ def structure_2b_o3(raw_dir, struct_dir, inst, source):
         if data is None:
             continue
         # Drops rows not matching provided schema
-        data = data.filter(~pl.all_horizontal(pl.all().is_null()))
+        # data = data.filter(~pl.all_horizontal(pl.all().is_null()))
+        data = data.drop_nulls()
         # Defines instrument datetime
         data = data.select(
             pl.concat_str(
@@ -113,4 +130,6 @@ def structure_2b_o3(raw_dir, struct_dir, inst, source):
         # Writes structured data to CSV file
         data.write_csv(struct_path)
 
-structure_2b_o3(RAW_DATA_DIR, STRUCT_DATA_DIR, "2BTech_205_A", "SD")
+
+structure_2b_o3(RAW_DATA_DIR, STRUCT_DATA_DIR, "2BTech_405nm", "SD")
+
