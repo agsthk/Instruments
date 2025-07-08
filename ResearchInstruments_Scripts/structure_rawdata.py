@@ -218,6 +218,95 @@ def structure_thermo(raw_dir, struct_dir):
         # Writes structured data to CSV file
         data.write_csv(struct_path)
 
+def structure_licor(raw_dir, struct_dir, inst):
+    # Path to directory containing raw data from declared instrument and source
+    raw_dir = os.path.join(raw_dir,
+                           inst + "_RawData",
+                           inst + "_RawLoggerData")
+    # Path to directory containing corresponding structured data
+    struct_dir = os.path.join(struct_dir,
+                              inst + "_StructuredData",
+                              inst + "_StructuredLoggerData")
+    if not os.path.exists(struct_dir):
+        os.makedirs(struct_dir)
+    else:
+        # PLAN: Create a text file that lists the files that have already been structured and read it in here
+        pass
+    
+    columns = {"CO2(ppm)": "co2_ppm",
+               "H2O(ppt)": "h2o_ppt",
+               "H2O(C)": "h2o_C",
+               "Cell_Temperature(C)": "cell_temp_C",
+               "Cell_Pressure(kPa)": "cell_press_kPa",
+               "CO2_Absorption": "co2_abs",
+               "H2O_Absorption": "h2o_abs"}
+    
+    for file in os.listdir(raw_dir):
+        raw_path = os.path.join(raw_dir, file)
+        
+        data = pd.read_csv(raw_path, delimiter="\s+", skiprows=1)
+        data = pl.from_pandas(data).lazy()
+        
+        # Defines instrument datetime
+        data = data.select(
+            pl.concat_str(
+                [pl.col("Date(Y-M-D)"), pl.col("Time(H:M:S)")],
+                separator=" "
+                ).str.to_datetime(
+                    "%Y-%m-%d %H:%M:%S"
+                    ).alias("local_datetime"),
+           pl.exclude("Date(Y-M-D)", "Time(H:M:S)")
+           )
+        try:
+            data = data.with_columns(
+                pl.col("local_datetime").dt.replace_time_zone(
+                    time_zone="America/Denver"
+                    )
+                ).collect()
+        # Handles ambiguous datetimes due to daylight savings
+        except pl.exceptions.ComputeError:
+            data = data.with_row_index()
+            mdt_i = data.filter(
+                pl.col(
+                    "local_datetime"
+                    ).shift(-1).sub(
+                        pl.col("local_datetime")
+                        ).lt(0)
+                        ).collect()["index"][0]
+            data = data.with_columns(
+                pl.when(pl.col("index").le(mdt_i))
+                .then(pl.col("local_datetime").dt.replace_time_zone(
+                    time_zone="America/Denver",
+                    ambiguous="earliest"
+                    ))
+                .otherwise(pl.col("local_datetime").dt.replace_time_zone(
+                    time_zone="America/Denver",
+                    ambiguous="latest"
+                    )),
+                pl.exclude("index", "local_datetime")
+                ).collect()
+        # Defines UTC datetime
+        data = data.select(
+           pl.col("local_datetime").dt.convert_time_zone(
+               "UTC"
+               ).alias("utc_datetime"),
+           pl.all()
+           ).rename(columns)
+        
+        local_start = data["local_datetime"].min().strftime("%Y%m%d_%H%M%S")
+        local_stop = data["local_datetime"].max().strftime("%Y%m%d_%H%M%S")
+        
+        struct_file_name = (inst
+                            + "_StructuredLoggerData_"
+                            + local_start 
+                            + "_" 
+                            + local_stop 
+                            + ".csv")
+
+        struct_path = os.path.join(struct_dir, struct_file_name)
+        # Writes structured data to CSV file
+        data.write_csv(struct_path)
+
 # for inst in ["2BTech_202", "2BTech_205_A","2BTech_205_B", "2BTech_405nm"]:
 #     for source in ["Logger", "SD"]:
 #         try:
@@ -225,4 +314,5 @@ def structure_thermo(raw_dir, struct_dir):
 #         except FileNotFoundError:
 #             continue
 
-structure_thermo(RAW_DATA_DIR, STRUCT_DATA_DIR)
+# structure_thermo(RAW_DATA_DIR, STRUCT_DATA_DIR)
+structure_licor(RAW_DATA_DIR, STRUCT_DATA_DIR, "LI-COR_LI-840A_A")
