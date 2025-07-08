@@ -315,4 +315,4 @@ def structure_licor(raw_dir, struct_dir, inst):
 #             continue
 
 # structure_thermo(RAW_DATA_DIR, STRUCT_DATA_DIR)
-structure_licor(RAW_DATA_DIR, STRUCT_DATA_DIR, "LI-COR_LI-840A_A")
+# structure_licor(RAW_DATA_DIR, STRUCT_DATA_DIR, "LI-COR_LI-840A_B")
