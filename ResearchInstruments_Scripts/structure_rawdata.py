@@ -24,7 +24,6 @@ if not os.path.exists(STRUCT_DATA_DIR):
     os.makedirs(STRUCT_DATA_DIR)
 
 def structure_2btech(raw_dir, struct_dir, inst, source):
-    
     # Path to directory containing raw data from declared instrument and source
     raw_dir = os.path.join(raw_dir,
                            inst + "_RawData",
@@ -80,7 +79,17 @@ def structure_2btech(raw_dir, struct_dir, inst, source):
             try:
                 data.collect()
             except pl.exceptions.SchemaError:
-                continue
+                data = pl.scan_csv(raw_path,
+                                   has_header=False,
+                                   schema=schema,
+                                   ignore_errors=True,
+                                   skip_rows=1)
+                try:
+                    data.collect()
+                except:
+                    continue
+                else:
+                    break
             # Skips empty files
             except pl.exceptions.NoDataError:
                 data = None
@@ -114,7 +123,7 @@ def structure_2btech(raw_dir, struct_dir, inst, source):
                 ).alias("local_datetime"),
             pl.exclude("mst_datetime")
             ).collect()
-        
+        print(raw_path)
         local_start = data["local_datetime"].min().strftime("%Y%m%d_%H%M%S")
         local_stop = data["local_datetime"].max().strftime("%Y%m%d_%H%M%S")
         
@@ -131,5 +140,10 @@ def structure_2btech(raw_dir, struct_dir, inst, source):
         data.write_csv(struct_path)
 
 
-structure_2b_o3(RAW_DATA_DIR, STRUCT_DATA_DIR, "2BTech_405nm", "SD")
-
+for inst in ["2BTech_202", "2BTech_205_A","2BTech_205_B", "2BTech_405nm"]:
+    for source in ["Logger", "SD"]:
+        try:
+            structure_2btech(RAW_DATA_DIR, STRUCT_DATA_DIR, inst, source)
+        except FileNotFoundError:
+            continue
+ 
