@@ -273,7 +273,7 @@ def structure_licor(raw_dir, struct_dir, inst):
                         pl.col("local_datetime")
                         ).lt(0)
                         ).collect()["index"][0]
-            data = data.with_columns(
+            data = data.select(
                 pl.when(pl.col("index").le(mdt_i))
                 .then(pl.col("local_datetime").dt.replace_time_zone(
                     time_zone="America/Denver",
@@ -283,7 +283,7 @@ def structure_licor(raw_dir, struct_dir, inst):
                     time_zone="America/Denver",
                     ambiguous="latest"
                     )),
-                pl.exclude("index", "local_datetime")
+                pl.exclude("index")
                 ).collect()
         # Defines UTC datetime
         data = data.select(
@@ -370,6 +370,102 @@ def structure_picarro(raw_dir, struct_dir, source):
         # Writes structured data to CSV file
         data.write_csv(struct_path)
 
+
+def structure_temprhdoor(raw_dir, struct_dir):
+    raw_dir = os.path.join(raw_dir,
+                           "TempRHDoor_RawData",
+                           "TempRHDoor_RawIgorData")
+    
+    struct_dir = os.path.join(struct_dir,
+                              "TempRHDoor_StructuredData",
+                              "TempRHDoor_StructuredIgorData")
+
+    if not os.path.exists(struct_dir):
+        os.makedirs(struct_dir)
+    else:
+        # PLAN: Create a text file that lists the files that have already been structured and read it in here
+        pass
+        
+    columns = {" Ch0Volts": "ch0_volt_V",
+               " Vaisala_Temp": "temp_C",
+               " Ch1Volts": "ch1_volt_V",
+               " Vaisala_RH": "RH",
+               " TC3_Temp": "tc3_temp_C",
+               " TC5_Temp": "tc5_temp_C",
+               " TC7_Temp": "tc7_temp_C",
+               " DoorStatus": "doorstatus"}
+        
+    for file in os.listdir(raw_dir):
+        raw_path = os.path.join(raw_dir, file)
+        data = pd.read_csv(raw_path)
+        try:
+            data = pl.from_pandas(data).lazy()
+        except:
+            print(raw_path)
+            continue
+        if " Date" not in data.collect_schema().names():
+            print(raw_path)
+            continue
+        # Defines instrument datetime
+        data = data.select(
+            pl.concat_str(
+                [pl.col(" Date"), pl.col(" Time")],
+                separator=" "
+                ).str.to_datetime(
+                    "%Y-%m-%d %H:%M:%S"
+                    ).alias("local_datetime"),
+           pl.exclude(" Date", " Time")
+           )
+
+        try:
+            data = data.with_columns(
+                pl.col("local_datetime").dt.replace_time_zone(
+                    time_zone="America/Denver"
+                    )
+                ).collect()
+        # Handles ambiguous datetimes due to daylight savings
+        except pl.exceptions.ComputeError:
+            data = data.with_row_index()
+            mdt_i = data.filter(
+                pl.col(
+                    "local_datetime"
+                    ).shift(-1).sub(
+                        pl.col("local_datetime")
+                        ).lt(0)
+                        ).collect()["index"][0]
+            data = data.select(
+                pl.when(pl.col("index").le(mdt_i))
+                .then(pl.col("local_datetime").dt.replace_time_zone(
+                    time_zone="America/Denver",
+                    ambiguous="earliest"
+                    ))
+                .otherwise(pl.col("local_datetime").dt.replace_time_zone(
+                    time_zone="America/Denver",
+                    ambiguous="latest"
+                    )),
+                pl.exclude("index")
+                ).collect()
+        # Defines UTC datetime
+        data = data.select(
+           pl.col("local_datetime").dt.convert_time_zone(
+               "UTC"
+               ).alias("utc_datetime"),
+           pl.exclude("index", "IgorTime")
+           ).rename(columns)
+            
+        local_start = data["local_datetime"].min().strftime("%Y%m%d_%H%M%S")
+        local_stop = data["local_datetime"].max().strftime("%Y%m%d_%H%M%S")
+        
+        struct_file_name = ("TempRHDoor_StructuredIgorData_"
+                            + local_start 
+                            + "_" 
+                            + local_stop 
+                            + ".csv")
+
+        struct_path = os.path.join(struct_dir, struct_file_name)
+        # Writes structured data to CSV file
+    return data
+        # data.write_csv(struct_path)
 # for inst in ["2BTech_202", "2BTech_205_A","2BTech_205_B", "2BTech_405nm"]:
 #     for source in ["Logger", "SD"]:
 #         try:
@@ -379,4 +475,8 @@ def structure_picarro(raw_dir, struct_dir, source):
 
 # structure_thermo(RAW_DATA_DIR, STRUCT_DATA_DIR)
 # structure_licor(RAW_DATA_DIR, STRUCT_DATA_DIR, "LI-COR_LI-840A_B")
-structure_picarro(RAW_DATA_DIR, STRUCT_DATA_DIR, "Logger")
+# structure_picarro(RAW_DATA_DIR, STRUCT_DATA_DIR, "Logger")
+
+test = structure_temprhdoor(RAW_DATA_DIR, STRUCT_DATA_DIR)
+
+test
