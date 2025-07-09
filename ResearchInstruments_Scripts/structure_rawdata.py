@@ -307,6 +307,69 @@ def structure_licor(raw_dir, struct_dir, inst):
         # Writes structured data to CSV file
         data.write_csv(struct_path)
 
+def structure_picarro(raw_dir, struct_dir, source):
+    # Path to directory containing raw data from declared source
+    raw_dir = os.path.join(raw_dir,
+                           "Picarro_G2307_RawData",
+                           "Picarro_G2307_RawLoggerData")
+    # Path to directory containing corresponding structured data
+    struct_dir = os.path.join(struct_dir,
+                              "Picarro_G2307_StructuredData",
+                              "Picarro_G2307_StructuredLoggerData")
+    if not os.path.exists(struct_dir):
+        os.makedirs(struct_dir)
+    else:
+        # PLAN: Create a text file that lists the files that have already been structured and read it in here
+        pass
+    
+    columns = {"H2CO": "hcho_ppm",
+               "H2CO_30s": "hcho_30s_ppm",
+               "H2CO_2min": "hcho_2min_ppm",
+               "H2CO_5min": "hcho_5min_ppm",
+               "CH4": "ch4_ppm",
+               "H2O": "h2o_perc",
+               "solenoid_valves": "solenoid_valves",
+               "MPVPosition": "mpv",
+               "ALARM_STATUS": "alarm",
+               "INST_STATUS": "status",
+               "species": "species",
+               "CavityTemp": "cavity_temp_C",
+               "CavityPressure": "cavity_press_torr",
+               "WarmBoxTemp": "warmbox_temp_C",
+               "DasTemp": "das_temp_C",
+               "EtalonTemp": "etalon_temp_C",
+               "OutletValve": "valve_DN"}
+    for file in os.listdir(raw_dir):
+        raw_path = os.path.join(raw_dir, file)
+        
+        data = pd.read_hdf(raw_path, "results")
+        data["utc_datetime"] = pd.to_datetime(data["DATE_TIME"],
+                                              utc=True,
+                                              unit="s")
+        
+        data = pl.from_pandas(data)
+        
+        data = data.select(
+            pl.col("utc_datetime"),
+            pl.col("utc_datetime").dt.convert_time_zone(
+                time_zone="America/Denver"
+                ).alias("local_datetime"),
+            *columns.keys()
+            ).rename(columns)
+        
+        local_start = data["local_datetime"].min().strftime("%Y%m%d_%H%M%S")
+        local_stop = data["local_datetime"].max().strftime("%Y%m%d_%H%M%S")
+        
+        struct_file_name = ("Picarro_G2307_StructuredLoggerData_"
+                            + local_start 
+                            + "_" 
+                            + local_stop 
+                            + ".csv")
+
+        struct_path = os.path.join(struct_dir, struct_file_name)
+        # Writes structured data to CSV file
+        data.write_csv(struct_path)
+
 # for inst in ["2BTech_202", "2BTech_205_A","2BTech_205_B", "2BTech_405nm"]:
 #     for source in ["Logger", "SD"]:
 #         try:
@@ -316,3 +379,4 @@ def structure_licor(raw_dir, struct_dir, inst):
 
 # structure_thermo(RAW_DATA_DIR, STRUCT_DATA_DIR)
 # structure_licor(RAW_DATA_DIR, STRUCT_DATA_DIR, "LI-COR_LI-840A_B")
+structure_picarro(RAW_DATA_DIR, STRUCT_DATA_DIR, "Logger")
