@@ -24,6 +24,264 @@ STRUCT_DATA_DIR = RAW_DATA_DIR.replace("Raw", "Structured")
 if not os.path.exists(STRUCT_DATA_DIR):
     os.makedirs(STRUCT_DATA_DIR)
 
+schemas = {
+    "2BTech_202": {
+        "Logger": {
+            "o3_ppb": pl.Float64(),
+            "temp_C": pl.Float64(),
+            "press_mbar": pl.Float64(),
+            "flow_ccm": pl.Float64(),
+            "date": pl.String(),
+            "time": pl.String()
+            }
+        },
+    "2BTech_405nm": {
+        "SD": {
+            "no2_ppb": pl.Float64(),
+            "no_ppb": pl.Float64(),
+            "nox_ppb": pl.Float64(),
+            "cell_temp_C": pl.Float64(),
+            "cell_press_mbar": pl.Float64(),
+            "cell_flow_ccm": pl.Float64(),
+            "o3_flow_ccm": pl.Float64(),
+            "photodiode_voltage_V": pl.Float64(),
+            "o3_voltage_V": pl.Float64(),
+            "scrubber_temp_C": pl.Float64(),
+            "error_byte": pl.String(),
+            "date": pl.String(),
+            "time": pl.String(),
+            "status": pl.Int64()
+            }
+        },
+    "LI-COR_LI-840A_A": {
+        "Logger": {
+            "date": pl.String(),
+            "time": pl.String(),
+            "co2_ppm": pl.Float64(),
+            "h2o_ppt": pl.Float64(),
+            "h2o_C": pl.Float64(),
+            "cell_temp_C": pl.Float64(),
+            "cell_press_kPa": pl.Float64(),
+            "co2_abs": pl.Float64(),
+            "h2o_abs": pl.Float64()
+            }
+        },
+    "Picarro_G2307": {
+        "Logger": {
+            "ALARM_STATUS": pl.Float64(),
+            "CH4": pl.Float64(),
+            "CavityPressure": pl.Float64(),
+            "CavityTemp": pl.Float64(),
+            "DATE_TIME": pl.Float64(),
+            "DasTemp": pl.Float64(),
+            "EPOCH_TIME": pl.Float64(),
+            "EtalonTemp": pl.Float64(),
+            "FRAC_DAYS_SINCE_JAN1": pl.Float64(),
+            "FRAC_HRS_SINCE_JAN1": pl.Float64(),
+            "H2CO": pl.Float64(),
+            "H2CO_2min": pl.Float64(),
+            "H2CO_30s": pl.Float64(),
+            "H2CO_5min": pl.Float64(),
+            "H2O": pl.Float64(),
+            "INST_STATUS": pl.Float64(),
+            "JULIAN_DAYS": pl.Float64(),
+            "MPVPosition": pl.Float64(),
+            "OutletValve": pl.Float64(),
+            "WarmBoxTemp": pl.Float64(),
+            "solenoid_valves": pl.Float64(),
+            "species": pl.Float64()
+            },
+        "DAQ": {
+            "unixtime": pl.Float64(),
+            "cavity_press_torr": pl.Float64(),
+            "cavity_temp_C": pl.Float64(),
+            "das_temp_C": pl.Float64(),
+            "etalon_temp_C": pl.Float64(),
+            "warmbox_temp_C": pl.Float64(),
+            "species": pl.Float64(),
+            "mpv_position": pl.Float64(),
+            "outlet_valve_DN": pl.Float64(),
+            "solenoid_valves": pl.Float64(),
+            "hcho_ppm": pl.Float64(),
+            "hcho_30s_ppm": pl.Float64(),
+            "hcho_2min_ppm": pl.Float64(),
+            "hcho_5min_ppm": pl.Float64(),
+            "h2o_perc": pl.Float64(),
+            "ch4_ppm": pl.Float64(),
+            "ymd": pl.Float64(),
+            "hms": pl.Float64(),
+            "utc_datetime": pl.Datetime(time_zone="UTC"),
+            "warm": pl.Int64()
+            }
+        },
+    "Teledyne_N300": {
+        "Logger": {}
+        },
+    "TempRHDoor": {
+        "Igor": {
+            "igortime": pl.Int64(),
+            "date": pl.String(),
+            "time": pl.String(),
+            "ch0_volt_V": pl.Float64(),
+            "temp_C": pl.Float64(),
+            "ch1_volt_V": pl.Float64(),
+            "rh": pl.Float32(),
+            "tc3_temp_C": pl.Float64(),
+            "tc5_temp_C": pl.Float64(),
+            "tc7_temp_C": pl.Float64(),
+            "doorstatus": pl.Int64()
+            }
+        },
+    "ThermoScientific_42i-TL": {
+        "Logger": {
+            "time": pl.String(),
+            "date": pl.String(),
+            "flags": pl.String(),
+            "no_ppb": pl.Float64(),
+            "nox_ppb": pl.Float64(),
+            "hi_no": pl.Int64(),
+            "hi_nox": pl.Int64(),
+            "press_mmHg": pl.Float64(),
+            "pmt_temp_C": pl.Float64(),
+            "internal_temp_C": pl.Float64(),
+            "chamber_temp_C": pl.Float64(),
+            "converter_temp_C": pl.Float64(),
+            "sample_flow_LPM": pl.Float64(),
+            "o3_flow_LPM": pl.Float64(),
+            "pmt_voltage_V": pl.Float64()
+            },
+        "DAQ": {
+            "time": pl.String(),
+            "date": pl.String(),
+            "flags": pl.String(),
+            "no_ppb": pl.Float64(),
+            "no2_ppb": pl.Float64(),
+            "chamber_temp_C": pl.Float64(),
+            "pmt_voltage_V": pl.Float64(),
+            "internal_temp_C": pl.Float64(),
+            "press_mmHg": pl.Float64(),
+            "sample_flow_LPM": pl.Float64(),
+            "o3_flow_LPM": pl.Float64(),
+            "utc_datetime": pl.Datetime(time_zone="UTC"),
+            "warm": pl.Int64()
+            }
+        }
+    }
+
+
+schemas["2BTech_202"]["SD"] = schemas["2BTech_202"]["Logger"]
+schemas["2BTech_202"]["DAQ"] = (
+    schemas["2BTech_202"]["Logger"]
+    | {"utc_datetime": pl.Datetime(time_zone="UTC"),
+       "warm": pl.Int64()}
+    )
+schemas["2BTech_205_A"] = schemas["2BTech_205_B"] = schemas["2BTech_202"]
+schemas["LI-COR_LI-840A_B"] = schemas["LI-COR_LI-840A_A"]
+
+def read_daqdata(path, schema):
+    
+    try:
+        data = pl.read_csv(path,
+                           has_header=False,
+                           schema=schema,
+                           ignore_errors=True,
+                           skip_rows=1,
+                           truncate_ragged_lines=True)
+    except pl.exceptions.SchemaError:
+        data = pd.read_csv(path,
+                           sep=",\s+|,+|\s+",
+                           names=schemas.keys(),
+                           skiprows=1,
+                           engine="python",
+                           on_bad_lines="warn")
+        data = pl.from_pandas(data, schema_overrides=schema)
+    finally:
+        return data
+   
+def read_2bdata(path, schema):
+    i = 0
+    while i < 2:
+        try:
+            data = pl.read_csv(path,
+                               skip_rows=i,
+                               has_header=False,
+                               schema=schema,
+                               ignore_errors=True)
+        except pl.exceptions.ComputeError:
+            if i == 1:
+                schema = {"index": pl.Int64()} | schema
+                i = 0
+            else:
+                i += 1
+        else:
+            break
+    data = data.drop_nulls()
+    return data
+
+
+def read_housekeeping(path, schema):
+    data = pd.read_csv(path,
+                       sep=", |,",
+                       names=schema.keys(),
+                       skiprows=0,
+                       engine="python",
+                       on_bad_lines="warn")
+    try:
+        data = pl.from_pandas(data, schema_overrides=schema).lazy()
+    except:
+        data = pd.read_csv(path,
+                           sep=", |,",
+                           names=schema.keys(),
+                           skiprows=1,
+                           engine="python",
+                           on_bad_lines="warn")
+        data = pl.from_pandas(data, schema_overrides=schema).lazy()
+    finally:
+        return data
+
+def read_rawdata(path, inst, source, schema):
+    
+    if source == "DAQ":
+        data = read_daqdata(path, schema)
+    elif inst == "Picarro_G2307":
+        data = pd.read_hdf(path, "results")
+    elif inst.find("2BTech") != -1:
+        data = read_2bdata(path, schema)
+    elif inst == "ThermoScientific_42i-TL":
+        data = pd.read_csv(path,
+                           sep="\s+",
+                           names=schema.keys(),
+                           skiprows=6,
+                           on_bad_lines="warn")
+    elif inst.find("LI-COR") != -1:
+        data = pl.scan_csv(path,
+                           separator=" ",
+                           has_header=False,
+                           schema=schema,
+                           ignore_errors=True,
+                           skip_rows=2)
+    elif inst == "TempRHDoor":
+        data = read_housekeeping(path, schema)
+    return data
+        
+    
+for subdir in os.listdir(RAW_DATA_DIR):
+    path = os.path.join(RAW_DATA_DIR, subdir)
+    for subdir2 in os.listdir(path):
+        path2 = os.path.join(path, subdir2)
+        inst, source = subdir2[:-4].split("_Raw")
+        schema = schemas[inst][source]
+        if inst.find("2BTech") == -1:
+            continue
+        for file in os.listdir(path2):
+            path3 = os.path.join(path2, file)
+
+            data = read_rawdata(path3, inst, source, schema)
+
+
+
+       
+
 def structure_2btech(raw_dir, struct_dir, inst, source):
     # Path to directory containing raw data from declared instrument and source
     raw_dir = os.path.join(raw_dir,
