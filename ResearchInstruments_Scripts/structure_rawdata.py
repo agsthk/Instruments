@@ -72,7 +72,7 @@ schemas = {
             "CH4": pl.Float64(),
             "CavityPressure": pl.Float64(),
             "CavityTemp": pl.Float64(),
-            "DATE_TIME": pl.Float64(),
+            "DATE_TIME": pl.Datetime(time_zone="UTC"),
             "DasTemp": pl.Float64(),
             "EPOCH_TIME": pl.Float64(),
             "EtalonTemp": pl.Float64(),
@@ -232,13 +232,43 @@ def read_temprhdoor(path, schema):
                        schema=schema,
                        ignore_errors=True,
                        eol_char="\r")
+    data = data.drop_nulls()
     return data
 
+def read_picarro(path, schema):
+    rename = {"DATE_TIME": "utc_datetime",
+              "ALARM_STATUS": "alarm_status",
+              "INST_STATUS": "inst_status",
+              "CavityPressure": "cavity_press_torr",
+              "CavityTemp": "cavity_temp_C",
+              "DasTemp": "das_temp_C",
+              "EtalonTemp": "etalon_temp_C",
+              "WarmBoxTemp": "warmbox_temp_C",
+              "species": "species",
+              "MPVPosition": "mpv_position",
+              "OutletValve": "outlet_valve_DN",
+              "solenoid_valves": "solenoid_valves",
+              "H2CO": "hcho_ppm",
+              "H2CO_30s": "hcho_30s_ppm",
+              "H2CO_2min": "hcho_2min_ppm",
+              "H2CO_5min": "hcho_5min_ppm",
+              "H2O": "h2o_perc",
+              "CH4": "ch4_ppm"}
+    data = pd.read_hdf(path, "results")
+    data["DATE_TIME"] = pd.to_datetime(data["DATE_TIME"],
+                                       utc=True,
+                                       unit="s")
+    data = pl.from_pandas(data, schema_overrides=schema)
+    data = data.select(
+        *rename.keys()
+        ).rename(rename)
+    return data
+    
 def read_rawdata(path, inst, source, schema):
     if source == "DAQ":
         data = read_daqdata(path, schema)
     elif inst == "Picarro_G2307":
-        data = pd.read_hdf(path, "results")
+        data = read_picarro(path, schema)
     elif inst.find("2BTech") != -1:
         data = read_2bdata(path, schema)
     elif inst == "ThermoScientific_42i-TL":
@@ -246,6 +276,7 @@ def read_rawdata(path, inst, source, schema):
                            sep="\s+",
                            names=schema.keys(),
                            skiprows=6)
+        data = pl.from_pandas(data, schema_overrides=schema)
     elif inst.find("LI-COR") != -1:
         data = pl.scan_csv(path,
                            separator=" ",
@@ -256,7 +287,7 @@ def read_rawdata(path, inst, source, schema):
     elif inst == "TempRHDoor":
         data = read_temprhdoor(path, schema)
     return data
-        
+
 data = []
 
 for subdir in os.listdir(RAW_DATA_DIR):
@@ -265,11 +296,11 @@ for subdir in os.listdir(RAW_DATA_DIR):
         path2 = os.path.join(path, subdir2)
         inst, source = subdir2[:-4].split("_Raw")
         schema = schemas[inst][source]
-        if inst.find("TempRHDoor") == -1:
+        if inst.find("Picarro") == -1:
             continue
         for file in os.listdir(path2):
             path3 = os.path.join(path2, file)
-            print(file)
+
             data.append(read_rawdata(path3, inst, source, schema))
 
 def structure_2btech(raw_dir, struct_dir, inst, source):
