@@ -178,8 +178,7 @@ schemas["2BTech_202"]["DAQ"] = (
 schemas["2BTech_205_A"] = schemas["2BTech_205_B"] = schemas["2BTech_202"]
 schemas["LI-COR_LI-840A_B"] = schemas["LI-COR_LI-840A_A"]
 
-def read_daqdata(path, schema):
-    
+def read_daqdata(path, schema): 
     try:
         data = pl.read_csv(path,
                            has_header=False,
@@ -192,8 +191,7 @@ def read_daqdata(path, schema):
                            sep=",\s+|,+|\s+",
                            names=schemas.keys(),
                            skiprows=1,
-                           engine="python",
-                           on_bad_lines="warn")
+                           engine="python")
         data = pl.from_pandas(data, schema_overrides=schema)
     finally:
         data = data.drop_nulls()
@@ -219,29 +217,24 @@ def read_2bdata(path, schema):
     data = data.drop_nulls()
     return data
 
-
-def read_housekeeping(path, schema):
-    data = pd.read_csv(path,
-                       sep=", |,",
-                       names=schema.keys(),
-                       skiprows=0,
-                       engine="python",
-                       on_bad_lines="warn")
+def read_temprhdoor(path, schema):
+    with open(path, "r", encoding="utf-8") as file:
+        first_line = file.readline()
     try:
-        data = pl.from_pandas(data, schema_overrides=schema).lazy()
-    except:
-        data = pd.read_csv(path,
-                           sep=", |,",
-                           names=schema.keys(),
-                           skiprows=1,
-                           engine="python",
-                           on_bad_lines="warn")
-        data = pl.from_pandas(data, schema_overrides=schema).lazy()
-    finally:
-        return data
+        int(first_line.split(",")[0])
+    except ValueError:
+        i = 1
+    else:
+        i = 0
+    data = pl.read_csv(path,
+                       skip_rows=i,
+                       has_header=False,
+                       schema=schema,
+                       ignore_errors=True,
+                       eol_char="\r")
+    return data
 
 def read_rawdata(path, inst, source, schema):
-    
     if source == "DAQ":
         data = read_daqdata(path, schema)
     elif inst == "Picarro_G2307":
@@ -252,8 +245,7 @@ def read_rawdata(path, inst, source, schema):
         data = pd.read_csv(path,
                            sep="\s+",
                            names=schema.keys(),
-                           skiprows=6,
-                           on_bad_lines="warn")
+                           skiprows=6)
     elif inst.find("LI-COR") != -1:
         data = pl.scan_csv(path,
                            separator=" ",
@@ -262,7 +254,7 @@ def read_rawdata(path, inst, source, schema):
                            ignore_errors=True,
                            skip_rows=2)
     elif inst == "TempRHDoor":
-        data = read_housekeeping(path, schema)
+        data = read_temprhdoor(path, schema)
     return data
         
 data = []
@@ -273,16 +265,12 @@ for subdir in os.listdir(RAW_DATA_DIR):
         path2 = os.path.join(path, subdir2)
         inst, source = subdir2[:-4].split("_Raw")
         schema = schemas[inst][source]
-        if inst.find("2BTech") == -1:
+        if inst.find("TempRHDoor") == -1:
             continue
         for file in os.listdir(path2):
             path3 = os.path.join(path2, file)
-
+            print(file)
             data.append(read_rawdata(path3, inst, source, schema))
-
-data[143][:7]
-
-       
 
 def structure_2btech(raw_dir, struct_dir, inst, source):
     # Path to directory containing raw data from declared instrument and source
