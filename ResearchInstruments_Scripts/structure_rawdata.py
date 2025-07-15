@@ -307,19 +307,6 @@ def define_datetime(df, inst):
 
 data = {}
 
-
-data = data.lazy().select(
-    pl.concat_str(
-        [pl.col("date"), pl.col("time").str.strip_chars()],
-        separator=" "
-        ).str.to_datetime(
-            "%d/%m/%y %H:%M:%S",
-            strict=False
-            ).dt.replace_time_zone(
-                time_zone="MST"
-                ).alias("mst_datetime"),
-    pl.exclude("date", "time", "index")
-    )
 for subdir in os.listdir(RAW_DATA_DIR):
     path = os.path.join(RAW_DATA_DIR, subdir)
     for subdir2 in os.listdir(path):
