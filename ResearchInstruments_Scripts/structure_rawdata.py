@@ -72,7 +72,7 @@ schemas = {
             "CH4": pl.Float64(),
             "CavityPressure": pl.Float64(),
             "CavityTemp": pl.Float64(),
-            "DATE_TIME": pl.Datetime(time_zone="UTC"),
+            "DATE_TIME": pl.Float64(),
             "DasTemp": pl.Float64(),
             "EPOCH_TIME": pl.Float64(),
             "EtalonTemp": pl.Float64(),
@@ -255,9 +255,6 @@ def read_picarro(path, schema):
               "H2O": "h2o_perc",
               "CH4": "ch4_ppm"}
     data = pd.read_hdf(path, "results")
-    data["DATE_TIME"] = pd.to_datetime(data["DATE_TIME"],
-                                       utc=True,
-                                       unit="s")
     data = pl.from_pandas(data, schema_overrides=schema)
     data = data.select(
         *rename.keys()
@@ -296,11 +293,10 @@ for subdir in os.listdir(RAW_DATA_DIR):
         path2 = os.path.join(path, subdir2)
         inst, source = subdir2[:-4].split("_Raw")
         schema = schemas[inst][source]
-        if inst.find("Picarro") == -1:
+        if inst.find("Teledyne") != -1:
             continue
         for file in os.listdir(path2):
             path3 = os.path.join(path2, file)
-
             data.append(read_rawdata(path3, inst, source, schema))
 
 def structure_2btech(raw_dir, struct_dir, inst, source):
