@@ -168,7 +168,6 @@ schemas = {
         }
     }
 
-
 schemas["2BTech_202"]["SD"] = schemas["2BTech_202"]["Logger"]
 schemas["2BTech_202"]["DAQ"] = (
     schemas["2BTech_202"]["Logger"]
@@ -177,6 +176,14 @@ schemas["2BTech_202"]["DAQ"] = (
     )
 schemas["2BTech_205_A"] = schemas["2BTech_205_B"] = schemas["2BTech_202"]
 schemas["LI-COR_LI-840A_B"] = schemas["LI-COR_LI-840A_A"]
+
+datetime_fmts = {"2BTech_202": "%d/%m/%y %H:%M:%S",
+                 "LI-COR_LI-840A_A": "%Y-%m-%d %H:%M:%S",
+                 "TempRHDoor": "%Y-%m-%d %H:%M:%S",
+                 "ThermoScientific_42i-TL": "%m-%d-%y %H:%M"}
+for inst in ["2BTech_205_A", "2BTech_205_B", "2BTech_405nm"]:
+    datetime_fmts[inst] = datetime_fmts["2BTech_202"]
+datetime_fmts["LI-COR_LI-840A_B"] = datetime_fmts["LI-COR_LI-840A_A"]
 
 def read_daqdata(path, schema): 
     try:
@@ -285,8 +292,34 @@ def read_rawdata(path, inst, source, schema):
         data = read_temprhdoor(path, schema)
     return data
 
-data = []
+def define_datetime(df, inst):
+    df = df.select(
+        pl.concat_str(
+            [pl.col("date"), pl.col("time").str.strip_chars()],
+            separator=" "
+            ).str.to_datetime(
+                datetime_fmts[inst],
+                strict=False
+                ).alias("datetime"),
+        pl.exclude("date", "time")
+        )
+    return df
 
+data = {}
+
+
+data = data.lazy().select(
+    pl.concat_str(
+        [pl.col("date"), pl.col("time").str.strip_chars()],
+        separator=" "
+        ).str.to_datetime(
+            "%d/%m/%y %H:%M:%S",
+            strict=False
+            ).dt.replace_time_zone(
+                time_zone="MST"
+                ).alias("mst_datetime"),
+    pl.exclude("date", "time", "index")
+    )
 for subdir in os.listdir(RAW_DATA_DIR):
     path = os.path.join(RAW_DATA_DIR, subdir)
     for subdir2 in os.listdir(path):
@@ -295,9 +328,15 @@ for subdir in os.listdir(RAW_DATA_DIR):
         schema = schemas[inst][source]
         if inst.find("Teledyne") != -1:
             continue
+        data[inst] = []
         for file in os.listdir(path2):
             path3 = os.path.join(path2, file)
-            data.append(read_rawdata(path3, inst, source, schema))
+            data[inst].append(read_rawdata(path3, inst, source, schema))
+
+for inst in data.keys():
+    if inst == "Picarro_G2307":
+        continue
+    print(define_datetime(data[inst][0], inst))
 
 def structure_2btech(raw_dir, struct_dir, inst, source):
     # Path to directory containing raw data from declared instrument and source
