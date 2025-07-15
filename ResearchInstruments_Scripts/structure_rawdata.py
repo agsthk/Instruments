@@ -196,6 +196,7 @@ def read_daqdata(path, schema):
                            on_bad_lines="warn")
         data = pl.from_pandas(data, schema_overrides=schema)
     finally:
+        data = data.drop_nulls()
         return data
    
 def read_2bdata(path, schema):
@@ -264,7 +265,8 @@ def read_rawdata(path, inst, source, schema):
         data = read_housekeeping(path, schema)
     return data
         
-    
+data = []
+
 for subdir in os.listdir(RAW_DATA_DIR):
     path = os.path.join(RAW_DATA_DIR, subdir)
     for subdir2 in os.listdir(path):
@@ -276,9 +278,9 @@ for subdir in os.listdir(RAW_DATA_DIR):
         for file in os.listdir(path2):
             path3 = os.path.join(path2, file)
 
-            data = read_rawdata(path3, inst, source, schema)
+            data.append(read_rawdata(path3, inst, source, schema))
 
-
+data[143][:7]
 
        
 
