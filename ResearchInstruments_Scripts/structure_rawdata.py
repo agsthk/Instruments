@@ -110,12 +110,29 @@ schemas = {
             "CH4_ppm": pl.Float64(),
             "YMD": pl.Float64(),
             "HMS": pl.Float64(),
-            "utc_datetime": pl.Datetime(time_zone="UTC"),
+            "UTC_DateTime": pl.Datetime(time_zone="UTC"),
             "WarmUp": pl.Int64()
             }
         },
     "Teledyne_N300": {
-        "Logger": {}
+        "Logger": {
+            "Local_DateTime": pl.String(),
+            "UTC_DateTime": pl.String(),
+            "AtmosphericPressure_Pa": pl.Float64(),
+            "BenchTemp_C": pl.Float64(),
+            "BoxTemp_C": pl.Float64(),
+            "CO_ppm": pl.Float64(),
+            "COStability_ppm": pl.Float64(),
+            "DetectorTemp_C": pl.Float64(),
+            "PeakIRMeasure_MV": pl.Float64(),
+            "PeakIRReference_MV": pl.Float64(),
+            "PHTDrive_mV": pl.Float64(),
+            "PumpDutyCycle": pl.Float64(),
+            "PumpFlow_ccm": pl.Float64(),
+            "SamplePressure_inHg": pl.Float64(),
+            "SampleTemp_C": pl.Float64(),
+            "WheelTemp_C": pl.Float64()
+            }
         },
     "TempRHDoor": {
         "Igor": {
@@ -162,7 +179,7 @@ schemas = {
             "ChamberPressure_mmHg": pl.Float64(),
             "SampleFlow_LPM": pl.Float64(),
             "O3Flow_LPM": pl.Float64(),
-            "utc_datetime": pl.Datetime(time_zone="UTC"),
+            "UTC_DateTime": pl.Datetime(time_zone="UTC"),
             "WarmUp": pl.Int64()
             }
         }
@@ -171,8 +188,8 @@ schemas = {
 schemas["2BTech_202"]["SD"] = schemas["2BTech_202"]["Logger"]
 schemas["2BTech_202"]["DAQ"] = (
     schemas["2BTech_202"]["Logger"]
-    | {"utc_datetime": pl.Datetime(time_zone="UTC"),
-       "warm": pl.Int64()}
+    | {"UTC_DateTime": pl.Datetime(time_zone="UTC"),
+       "WarmUp": pl.Int64()}
     )
 schemas["2BTech_205_A"] = schemas["2BTech_205_B"] = schemas["2BTech_202"]
 schemas["LI-COR_LI-840A_B"] = schemas["LI-COR_LI-840A_A"]
@@ -243,7 +260,7 @@ def read_temprhdoor(path, schema):
     return data
 
 def read_picarro(path, schema):
-    rename = {"DATE_TIME": "utc_datetime",
+    rename = {"DATE_TIME": "UTC_DateTime",
               "ALARM_STATUS": "AlarmStatus",
               "INST_STATUS": "InstrumentStatus",
               "CavityPressure": "CavityPressure_Torr",
@@ -282,7 +299,7 @@ def read_rawdata(path, inst, source, schema):
                            skiprows=6)
         data = pl.from_pandas(data, schema_overrides=schema)
     elif inst.find("LI-COR") != -1:
-        data = pl.scan_csv(path,
+        data = pl.read_csv(path,
                            separator=" ",
                            has_header=False,
                            schema=schema,
@@ -290,6 +307,13 @@ def read_rawdata(path, inst, source, schema):
                            skip_rows=2)
     elif inst == "TempRHDoor":
         data = read_temprhdoor(path, schema)
+    elif inst == "Teledyne_N300":
+        data = pl.read_csv(path,
+                           separator=",",
+                           has_header=False,
+                           schema=schema,
+                           ignore_errors=True,
+                           skip_rows=1)
     return data
 
 def define_datetime(df, inst):
@@ -313,13 +337,17 @@ for subdir in os.listdir(RAW_DATA_DIR):
         path2 = os.path.join(path, subdir2)
         inst, source = subdir2[:-4].split("_Raw")
         schema = schemas[inst][source]
-        if inst.find("Teledyne") != -1:
-            continue
         data[inst] = []
+        if inst.find("Teledyne") != -1:
+            for folder in os.listdir(path2):
+                path3 = os.path.join(path2, folder, "HIRES.txt")
+                data[inst].append(read_rawdata(path3, inst, source, schema))
+            continue
         for file in os.listdir(path2):
             path3 = os.path.join(path2, file)
             data[inst].append(read_rawdata(path3, inst, source, schema))
-
+            
+data["Teledyne_N300"]
 for inst in data.keys():
     if inst == "Picarro_G2307":
         continue
