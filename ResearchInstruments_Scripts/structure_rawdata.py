@@ -360,7 +360,32 @@ def define_datetime(df, inst):
                     ).alias("DateTime"),
             pl.exclude("Date", "Time")
             )
+    try:
+        df = df.with_columns(
+            pl.col("DateTime").dt.replace_time_zone(
+                time_zone=timezones[inst]
+                )
+            )
+    except pl.exceptions.ComputeError:
+        df = df.with_row_index()
+        dst_i = df.filter(
+            pl.col("DateTime").shift(-1).sub(pl.col("DateTime")).lt(0)
+            )["index"][0]
+        
+        df = df.select(
+            pl.when(pl.col("index").le(dst_i))
+            .then(pl.col("DateTime").dt.replace_time_zone(
+                time_zone=timezones[inst],
+                ambiguous="earliest"
+                ))
+            .otherwise(pl.col("DateTime").dt.replace_time_zone(
+                time_zone=timezones[inst],
+                ambiguous="latest"
+                )),
+            pl.exclude("index", "DateTime")
+            )
     return df
+
 
 data = {}
 
@@ -383,6 +408,9 @@ for subdir in os.listdir(RAW_DATA_DIR):
             
 for inst in data.keys():
     print(define_datetime(data[inst][-1], inst))
+    
+df = define_datetime(data["LI-COR_LI-840A_A"][-13], "LI-COR_LI-840A_A")
+
 
 def structure_2btech(raw_dir, struct_dir, inst, source):
     # Path to directory containing raw data from declared instrument and source
