@@ -117,7 +117,7 @@ schemas = {
     "Teledyne_N300": {
         "Logger": {
             "Local_DateTime": pl.String(),
-            "UTC_DateTime": pl.String(),
+            "DateTime": pl.String(),
             "AtmosphericPressure_Pa": pl.Float64(),
             "BenchTemp_C": pl.Float64(),
             "BoxTemp_C": pl.Float64(),
@@ -194,13 +194,34 @@ schemas["2BTech_202"]["DAQ"] = (
 schemas["2BTech_205_A"] = schemas["2BTech_205_B"] = schemas["2BTech_202"]
 schemas["LI-COR_LI-840A_B"] = schemas["LI-COR_LI-840A_A"]
 
-datetime_fmts = {"2BTech_202": "%d/%m/%y %H:%M:%S",
-                 "LI-COR_LI-840A_A": "%Y-%m-%d %H:%M:%S",
-                 "TempRHDoor": "%Y-%m-%d %H:%M:%S",
-                 "ThermoScientific_42i-TL": "%m-%d-%y %H:%M"}
+date_fmts = {"2BTech_202": "%d/%m/%y",
+             "LI-COR_LI-840A_A": "%Y-%m-%d",
+             "TempRHDoor": "%Y-%m-%d",
+             "ThermoScientific_42i-TL": "%m-%d-%y"}
+
 for inst in ["2BTech_205_A", "2BTech_205_B", "2BTech_405nm"]:
-    datetime_fmts[inst] = datetime_fmts["2BTech_202"]
-datetime_fmts["LI-COR_LI-840A_B"] = datetime_fmts["LI-COR_LI-840A_A"]
+    date_fmts[inst] = date_fmts["2BTech_202"]
+date_fmts["LI-COR_LI-840A_B"] = date_fmts["LI-COR_LI-840A_A"]
+
+time_fmts = {"2BTech_202": "%H:%M:%S",
+             "ThermoScientific_42i-TL": "%H:%M"}
+
+for inst in ["2BTech_205_A", "2BTech_205_B", "2BTech_405nm",
+             "LI-COR_LI-840A_A", "LI-COR_LI-840A_B", "TempRHDoor"]:
+    time_fmts[inst] = time_fmts["2BTech_202"]
+    
+datetime_fmts = {"Teledyne_N300": "%m/%d/%Y %H:%M:%S"}
+
+timezones = {"2BTech_202": "MST",
+             "2BTech_205_A": "MST",
+             "2BTech_205_B": "MST",
+             "2BTech_405nm": "MST",
+             "LI-COR_LI-840A_A": "America/Denver",
+             "LI-COR_LI-840A_B": "America/Denver",
+             "Picarro_G2307": "UTC",
+             "Teledyne_N300": "UTC", # NOT ALWAYS TRUE
+             "TempRHDoor": "America/Denver",
+             "ThermoScientific_42i-TL": "MST"}
 
 def read_daqdata(path, schema): 
     try:
@@ -220,7 +241,7 @@ def read_daqdata(path, schema):
     finally:
         data = data.drop_nulls()
         return data
-   
+
 def read_2bdata(path, schema):
     i = 0
     while i < 2:
@@ -260,7 +281,7 @@ def read_temprhdoor(path, schema):
     return data
 
 def read_picarro(path, schema):
-    rename = {"DATE_TIME": "UTC_DateTime",
+    rename = {"DATE_TIME": "DateTime",
               "ALARM_STATUS": "AlarmStatus",
               "INST_STATUS": "InstrumentStatus",
               "CavityPressure": "CavityPressure_Torr",
@@ -317,16 +338,28 @@ def read_rawdata(path, inst, source, schema):
     return data
 
 def define_datetime(df, inst):
-    df = df.select(
-        pl.concat_str(
-            [pl.col("date"), pl.col("time").str.strip_chars()],
-            separator=" "
-            ).str.to_datetime(
-                datetime_fmts[inst],
-                strict=False
-                ).alias("datetime"),
-        pl.exclude("date", "time")
-        )
+    if "DateTime" in df.columns:
+        try:
+            df = df.with_columns(
+                pl.from_epoch(pl.col("DateTime").mul(1e9), time_unit="ns")
+                )
+        except pl.exceptions.InvalidOperationError:
+            df = df.with_columns(
+                pl.col("DateTime").str.to_datetime(
+                    datetime_fmts[inst],
+                    )
+                )
+    else:
+        df = df.select(
+            pl.concat_str(
+                [pl.col("Date"), pl.col("Time").str.strip_chars()],
+                separator=""
+                ).str.to_datetime(
+                    date_fmts[inst] + time_fmts[inst],
+                    strict=False
+                    ).alias("DateTime"),
+            pl.exclude("Date", "Time")
+            )
     return df
 
 data = {}
@@ -337,7 +370,8 @@ for subdir in os.listdir(RAW_DATA_DIR):
         path2 = os.path.join(path, subdir2)
         inst, source = subdir2[:-4].split("_Raw")
         schema = schemas[inst][source]
-        data[inst] = []
+        if inst not in data.keys():
+            data[inst] = []
         if inst.find("Teledyne") != -1:
             for folder in os.listdir(path2):
                 path3 = os.path.join(path2, folder, "HIRES.txt")
@@ -347,11 +381,8 @@ for subdir in os.listdir(RAW_DATA_DIR):
             path3 = os.path.join(path2, file)
             data[inst].append(read_rawdata(path3, inst, source, schema))
             
-data["Teledyne_N300"]
 for inst in data.keys():
-    if inst == "Picarro_G2307":
-        continue
-    print(define_datetime(data[inst][0], inst))
+    print(define_datetime(data[inst][-1], inst))
 
 def structure_2btech(raw_dir, struct_dir, inst, source):
     # Path to directory containing raw data from declared instrument and source
