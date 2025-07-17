@@ -384,8 +384,18 @@ def define_datetime(df, inst):
                 )),
             pl.exclude("index", "DateTime")
             )
+    finally:
+        df = df.select(
+            pl.col("DateTime").dt.convert_time_zone(
+                "UTC"
+                ).alias("UTC_DateTime"),
+            pl.col("DateTime").dt.convert_time_zone(
+                "America/Denver"
+                ).alias("Local_DateTime"),
+            pl.exclude("DateTime", "Local_DateTime")
+            )
+        
     return df
-
 
 data = {}
 
