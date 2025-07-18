@@ -467,7 +467,12 @@ for inst in data.keys():
     for source in data[inst].keys():
         for date, df in data[inst][source].items():
             f_name = inst + "_Structured" + source + "Data_" + date + ".csv"
-            path = os.path.join(STRUCT_DATA_DIR,
-                                inst + "_Structured" + source + "Data",
+            f_dir = os.path.join(STRUCT_DATA_DIR,
+                                inst + "_StructuredData",
+                                inst + "_Structured" + source + "Data")
+            if not os.path.exists(f_dir):
+                os.makedirs(f_dir)
+            path = os.path.join(f_dir,
                                 f_name)
             df.write_csv(path)
+            
