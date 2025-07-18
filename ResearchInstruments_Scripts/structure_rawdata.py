@@ -463,3 +463,11 @@ for inst in data.keys():
         concat_df = pl.concat(data[inst][source]).sort("UTC_DateTime")
         data[inst][source] = split_by_date(concat_df)
 
+for inst in data.keys():
+    for source in data[inst].keys():
+        for date, df in data[inst][source].items():
+            f_name = inst + "_Structured" + source + "Data_" + date + ".csv"
+            path = os.path.join(STRUCT_DATA_DIR,
+                                inst + "_Structured" + source + "Data",
+                                f_name)
+            df.write_csv(path)
