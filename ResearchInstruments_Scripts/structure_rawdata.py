@@ -42,7 +42,7 @@ schemas = {
             "NOx_ppb": pl.Float64(),
             "CellTemp_C": pl.Float64(),
             "CellPressure_mbar": pl.Float64(),
-            "SamplFlow_ccm": pl.Float64(),
+            "SampleFlow_ccm": pl.Float64(),
             "O3Flow_ccm": pl.Float64(),
             "PhotodiodeVoltage_V": pl.Float64(),
             "O3Voltage_V": pl.Float64(),
@@ -399,7 +399,8 @@ def define_datetime(df, inst):
             pl.col("DateTime").dt.convert_time_zone(
                 "America/Denver"
                 ).alias("Local_DateTime"),
-            pl.exclude("DateTime", "Local_DateTime")
+            pl.exclude("DateTime", "Local_DateTime", "Date", "Time",
+                       "UnixTime", "YMD", "HMS", "IgorTime")
             )
         
     return df
@@ -432,9 +433,16 @@ for inst in data.keys():
                 pl.col("UTC_DateTime").dt.convert_time_zone(
                     "America/Denver"
                     ).alias("Local_DateTime"),
-                pl.exclude("UTC_DateTime", "Local_DateTime")
+                pl.exclude("UTC_DateTime", "DateTime", "Local_DateTime",
+                           "Date", "Time", "UnixTime", "YMD", "HMS",
+                           "IgorTime")
                 )
             dfs.append(df)
             continue
         dfs.append(define_datetime(df, inst))
     data[inst] = dfs
+
+for inst in data.keys():
+    for df in data[inst]:
+        print(df.columns)
+        break
