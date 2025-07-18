@@ -228,16 +228,33 @@ def read_daqdata(path, schema):
         data = pl.read_csv(path,
                            has_header=False,
                            schema=schema,
-                           ignore_errors=True,
                            skip_rows=1,
                            truncate_ragged_lines=True)
-    except pl.exceptions.SchemaError:
-        data = pd.read_csv(path,
-                           sep=",\s+|,+|\s+",
-                           names=schemas.keys(),
-                           skiprows=1,
-                           engine="python")
-        data = pl.from_pandas(data, schema_overrides=schema)
+    except pl.exceptions.ComputeError:
+        col_names = list(schema.keys())
+        i = col_names.index("UTC_DateTime")
+        col_names.insert(i, "UTC_Date")
+        try:
+            data = pd.read_csv(path,
+                               sep=",+\s*|\s+",
+                               names=col_names,
+                               skiprows=1,
+                               engine="python")
+        except pd.errors.ParserError:
+            data = pl.read_csv(path,
+                               has_header=False,
+                               schema=schema,
+                               ignore_errors=True,
+                               skip_rows=1,
+                               truncate_ragged_lines=True)
+        else:
+            data = data.dropna()
+            data["UTC_DateTime"] = pd.to_datetime(
+                data["UTC_Date"] + "T" + data["UTC_DateTime"],
+                format="ISO8601"
+                ) 
+            data = data.drop("UTC_Date", axis=1)
+            data = pl.from_pandas(data, schema_overrides=schema)
     finally:
         data = data.drop_nulls()
         return data
@@ -415,7 +432,7 @@ for subdir in os.listdir(RAW_DATA_DIR):
         for file in os.listdir(path2):
             path3 = os.path.join(path2, file)
             data[inst].append(read_rawdata(path3, inst, source, schema))
-            
+
 for inst in data.keys():
     dfs = []
     for df in data[inst]:
