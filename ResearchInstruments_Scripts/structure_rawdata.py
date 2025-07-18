@@ -417,6 +417,17 @@ for subdir in os.listdir(RAW_DATA_DIR):
             data[inst].append(read_rawdata(path3, inst, source, schema))
             
 for inst in data.keys():
-    print(define_datetime(data[inst][-1], inst))
-    
-df = define_datetime(data["LI-COR_LI-840A_A"][-13], "LI-COR_LI-840A_A")
+    dfs = []
+    for df in data[inst]:
+        if "UTC_DateTime" in df.columns:
+            df = df.select(
+                pl.col("UTC_DateTime"),
+                pl.col("UTC_DateTime").dt.convert_time_zone(
+                    "America/Denver"
+                    ).alias("Local_DateTime"),
+                pl.exclude("UTC_DateTime", "Local_DateTime")
+                )
+            dfs.append(df)
+            continue
+        dfs.append(define_datetime(df, inst))
+    data[inst] = dfs
