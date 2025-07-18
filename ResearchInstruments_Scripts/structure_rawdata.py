@@ -342,6 +342,7 @@ def read_rawdata(path, inst, source, schema):
                            schema=schema,
                            ignore_errors=True,
                            skip_rows=1)
+    data = data.drop_nulls()
     return data
 
 def define_datetime(df, inst):
@@ -400,10 +401,22 @@ def define_datetime(df, inst):
                 "America/Denver"
                 ).alias("Local_DateTime"),
             pl.exclude("DateTime", "Local_DateTime", "Date", "Time",
-                       "UnixTime", "YMD", "HMS", "IgorTime")
+                       "UnixTime", "YMD", "HMS", "IgorTime", "index")
             )
+    df = df.drop_nulls()
         
     return df
+
+def split_by_date(df):
+    df_with_date = df.with_columns(
+        pl.col("UTC_DateTime").dt.date().alias("Date")
+        )
+    df_by_date = df_with_date.partition_by(
+        "Date", include_key=False, as_dict=True
+        )
+    df_by_date = {key[0].strftime("%Y%m%d"): df
+                  for key, df in df_by_date.items()}
+    return df_by_date
 
 data = {}
 
@@ -414,35 +427,39 @@ for subdir in os.listdir(RAW_DATA_DIR):
         inst, source = subdir2[:-4].split("_Raw")
         schema = schemas[inst][source]
         if inst not in data.keys():
-            data[inst] = []
+            data[inst] = {}
+        if source not in data[inst].keys():
+            data[inst][source] = []
         if inst.find("Teledyne") != -1:
             for folder in os.listdir(path2):
                 path3 = os.path.join(path2, folder, "HIRES.txt")
-                data[inst].append(read_rawdata(path3, inst, source, schema))
+                data[inst][source].append(read_rawdata(path3, inst, source, schema))
             continue
         for file in os.listdir(path2):
             path3 = os.path.join(path2, file)
-            data[inst].append(read_rawdata(path3, inst, source, schema))
+            data[inst][source].append(read_rawdata(path3, inst, source, schema))
 
 for inst in data.keys():
-    dfs = []
-    for df in data[inst]:
-        if "UTC_DateTime" in df.columns:
-            df = df.select(
-                pl.col("UTC_DateTime"),
-                pl.col("UTC_DateTime").dt.convert_time_zone(
-                    "America/Denver"
-                    ).alias("Local_DateTime"),
-                pl.exclude("UTC_DateTime", "DateTime", "Local_DateTime",
-                           "Date", "Time", "UnixTime", "YMD", "HMS",
-                           "IgorTime")
-                )
-            dfs.append(df)
-            continue
-        dfs.append(define_datetime(df, inst))
-    data[inst] = dfs
+    for source in data[inst].keys():
+        dfs = []
+        for df in data[inst][source]:
+            if "UTC_DateTime" in df.columns:
+                df = df.select(
+                    pl.col("UTC_DateTime"),
+                    pl.col("UTC_DateTime").dt.convert_time_zone(
+                        "America/Denver"
+                        ).alias("Local_DateTime"),
+                    pl.exclude("UTC_DateTime", "DateTime", "Local_DateTime",
+                               "Date", "Time", "UnixTime", "YMD", "HMS",
+                               "IgorTime", "index")
+                    )
+                dfs.append(df)
+                continue
+            dfs.append(define_datetime(df, inst))
+        data[inst][source] = dfs
 
 for inst in data.keys():
-    for df in data[inst]:
-        print(df.columns)
-        break
+    for source in data[inst].keys():
+        concat_df = pl.concat(data[inst][source]).sort("UTC_DateTime")
+        data[inst][source] = split_by_date(concat_df)
+
