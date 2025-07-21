@@ -8,6 +8,7 @@ Created on Tue Jul  8 10:14:54 2025
 import os
 import polars as pl
 import pandas as pd
+from datetime import datetime
 
 # Declares full path to ResearchInstruments_Data/ directory
 data_dir = os.getcwd()
@@ -116,7 +117,7 @@ schemas = {
         },
     "Teledyne_N300": {
         "Logger": {
-            "Local_DateTime": pl.String(),
+            "FTC_DateTime": pl.String(),
             "DateTime": pl.String(),
             "AtmosphericPressure_Pa": pl.Float64(),
             "BenchTemp_C": pl.Float64(),
@@ -222,6 +223,46 @@ timezones = {"2BTech_202": "MST",
              "Teledyne_N300": "UTC", # NOT ALWAYS TRUE
              "TempRHDoor": "America/Denver",
              "ThermoScientific_42i-TL": "MST"}
+
+avg_times = {
+    "2BTech_202": {
+        "2024-01-18 20:39:16+00:00": "10s",
+        "2024-01-19 23:05:11+00:00": "60s"
+        },
+    "2BTech_205_A": {
+        "2022-09-30 18:49:04+00:00": "10s",
+        "2024-01-20 02:54:18+00:00": "60s",
+        "2024-01-19 17:22:26+00:00": "10s",
+        "2024-01-19 23:05:18+00:00": "60s",
+        "2024-03-11 19:27:01+00:00": "2s",
+        "2024-03-11 23:30:47+00:00": "60s",
+        "2024-06-04 16:21:24+00:00": "2s",
+        "2024-06-04 19:01:29+00:00": "60s",
+        "2024-06-05 21:11:14+00:00": "2s",
+        "2024-06-11 14:03:39+00:00": "60s",
+        "2025-01-15 16:04:20+00:00": "10s"
+        },
+    "2BTech_205_B": {
+        "2023-05-12 03:50:59+00:00": "10s",
+        "2024-06-04 18:52:23+00:00": "2s",
+        "2024-06-10 20:39:53+00:00": "60s",
+        "2025-01-15 17:17:42+00:00": "10s",
+        },
+    "2BTech_405nm": {
+        "2024-01-17 18:38:28+00:00": "60s",
+        "2024-01-19 20:44:52+00:00": "5s",
+        "2024-02-01 22:30:59+00:00": "60s",
+        "2024-06-05 21:11:35+00:00": "5s",
+        "2024-06-11 14:04:55+00:00": "60s",
+        "2024-06-25 18:31:08+00:00": "5s",
+        "2024-06-25 21:09:43+00:00": "60s",
+        "2024-07-02 15:42:36+00:00": "5s",
+        "2024-07-02 20:17:40+00:00": "60s",
+        },
+    "ThermoScientific_42i-TL": {
+        "2024-01-19 17:39:00+00:00": "60s"
+        }
+    }
 
 def read_daqdata(path, schema): 
     data = pl.read_csv(path,
@@ -399,8 +440,8 @@ def define_datetime(df, inst):
                 ).alias("UTC_DateTime"),
             pl.col("DateTime").dt.convert_time_zone(
                 "America/Denver"
-                ).alias("Local_DateTime"),
-            pl.exclude("DateTime", "Local_DateTime", "Date", "Time",
+                ).alias("FTC_DateTime"),
+            pl.exclude("DateTime", "FTC_DateTime", "Date", "Time",
                        "UnixTime", "YMD", "HMS", "IgorTime", "index")
             )
     df = df.drop_nulls()
@@ -408,8 +449,12 @@ def define_datetime(df, inst):
     return df
 
 def split_by_date(df):
+    if "UTC_DateTime" in df.columns:
+        dt_col = "UTC_DateTime"
+    else:
+        dt_col = "UTC_Start"
     df_with_date = df.with_columns(
-        pl.col("UTC_DateTime").dt.date().alias("Date")
+        pl.col(dt_col).dt.date().alias("Date")
         )
     df_by_date = df_with_date.partition_by(
         "Date", include_key=False, as_dict=True
@@ -421,6 +466,8 @@ def split_by_date(df):
 data = {}
 
 for subdir in os.listdir(RAW_DATA_DIR):
+    if subdir == "test.yml":
+        continue
     path = os.path.join(RAW_DATA_DIR, subdir)
     for subdir2 in os.listdir(path):
         path2 = os.path.join(path, subdir2)
@@ -448,8 +495,8 @@ for inst in data.keys():
                     pl.col("UTC_DateTime"),
                     pl.col("UTC_DateTime").dt.convert_time_zone(
                         "America/Denver"
-                        ).alias("Local_DateTime"),
-                    pl.exclude("UTC_DateTime", "DateTime", "Local_DateTime",
+                        ).alias("FTC_DateTime"),
+                    pl.exclude("UTC_DateTime", "DateTime", "FTC_DateTime",
                                "Date", "Time", "UnixTime", "YMD", "HMS",
                                "IgorTime", "index")
                     )
@@ -461,6 +508,42 @@ for inst in data.keys():
 for inst in data.keys():
     for source in data[inst].keys():
         concat_df = pl.concat(data[inst][source]).sort("UTC_DateTime")
+        if inst in avg_times.keys():
+            for start, avg_time in avg_times[inst].items():
+                if "UTC_Start" not in concat_df.columns:
+                    concat_df = concat_df.select(
+                        pl.when(
+                            pl.col("UTC_DateTime").ge(
+                                datetime.fromisoformat(start)
+                                )
+                            )
+                        .then(
+                            pl.col("UTC_DateTime").dt.offset_by("-" + avg_time)
+                            ).alias("UTC_Start"),
+                        pl.exclude("UTC_Start")
+                        )
+                    continue
+                concat_df = concat_df.select(
+                    pl.when(
+                        pl.col("UTC_DateTime").ge(
+                            datetime.fromisoformat(start)
+                            )
+                        )
+                    .then(
+                        pl.col("UTC_DateTime").dt.offset_by("-" + avg_time)
+                        )
+                    .otherwise(
+                        pl.col("UTC_Start")
+                        ).alias("UTC_Start"),
+                    pl.exclude("UTC_Start")
+                    )
+            concat_df = concat_df.select(
+                pl.col("UTC_Start"),
+                pl.col("UTC_DateTime").alias("UTC_Stop"),
+                pl.col("UTC_Start").dt.convert_time_zone("America/Denver").alias("FTC_Start"),
+                pl.col("FTC_DateTime").alias("FTC_Stop"),
+                pl.exclude("UTC_Start", "UTC_DateTime", "FTC_DateTime")
+                )
         data[inst][source] = split_by_date(concat_df)
 
 for inst in data.keys():
@@ -475,4 +558,3 @@ for inst in data.keys():
             path = os.path.join(f_dir,
                                 f_name)
             df.write_csv(path)
-            
