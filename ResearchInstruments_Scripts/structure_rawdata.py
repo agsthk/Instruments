@@ -449,10 +449,10 @@ def define_datetime(df, inst):
     return df
 
 def split_by_date(df):
-    if "UTC_DateTime" in df.columns:
-        dt_col = "UTC_DateTime"
+    if "FTC_DateTime" in df.columns:
+        dt_col = "FTC_DateTime"
     else:
-        dt_col = "UTC_Start"
+        dt_col = "FTC_Start"
     df_with_date = df.with_columns(
         pl.col(dt_col).dt.date().alias("Date")
         )
