@@ -32,6 +32,17 @@ insts = ["2BTech_202",
          "TempRHDoor",
          "ThermoScientific_42i-TL"]
 
+sampling_times = {
+    "LI-COR_LI-840A_B": [
+        ["2025-02-28T17:37:00-0700", "2025-03-03T07:05:00-0700"]
+        ]
+    }
+sampling_times = {
+    inst: pl.DataFrame(times, schema=["Start", "Stop"], orient="row")
+            .with_columns(pl.all().str.to_datetime(strict=False))
+    for inst, times in sampling_times.items()
+    }
+
 # tg_line = ["2BTech_205_A",
 #            "Picarro_G2307",
 #            "ThermoScientific_42i-TL"]
@@ -48,9 +59,16 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
             pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
             pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
             )
-        if path.find("LI-COR_LI-840A_B") != -1:
+        if inst == "LI-COR_LI-840A_B":
             lf = lf.with_columns(
                 pl.selectors.contains("DateTime").dt.offset_by("-12m15s")
+                )
+        if inst in sampling_times.keys():
+            lf = pl.concat(
+                lf.filter(
+                    pl.col("UTC_DateTime").is_between(*row)
+                    )
+                for row in sampling_times[inst].rows()
                 )
         data[inst][path[-12:-4]] = lf
         # try:
@@ -66,8 +84,10 @@ for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
     df = lf.collect()
+    df2 = data[inst[:-1] + "A"][date].collect()
     fig, ax = plt.subplots()
     ax.plot(df["UTC_DateTime"], df["CO2_ppm"])
+    ax.plot(df2["UTC_DateTime"], df2["CO2_ppm"])
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
