@@ -35,7 +35,7 @@ insts = ["2BTech_202",
 #            "Picarro_G2307",
 #            "ThermoScientific_42i-TL"]
 
-data = {inst: [] for inst in insts}
+data = {inst: {} for inst in insts}
 
 for root, dirs, files in os.walk(STRUCT_DATA_DIR):
     for file in files:
@@ -43,8 +43,8 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
         for inst in insts:
             if path.find(inst) != -1:
                 break
-        df = pl.scan_csv(path, try_parse_dates=True, infer_schema_length=None)
-        data[inst].append(df)
+        lf = pl.scan_csv(path, try_parse_dates=True, infer_schema_length=None)
+        data[inst][path[-12:-4]] = lf
         # try:
         #     df = pl.read_csv(path, try_parse_dates=True)
         # except pl.exceptions.ComputeError:
