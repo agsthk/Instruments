@@ -544,6 +544,10 @@ for inst in data.keys():
                 pl.col("FTC_DateTime").alias("FTC_Stop"),
                 pl.exclude("UTC_Start", "UTC_DateTime", "FTC_DateTime")
                 )
+            if inst == "LI-COR_LI-840A_B":
+                concat_df = concat_df.with_columns(
+                    pl.selectors.contains("UTC", "FTC").dt.offset_by("-12m15s")
+                    )
         data[inst][source] = split_by_date(concat_df)
 
 for inst in data.keys():
