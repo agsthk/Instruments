@@ -31,57 +31,57 @@ insts = ["2BTech_202",
          "TempRHDoor",
          "ThermoScientific_42i-TL"]
 
-tg_line = ["2BTech_205_A",
-           "Picarro_G2307",
-           "ThermoScientific_42i-TL"]
+# tg_line = ["2BTech_205_A",
+#            "Picarro_G2307",
+#            "ThermoScientific_42i-TL"]
 
 data = {inst: [] for inst in insts}
 
 for root, dirs, files in os.walk(STRUCT_DATA_DIR):
     for file in files:
         path = os.path.join(root, file)
-        if path.find("DAQ") == -1:
-            continue
         for inst in insts:
             if path.find(inst) != -1:
                 break
-        try:
-            df = pl.read_csv(path, try_parse_dates=True)
-        except pl.exceptions.ComputeError:
-            df = pl.read_csv(path, try_parse_dates=True,
-                             infer_schema_length=None)
-        finally:
-            data[inst].append(df)
-            
-for inst, dfs in data.items():
-    if len(dfs) == 0:
-        continue
-    df = pl.concat(dfs)
-    if inst in tg_line:
-        df = df.with_columns(
-            pl.lit(inst).alias("Instrument")
-            )
-        if "UTC_DateTime" in df.columns:
-            df = df.with_columns(
-                pl.col("UTC_DateTime").alias("UTC_Start")
-                )
-    data[inst] = df
+        df = pl.scan_csv(path, try_parse_dates=True, infer_schema_length=None)
+        data[inst].append(df)
+        # try:
+        #     df = pl.read_csv(path, try_parse_dates=True)
+        # except pl.exceptions.ComputeError:
+        #     df = pl.read_csv(path, try_parse_dates=True,
+        #                      infer_schema_length=None)
+        # finally:
+        #     data[inst].append(df)
 
-tg_line_data = pl.concat([data[inst] for inst in tg_line],
-                         how="align").sort(by="UTC_Start")
+# for inst, dfs in data.items():
+#     if len(dfs) == 0:
+#         continue
+#     df = pl.concat(dfs)
+#     if inst in tg_line:
+#         df = df.with_columns(
+#             pl.lit(inst).alias("Instrument")
+#             )
+#         if "UTC_DateTime" in df.columns:
+#             df = df.with_columns(
+#                 pl.col("UTC_DateTime").alias("UTC_Start")
+#                 )
+#     data[inst] = df
 
-tg_line_data = tg_line_data.with_columns(
-    pl.when(pl.col("SolenoidValves").fill_null(strategy="forward").eq(1))
-    .then(True)
-    .otherwise(False)
-    .alias("Zeroing")
-    )
+# tg_line_data = pl.concat([data[inst] for inst in tg_line],
+#                          how="align").sort(by="UTC_Start")
 
-tg_line_data = {
-    key[0]: df for key, df in tg_line_data.partition_by(
-        "Instrument", include_key=False, as_dict=True
-        ).items()
-    }
+# tg_line_data = tg_line_data.with_columns(
+#     pl.when(pl.col("SolenoidValves").fill_null(strategy="forward").eq(1))
+#     .then(True)
+#     .otherwise(False)
+#     .alias("Zeroing")
+#     )
+
+# tg_line_data = {
+#     key[0]: df for key, df in tg_line_data.partition_by(
+#         "Instrument", include_key=False, as_dict=True
+#         ).items()
+#     }
 
 # for inst, df in tg_line_data.items():
 #     tg_line_data[inst] = df.with_columns(
