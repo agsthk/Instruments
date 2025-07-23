@@ -10,6 +10,7 @@ import polars as pl
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import pytz
+from datetime import datetime, timedelta
 
 # Declares full path to ResearchInstruments_Data/ directory
 data_dir = os.getcwd()
@@ -43,7 +44,14 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
         for inst in insts:
             if path.find(inst) != -1:
                 break
-        lf = pl.scan_csv(path, try_parse_dates=True, infer_schema_length=None)
+        lf = pl.scan_csv(path).with_columns(
+            pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
+            pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
+            )
+        if path.find("LI-COR_LI-840A_B") != -1:
+            lf = lf.with_columns(
+                pl.selectors.contains("DateTime").dt.offset_by("-12m15s")
+                )
         data[inst][path[-12:-4]] = lf
         # try:
         #     df = pl.read_csv(path, try_parse_dates=True)
