@@ -32,22 +32,23 @@ insts = ["2BTech_202",
          "TempRHDoor",
          "ThermoScientific_42i-TL"]
 
-sampling_times = {
+break_times = {
     "LI-COR_LI-840A_A": [
-        ["2025-01-09T12:40:00-0700", "2025-01-10T10:10:01-0700"],
-        ["2025-01-10T17:00:38-0700", "2025-02-12T15:05:26-0700"],
-        ["2025-02-13T08:58:55-0600", "2025-03-17T08:06:47-0600"],
-        ["2025-03-17T10:45:51-0600", "2025-03-18T08:22:16-0600"],
-        ["2025-03-23T19:27:42-0600", "2025-04-16T02:16:55-0600"]
+        ["2025-01-10T10:10:01-0700", "2025-01-10T17:00:38-0700"],
+        ["2025-02-12T15:05:26-0700", "2025-02-13T08:58:55-0600"],
+        ["2025-03-17T08:06:47-0600", "2025-03-17T10:45:51-0600"],
+        ["2025-03-18T08:22:16-0600", "2025-03-23T19:27:42-0600"],
+        ["2025-04-16T02:16:55-0600", "2025-04-18T10:47:06-0600"]
         ],
     "LI-COR_LI-840A_B": [
-        ["2025-02-28T17:37:00-0700", "2025-03-03T07:05:00-0700"]
+        ["2025-02-28T17:34:05-0700", "2025-02-28T17:37:00-0700"]
         ],
     }
-sampling_times = {
+
+break_times = {
     inst: pl.DataFrame(times, schema=["Start", "Stop"], orient="row")
-            .with_columns(pl.all().str.to_datetime(strict=False))
-    for inst, times in sampling_times.items()
+            .with_columns(pl.all().str.to_datetime())
+    for inst, times in break_times.items()
     }
 
 # tg_line = ["2BTech_205_A",
@@ -70,13 +71,11 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
             lf = lf.with_columns(
                 pl.selectors.contains("DateTime").dt.offset_by("-12m15s")
                 )
-        if inst in sampling_times.keys():
-            lf = pl.concat(
-                lf.filter(
-                    pl.col("UTC_DateTime").is_between(*row)
-                    )
-                for row in sampling_times[inst].rows()
-                )
+        if inst in break_times.keys():
+            mask = pl.lit(True)
+            for row in break_times[inst].iter_rows():
+                mask &= ~pl.col("UTC_DateTime").is_between(*row)
+            lf = lf.filter(mask)
         data[inst][path[-12:-4]] = lf
         # try:
         #     df = pl.read_csv(path, try_parse_dates=True)
