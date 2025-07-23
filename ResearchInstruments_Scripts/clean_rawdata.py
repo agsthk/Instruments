@@ -53,6 +53,18 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
         # finally:
         #     data[inst].append(df)
 
+inst = "LI-COR_LI-840A_B"
+for date, lf in data[inst].items():
+    if date[:4] != "2025":
+        continue
+    df = lf.collect()
+    fig, ax = plt.subplots()
+    ax.plot(df["UTC_DateTime"], df["CO2_ppm"])
+    ax.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax.set_title(date)
+
 # for inst, dfs in data.items():
 #     if len(dfs) == 0:
 #         continue
