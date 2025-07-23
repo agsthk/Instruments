@@ -33,9 +33,16 @@ insts = ["2BTech_202",
          "ThermoScientific_42i-TL"]
 
 sampling_times = {
+    "LI-COR_LI-840A_A": [
+        ["2025-01-09T12:40:00-0700", "2025-01-10T10:10:01-0700"],
+        ["2025-01-10T17:00:38-0700", "2025-02-12T15:05:26-0700"],
+        ["2025-02-13T08:58:55-0600", "2025-03-17T08:06:47-0600"],
+        ["2025-03-17T10:45:51-0600", "2025-03-18T08:22:16-0600"],
+        ["2025-03-23T19:27:42-0600", "2025-04-16T02:16:55-0600"]
+        ],
     "LI-COR_LI-840A_B": [
         ["2025-02-28T17:37:00-0700", "2025-03-03T07:05:00-0700"]
-        ]
+        ],
     }
 sampling_times = {
     inst: pl.DataFrame(times, schema=["Start", "Stop"], orient="row")
@@ -79,15 +86,16 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
         # finally:
         #     data[inst].append(df)
 
-inst = "LI-COR_LI-840A_B"
+inst = "LI-COR_LI-840A_A"
 for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
     df = lf.collect()
-    df2 = data[inst[:-1] + "A"][date].collect()
     fig, ax = plt.subplots()
     ax.plot(df["UTC_DateTime"], df["CO2_ppm"])
-    ax.plot(df2["UTC_DateTime"], df2["CO2_ppm"])
+    if date in data[inst[:-1] + "B"].keys():
+        df2 = data[inst[:-1] + "B"][date].collect()
+        ax.plot(df2["UTC_DateTime"], df2["CO2_ppm"])
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
