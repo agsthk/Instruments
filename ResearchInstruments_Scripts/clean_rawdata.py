@@ -67,10 +67,6 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
             pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
             pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
             )
-        if inst == "LI-COR_LI-840A_B":
-            lf = lf.with_columns(
-                pl.selectors.contains("DateTime").dt.offset_by("-12m15s")
-                )
         if inst in break_times.keys():
             mask = pl.lit(True)
             for row in break_times[inst].iter_rows():
