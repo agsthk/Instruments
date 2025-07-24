@@ -32,25 +32,6 @@ insts = ["2BTech_202",
          "TempRHDoor",
          "ThermoScientific_42i-TL"]
 
-break_times = {
-    "LI-COR_LI-840A_A": [
-        ["2025-01-10T10:10:01-0700", "2025-01-10T17:00:38-0700"],
-        ["2025-02-12T15:05:26-0700", "2025-02-13T08:58:55-0600"],
-        ["2025-03-17T08:06:47-0600", "2025-03-17T10:45:51-0600"],
-        ["2025-03-18T08:22:16-0600", "2025-03-23T19:27:42-0600"],
-        ["2025-04-16T02:16:55-0600", "2025-04-18T10:47:06-0600"]
-        ],
-    "LI-COR_LI-840A_B": [
-        ["2025-02-28T17:34:05-0700", "2025-02-28T17:37:00-0700"]
-        ],
-    }
-
-break_times = {
-    inst: pl.DataFrame(times, schema=["Start", "Stop"], orient="row")
-            .with_columns(pl.all().str.to_datetime())
-    for inst, times in break_times.items()
-    }
-
 sampling_locs = {
     "LI-COR_LI-840A_A": [
         ["2025-01-10T10:10:01-0700", "C200"]
@@ -72,10 +53,6 @@ sampling_locs = {
                 ).fill_null(pl.col("Start").dt.offset_by("1y"))
     for inst, locs in sampling_locs.items()
     }
-           
-# tg_line = ["2BTech_205_A",
-#            "Picarro_G2307",
-#            "ThermoScientific_42i-TL"]
 
 data = {inst: {} for inst in insts}
 
@@ -89,11 +66,6 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
             pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
             pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
             )
-        # if inst in break_times.keys():
-        #     mask = pl.lit(True)
-        #     for row in break_times[inst].iter_rows():
-        #         mask &= ~pl.col("UTC_DateTime").is_between(*row)
-        #     lf = lf.filter(mask)
         if inst in sampling_locs.keys():
             lf = lf.with_columns(
                 pl.lit(None).alias("SamplingLocation")
@@ -114,13 +86,6 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
                     .alias("SamplingLocation")
                     )
         data[inst][path[-12:-4]] = lf
-        # try:
-        #     df = pl.read_csv(path, try_parse_dates=True)
-        # except pl.exceptions.ComputeError:
-        #     df = pl.read_csv(path, try_parse_dates=True,
-        #                      infer_schema_length=None)
-        # finally:
-        #     data[inst].append(df)
 
 inst = "LI-COR_LI-840A_A"
 for date, lf in data[inst].items():
@@ -140,41 +105,3 @@ for date, lf in data[inst].items():
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
     ax.set_title(date)
-
-# for inst, dfs in data.items():
-#     if len(dfs) == 0:
-#         continue
-#     df = pl.concat(dfs)
-#     if inst in tg_line:
-#         df = df.with_columns(
-#             pl.lit(inst).alias("Instrument")
-#             )
-#         if "UTC_DateTime" in df.columns:
-#             df = df.with_columns(
-#                 pl.col("UTC_DateTime").alias("UTC_Start")
-#                 )
-#     data[inst] = df
-
-# tg_line_data = pl.concat([data[inst] for inst in tg_line],
-#                          how="align").sort(by="UTC_Start")
-
-# tg_line_data = tg_line_data.with_columns(
-#     pl.when(pl.col("SolenoidValves").fill_null(strategy="forward").eq(1))
-#     .then(True)
-#     .otherwise(False)
-#     .alias("Zeroing")
-#     )
-
-# tg_line_data = {
-#     key[0]: df for key, df in tg_line_data.partition_by(
-#         "Instrument", include_key=False, as_dict=True
-#         ).items()
-#     }
-
-# for inst, df in tg_line_data.items():
-#     tg_line_data[inst] = df.with_columns(
-#         pl.col(
-#             [col for col in tg_line_data[inst].columns
-#              if col in data[inst].columns] + ["Zeroing"]
-#             )
-#         )
