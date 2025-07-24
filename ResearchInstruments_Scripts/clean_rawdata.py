@@ -51,6 +51,28 @@ break_times = {
     for inst, times in break_times.items()
     }
 
+sampling_locs = {
+    "LI-COR_LI-840A_A": [
+        ["2025-01-10T10:10:01-0700", "C200"]
+        ],
+    "LI-COR_LI-840A_B": [
+        ["2025-02-28T17:34:00-0700", "B203"],
+        ["2025-02-28T17:37:00-0700", "C200_Vent"]
+        ],
+    }
+sampling_locs = {
+    inst: pl.DataFrame(
+        locs, schema=["Start", "SamplingLocation"], orient="row"
+        ).with_columns(
+            pl.col("Start").str.to_datetime()
+            ).select(
+                pl.col("Start").dt.offset_by("1m"),
+                pl.col("Start").shift(-1).dt.offset_by("-1m").alias("Stop"),
+                pl.col("SamplingLocation")
+                ).fill_null(pl.col("Start").dt.offset_by("1y"))
+    for inst, locs in sampling_locs.items()
+    }
+           
 # tg_line = ["2BTech_205_A",
 #            "Picarro_G2307",
 #            "ThermoScientific_42i-TL"]
@@ -67,11 +89,30 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
             pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
             pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
             )
-        if inst in break_times.keys():
-            mask = pl.lit(True)
-            for row in break_times[inst].iter_rows():
-                mask &= ~pl.col("UTC_DateTime").is_between(*row)
-            lf = lf.filter(mask)
+        # if inst in break_times.keys():
+        #     mask = pl.lit(True)
+        #     for row in break_times[inst].iter_rows():
+        #         mask &= ~pl.col("UTC_DateTime").is_between(*row)
+        #     lf = lf.filter(mask)
+        if inst in sampling_locs.keys():
+            lf = lf.with_columns(
+                pl.lit(None).alias("SamplingLocation")
+                )
+            for row in sampling_locs[inst].iter_rows(named=True):
+                lf = lf.with_columns(
+                    pl.when(
+                        pl.col("UTC_DateTime").is_between(
+                            row["Start"], row["Stop"]
+                            )
+                        )
+                    .then(
+                        pl.lit(row["SamplingLocation"])
+                        )
+                    .otherwise(
+                        pl.col("SamplingLocation")
+                        )
+                    .alias("SamplingLocation")
+                    )
         data[inst][path[-12:-4]] = lf
         # try:
         #     df = pl.read_csv(path, try_parse_dates=True)
@@ -85,11 +126,15 @@ inst = "LI-COR_LI-840A_A"
 for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
-    df = lf.collect()
+    df = lf.filter(
+        pl.col("SamplingLocation").eq("C200")
+        ).collect()
     fig, ax = plt.subplots()
     ax.plot(df["UTC_DateTime"], df["CO2_ppm"])
     if date in data[inst[:-1] + "B"].keys():
-        df2 = data[inst[:-1] + "B"][date].collect()
+        df2 = data[inst[:-1] + "B"][date].filter(
+            pl.col("SamplingLocation").eq("C200_Vent")
+            ).collect()
         ax.plot(df2["UTC_DateTime"], df2["CO2_ppm"])
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
