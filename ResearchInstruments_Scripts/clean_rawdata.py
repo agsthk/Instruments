@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import pytz
 from datetime import datetime, timedelta
+from tqdm import tqdm
 
 # Declares full path to ResearchInstruments_Data/ directory
 data_dir = os.getcwd()
@@ -121,30 +122,6 @@ sampling_locs = {
     for inst, locs in sampling_locs.items()
     }
 
-for inst, df in sampling_locs.items():
-    on_tg = df.filter(
-        pl.col("SamplingLocation").eq("TG_Line")
-        )
-    if on_tg.is_empty():
-        continue
-    for row in on_tg.iter_rows(named=True):
-        tg_locs = sampling_locs["TG_Line"].filter(
-            pl.col("Stop").ge(row["Start"])
-            & pl.col("Start").le(row["Stop"])
-            )
-        tg_locs = tg_locs.with_columns(
-            pl.when(pl.col("Start").lt(row["Start"]))
-            .then(pl.lit(row["Start"]))
-            .otherwise(pl.col("Start")).alias("Start"),
-            pl.when(pl.col("Stop").gt(row["Stop"]))
-            .then(pl.lit(row["Stop"]))
-            .otherwise(pl.col("Stop")).alias("Stop")
-            )
-    df = pl.concat([df, tg_locs]).sort(by="Start").filter(
-        pl.col("SamplingLocation").ne("TG_Line")
-        )
-    sampling_locs[inst] = df
-# sampling_locs.pop("TG_Line")
 
 data = {inst: {} for inst in insts}
 
@@ -160,96 +137,8 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
             pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
             pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
             )
-        if inst in sampling_locs.keys():
-            lf = lf.with_columns(
-                pl.lit(None).alias("SamplingLocation")
-                )
-            for row in sampling_locs[inst].iter_rows(named=True):
-                if "UTC_DateTime" in lf.collect_schema().names():
-                    lf = lf.with_columns(
-                        pl.when(
-                            pl.col("UTC_DateTime").is_between(
-                                row["Start"], row["Stop"]
-                                )
-                            )
-                        .then(
-                            pl.lit(row["SamplingLocation"])
-                            )
-                        .otherwise(
-                            pl.col("SamplingLocation")
-                            )
-                        .alias("SamplingLocation")
-                        )
-                else:
-                    lf = lf.with_columns(
-                        pl.when(
-                            pl.col("UTC_Start").is_between(
-                                row["Start"], row["Stop"]
-                                )
-                            & pl.col("UTC_Stop").is_between(
-                                row["Start"], row["Stop"]
-                                )
-                            )
-                        .then(
-                            pl.lit(row["SamplingLocation"])
-                            )
-                        .otherwise(
-                            pl.col("SamplingLocation")
-                            )
-                        .alias("SamplingLocation")
-                        )
         data[inst][path[-12:-4]] = lf
 
-inst = "2BTech_205_A"
-for date, lf in data[inst].items():
-    if date[:4] != "2025":
-        continue
-    df = lf.filter(
-        pl.col("SamplingLocation").eq("B203")
-        ).collect()
-    if df.is_empty():
-        continue
-    fig, ax = plt.subplots()
-    ax.plot(df["UTC_Start"], df["O3_ppb"])
-    ax.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax.set_title(date)
-
-inst = "Picarro_G2307"
-for date, lf in data[inst].items():
-    if date[:4] != "2025":
-        continue
-    df = lf.filter(
-        pl.col("SamplingLocation").eq("B203")
-        ).collect()
-    if df.is_empty():
-        continue
-    fig, ax = plt.subplots()
-    ax.plot(df["UTC_DateTime"], df["CH2O_ppm"])
-    ax.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax.set_title(date)
-
-inst = "LI-COR_LI-840A_A"
-for date, lf in data[inst].items():
-    if date[:4] != "2025":
-        continue
-    df = lf.filter(
-        pl.col("SamplingLocation").eq("C200")
-        ).collect()
-    fig, ax = plt.subplots()
-    ax.plot(df["UTC_DateTime"], df["CO2_ppm"])
-    if date in data[inst[:-1] + "B"].keys():
-        df2 = data[inst[:-1] + "B"][date].filter(
-            pl.col("SamplingLocation").eq("C200_Vent")
-            ).collect()
-        ax.plot(df2["UTC_DateTime"], df2["CO2_ppm"])
-    ax.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax.set_title(date)
 
 intvs = []
 pic_lf = pl.concat([
@@ -322,3 +211,122 @@ intvs = intvs.filter(
     & pl.col("Start").le(sampling_locs["TG_Line"]["Stop"].max())
     )
 sampling_locs["TG_Line"] = intvs
+
+for inst, df in sampling_locs.items():
+    on_tg = df.filter(
+        pl.col("SamplingLocation").eq("TG_Line")
+        )
+    if on_tg.is_empty():
+        continue
+    for row in on_tg.iter_rows(named=True):
+        tg_locs = sampling_locs["TG_Line"].filter(
+            pl.col("Stop").ge(row["Start"])
+            & pl.col("Start").le(row["Stop"])
+            )
+        tg_locs = tg_locs.with_columns(
+            pl.when(pl.col("Start").lt(row["Start"]))
+            .then(pl.lit(row["Start"]))
+            .otherwise(pl.col("Start")).alias("Start"),
+            pl.when(pl.col("Stop").gt(row["Stop"]))
+            .then(pl.lit(row["Stop"]))
+            .otherwise(pl.col("Stop")).alias("Stop")
+            )
+    df = pl.concat([df, tg_locs]).sort(by="Start").filter(
+        pl.col("SamplingLocation").ne("TG_Line")
+        )
+    sampling_locs[inst] = df
+
+sampling_locs.pop("TG_Line")
+
+for inst, lfs in tqdm(data.items()):
+    if inst in sampling_locs.keys():
+        for date, lf in tqdm(lfs.items()):
+            lf = lf.with_columns(
+                pl.lit(None).alias("SamplingLocation")
+                )
+            for row in sampling_locs[inst].iter_rows(named=True):
+                if "UTC_DateTime" in lf.collect_schema().names():
+                    lf = lf.with_columns(
+                        pl.when(
+                            pl.col("UTC_DateTime").is_between(
+                                row["Start"], row["Stop"]
+                                )
+                            )
+                        .then(
+                            pl.lit(row["SamplingLocation"])
+                            )
+                        .otherwise(
+                            pl.col("SamplingLocation")
+                            )
+                        .alias("SamplingLocation")
+                        )
+                else:
+                    lf = lf.with_columns(
+                        pl.when(
+                            pl.col("UTC_Start").is_between(
+                                row["Start"], row["Stop"]
+                                )
+                            & pl.col("UTC_Stop").is_between(
+                                row["Start"], row["Stop"]
+                                )
+                            )
+                        .then(
+                            pl.lit(row["SamplingLocation"])
+                            )
+                        .otherwise(
+                            pl.col("SamplingLocation")
+                            )
+                        .alias("SamplingLocation")
+                        )
+            data[inst][date] = lf
+
+inst = "2BTech_205_A"
+for date, lf in data[inst].items():
+    if date[:4] != "2025":
+        continue
+    df = lf.filter(
+        pl.col("SamplingLocation").eq("UZA")
+        ).collect()
+    if df.is_empty():
+        continue
+    fig, ax = plt.subplots()
+    ax.plot(df["UTC_Start"], df["O3_ppb"])
+    ax.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax.set_title(date)
+
+inst = "Picarro_G2307"
+for date, lf in data[inst].items():
+    if date[:4] != "2025":
+        continue
+    df = lf.filter(
+        pl.col("SamplingLocation").eq("UZA")
+        ).collect()
+    if df.is_empty():
+        continue
+    fig, ax = plt.subplots()
+    ax.plot(df["UTC_DateTime"], df["CH2O_ppm"])
+    ax.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax.set_title(date)
+
+inst = "LI-COR_LI-840A_A"
+for date, lf in data[inst].items():
+    if date[:4] != "2025":
+        continue
+    df = lf.filter(
+        pl.col("SamplingLocation").eq("C200")
+        ).collect()
+    fig, ax = plt.subplots()
+    ax.plot(df["UTC_DateTime"], df["CO2_ppm"])
+    if date in data[inst[:-1] + "B"].keys():
+        df2 = data[inst[:-1] + "B"][date].filter(
+            pl.col("SamplingLocation").eq("C200_Vent")
+            ).collect()
+        ax.plot(df2["UTC_DateTime"], df2["CO2_ppm"])
+    ax.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax.set_title(date)
