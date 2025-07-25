@@ -150,6 +150,8 @@ data = {inst: {} for inst in insts}
 
 for root, dirs, files in os.walk(STRUCT_DATA_DIR):
     for file in files:
+        if file.startswith("."):
+            continue
         path = os.path.join(root, file)
         for inst in insts:
             if path.find(inst) != -1:
