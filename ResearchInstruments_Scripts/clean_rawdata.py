@@ -246,14 +246,11 @@ for inst, lfs in tqdm(data.items()):
                 )
             if "UTC_DateTime" in lf.collect_schema().names():
                 rename = "UTC_DateTime"
-                locs = sampling_locs[inst].rename(
-                    {"Start": "UTC_DateTime"}
-                    ).lazy()
             else:
                 rename = "UTC_Start"
-                locs = sampling_locs[inst].rename(
-                    {"Start": "UTC_Start", "Stop": "UTC_Stop"}
-                    ).lazy()
+            locs = sampling_locs[inst].rename(
+                {"Start": rename}
+                ).lazy()
             lf = pl.concat(
                 [lf, locs], how="diagonal_relaxed"
                 ).sort(by=rename).with_columns(
