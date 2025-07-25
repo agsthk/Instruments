@@ -244,42 +244,57 @@ for inst, lfs in tqdm(data.items()):
             lf = lf.with_columns(
                 pl.lit(None).alias("SamplingLocation")
                 )
-            for row in sampling_locs[inst].iter_rows(named=True):
-                if "UTC_DateTime" in lf.collect_schema().names():
-                    lf = lf.with_columns(
-                        pl.when(
-                            pl.col("UTC_DateTime").is_between(
-                                row["Start"], row["Stop"]
-                                )
-                            )
-                        .then(
-                            pl.lit(row["SamplingLocation"])
-                            )
-                        .otherwise(
-                            pl.col("SamplingLocation")
-                            )
-                        .alias("SamplingLocation")
+            if "UTC_DateTime" in lf.collect_schema().names():
+                locs = sampling_locs[inst].rename(
+                    {"Start": "UTC_Start"}
+                    ).lazy()
+            else:
+                locs = sampling_locs[inst].rename(
+                    {"Start": "UTC_Start", "Stop": "UTC_Stop"}
+                    ).lazy()
+            lf = pl.concat(
+                [lf, locs], how="diagonal_relaxed"
+                ).sort(by="UTC_Start").with_columns(
+                    pl.col("SamplingLocation").forward_fill()
+                    ).drop_nulls(
+                        subset=pl.selectors.float()
                         )
-                else:
-                    lf = lf.with_columns(
-                        pl.when(
-                            pl.col("UTC_Start").is_between(
-                                row["Start"], row["Stop"]
-                                )
-                            & pl.col("UTC_Stop").is_between(
-                                row["Start"], row["Stop"]
-                                )
-                            )
-                        .then(
-                            pl.lit(row["SamplingLocation"])
-                            )
-                        .otherwise(
-                            pl.col("SamplingLocation")
-                            )
-                        .alias("SamplingLocation")
-                        )
+            # for row in sampling_locs[inst].iter_rows(named=True):
+            #     if "UTC_DateTime" in lf.collect_schema().names():
+            #         lf = lf.with_columns(
+            #             pl.when(
+            #                 pl.col("UTC_DateTime").is_between(
+            #                     row["Start"], row["Stop"]
+            #                     )
+            #                 )
+            #             .then(
+            #                 pl.lit(row["SamplingLocation"])
+            #                 )
+            #             .otherwise(
+            #                 pl.col("SamplingLocation")
+            #                 )
+            #             .alias("SamplingLocation")
+            #             )
+            #     else:
+            #         lf = lf.with_columns(
+            #             pl.when(
+            #                 pl.col("UTC_Start").is_between(
+            #                     row["Start"], row["Stop"]
+            #                     )
+            #                 & pl.col("UTC_Stop").is_between(
+            #                     row["Start"], row["Stop"]
+            #                     )
+            #                 )
+            #             .then(
+            #                 pl.lit(row["SamplingLocation"])
+            #                 )
+            #             .otherwise(
+            #                 pl.col("SamplingLocation")
+            #                 )
+            #             .alias("SamplingLocation")
+            #             )
             data[inst][date] = lf
-
+lf.collect()
 inst = "2BTech_205_A"
 for date, lf in data[inst].items():
     if date[:4] != "2025":
@@ -306,7 +321,7 @@ for date, lf in data[inst].items():
     if df.is_empty():
         continue
     fig, ax = plt.subplots()
-    ax.plot(df["UTC_DateTime"], df["CH2O_ppm"])
+    ax.scatter(df["UTC_DateTime"], df["CH2O_ppm"])
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
