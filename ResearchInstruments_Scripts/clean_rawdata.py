@@ -144,7 +144,7 @@ for inst, df in sampling_locs.items():
         pl.col("SamplingLocation").ne("TG_Line")
         )
     sampling_locs[inst] = df
-sampling_locs.pop("TG_Line")
+# sampling_locs.pop("TG_Line")
 
 data = {inst: {} for inst in insts}
 
@@ -248,3 +248,75 @@ for date, lf in data[inst].items():
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
     ax.set_title(date)
+
+intvs = []
+pic_lf = pl.concat([
+     lf.select(
+         pl.col("UTC_DateTime"),
+         pl.col("SolenoidValves")
+         ).with_columns(
+             pl.when(pl.col("SolenoidValves").gt(0))
+             .then(pl.lit(1))
+             .otherwise(pl.col("SolenoidValves")).alias("SolenoidValves")
+             )
+     for date, lf in data["Picarro_G2307"].items() if date.find("2025") != -1
+     ]).sort(by="UTC_DateTime")
+pic_df = pic_lf.collect().with_columns(
+    pl.col("SolenoidValves").rle_id().alias("intv")
+    )
+intv_starts = pic_df.unique(
+    subset="intv",
+    keep="first"
+    ).filter(
+        pl.col("SolenoidValves").eq(1)
+        ).select(
+            pl.col("UTC_DateTime").alias("Start"),
+            pl.col("intv")
+            )
+intv_stops = pic_df.unique(
+    subset="intv",
+    keep="last"
+    ).filter(
+        pl.col("SolenoidValves").eq(1)
+        ).select(
+            pl.col("UTC_DateTime").alias("Stop"),
+            pl.col("intv")
+            )
+intvs = intv_starts.join(
+    intv_stops, on="intv", how="full"
+    ).select(
+        pl.col("Start", "Stop")
+        )
+intvs = intvs.with_columns(
+    pl.when(
+        pl.col("Start").gt(datetime(2025, 3, 20, 15, 57, tzinfo=pytz.UTC))
+        & pl.col("Stop").lt(datetime(2025, 3, 20, 20, 35, tzinfo=pytz.UTC))
+        )
+    .then(pl.lit("B203"))
+    .otherwise(pl.lit("UZA"))
+    .alias("SamplingLocation")
+    )
+gaps = intvs.with_columns(
+    pl.col("Stop").shift(1).alias("Start"),
+    pl.col("Start").alias("Stop"),
+    pl.lit(None).alias("SamplingLocation")
+    ).with_columns(
+        pl.col("Start").fill_null(pl.col("Stop").dt.offset_by("-1y"))
+        )
+intvs = pl.concat([intvs, gaps]).sort(by="Start")
+for row in sampling_locs["TG_Line"].iter_rows(named=True):
+    intvs = intvs.with_columns(
+        pl.when(
+            pl.col("Start").ge(row["Start"])
+            & pl.col("Stop").le(row["Stop"])
+            & pl.col("SamplingLocation").is_null()
+            )
+        .then(pl.lit(row["SamplingLocation"]))
+        .otherwise(pl.col("SamplingLocation"))
+        .alias("SamplingLocation")
+        )
+intvs = intvs.filter(
+    pl.col("Stop").ge(sampling_locs["TG_Line"]["Start"].min())
+    & pl.col("Start").le(sampling_locs["TG_Line"]["Stop"].max())
+    )
+sampling_locs["TG_Line"] = intvs
