@@ -64,7 +64,7 @@ sampling_locs = {
         ["2025-01-27T17:17:00-0700", "TG_Line"]
         ],
     "ThermoScientific_42i-TL": [
-        ["2025-01-15T09:34:00-0700", "B213"],
+        ["2025-01-15T09:33:00-0700", "B213"],
         ["2025-01-20T16:29:00-0700", "TG_Line"],
         ["2025-01-20T17:11:00-0700", "B203"],
         ["2025-01-20T17:30:00-0700", "TG_Line"],
@@ -163,27 +163,50 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
                 pl.lit(None).alias("SamplingLocation")
                 )
             for row in sampling_locs[inst].iter_rows(named=True):
-                lf = lf.with_columns(
-                    pl.when(
-                        pl.col("UTC_DateTime").is_between(
-                            row["Start"], row["Stop"]
+                if "UTC_DateTime" in lf.collect_schema().names():
+                    lf = lf.with_columns(
+                        pl.when(
+                            pl.col("UTC_DateTime").is_between(
+                                row["Start"], row["Stop"]
+                                )
                             )
+                        .then(
+                            pl.lit(row["SamplingLocation"])
+                            )
+                        .otherwise(
+                            pl.col("SamplingLocation")
+                            )
+                        .alias("SamplingLocation")
                         )
-                    .then(
-                        pl.lit(row["SamplingLocation"])
+                else:
+                    lf = lf.with_columns(
+                        pl.when(
+                            pl.col("UTC_Start").is_between(
+                                row["Start"], row["Stop"]
+                                )
+                            & pl.col("UTC_Stop").is_between(
+                                row["Start"], row["Stop"]
+                                )
+                            )
+                        .then(
+                            pl.lit(row["SamplingLocation"])
+                            )
+                        .otherwise(
+                            pl.col("SamplingLocation")
+                            )
+                        .alias("SamplingLocation")
                         )
-                    .otherwise(
-                        pl.col("SamplingLocation")
-                        )
-                    .alias("SamplingLocation")
-                    )
         data[inst][path[-12:-4]] = lf
 
 inst = "2BTech_205_A"
 for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
-    df = lf.collect()
+    df = lf.filter(
+        pl.col("SamplingLocation").eq("B203")
+        ).collect()
+    if df.is_empty():
+        continue
     fig, ax = plt.subplots()
     ax.plot(df["UTC_Start"], df["O3_ppb"])
     ax.xaxis.set_major_formatter(
@@ -195,7 +218,11 @@ inst = "Picarro_G2307"
 for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
-    df = lf.collect()
+    df = lf.filter(
+        pl.col("SamplingLocation").eq("B203")
+        ).collect()
+    if df.is_empty():
+        continue
     fig, ax = plt.subplots()
     ax.plot(df["UTC_DateTime"], df["CH2O_ppm"])
     ax.xaxis.set_major_formatter(
