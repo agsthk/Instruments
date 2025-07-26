@@ -150,7 +150,7 @@ pic_lf = pl.concat([
              .then(pl.lit(1))
              .otherwise(pl.col("SolenoidValves")).alias("SolenoidValves")
              )
-     for date, lf in data["Picarro_G2307"].items() if date.find("2025") != -1
+     for date, lf in data["Picarro_G2307"].items()
      ]).sort(by=["UTC_DateTime", "SolenoidValves"])
 pic_df = pic_lf.collect().with_columns(
     pl.col("SolenoidValves").rle_id().alias("intv")
