@@ -246,21 +246,28 @@ for inst, lfs in tqdm(data.items()):
                 )
             if "UTC_DateTime" in lf.collect_schema().names():
                 rename = "UTC_DateTime"
+                compare = rename
             else:
                 rename = "UTC_Start"
+                compare = "UTC_Stop"
             locs = sampling_locs[inst].rename(
                 {"Start": rename}
                 ).lazy().with_columns(
-                    pl.col(rename).alias("SamplingStart")
+                    pl.col(rename).alias("NextSamplingStart")
                     )
             lf = pl.concat(
                 [lf, locs], how="diagonal_relaxed"
                 ).sort(by=rename).with_columns(
                     pl.col("SamplingLocation").forward_fill(),
-                    pl.col("SamplingStart").forward_fill()
+                    pl.col("NextSamplingStart").backward_fill()
                     ).drop_nulls(
                         subset=pl.selectors.float()
-                        )
+                        ).with_columns(
+                            pl.when(pl.col("UTC_Stop").gt(pl.col("NextSamplingStart")))
+                            .then(pl.lit(True))
+                            .otherwise(pl.lit(False))
+                            .alias("TransitionPoint")
+                            )
             data[inst][date] = lf
 
 inst = "2BTech_205_A"
