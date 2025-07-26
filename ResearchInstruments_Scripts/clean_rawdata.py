@@ -194,7 +194,10 @@ gaps = intvs.with_columns(
     ).with_columns(
         pl.col("Start").fill_null(pl.col("Stop").dt.offset_by("-1y"))
         )
-intvs = pl.concat([intvs, gaps]).sort(by="Start")
+intvs = pl.concat([intvs, gaps]).sort(by="Start").with_columns(
+    pl.col("Start").dt.offset_by("20s"),
+    pl.col("Stop").dt.offset_by("-20s")
+    )
 for row in sampling_locs["TG_Line"].iter_rows(named=True):
     intvs = intvs.with_columns(
         pl.when(
@@ -251,19 +254,17 @@ for inst, lfs in tqdm(data.items()):
                 rename = "UTC_Start"
                 compare = "UTC_Stop"
             locs = sampling_locs[inst].rename(
-                {"Start": rename}
-                ).lazy().with_columns(
-                    pl.col(rename).alias("NextSamplingStart")
-                    )
+                {"Start": rename, "Stop": "SamplingStop"}
+                ).lazy()
             lf = pl.concat(
                 [lf, locs], how="diagonal_relaxed"
                 ).sort(by=rename).with_columns(
                     pl.col("SamplingLocation").forward_fill(),
-                    pl.col("NextSamplingStart").backward_fill()
+                    pl.col("SamplingStop").forward_fill()
                     ).drop_nulls(
                         subset=pl.selectors.float()
                         ).with_columns(
-                            pl.when(pl.col("UTC_Stop").gt(pl.col("NextSamplingStart")))
+                            pl.when(pl.col(compare).gt(pl.col("SamplingStop")))
                             .then(pl.lit(True))
                             .otherwise(pl.lit(False))
                             .alias("TransitionPoint")
@@ -275,12 +276,34 @@ for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
     df = lf.filter(
-        pl.col("SamplingLocation").eq("UZA")
+        pl.col("SamplingLocation").eq("UZA"),
+        ~pl.col("TransitionPoint")
         ).collect()
     if df.is_empty():
         continue
     fig, ax = plt.subplots()
     ax.plot(df["UTC_Start"], df["O3_ppb"])
+    ax.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax.set_title(date)
+
+inst = "ThermoScientific_42i-TL"
+for date, lf in data[inst].items():
+    if date[:4] != "2025":
+        continue
+    df = lf.filter(
+        pl.col("SamplingLocation").eq("UZA"),
+        ~pl.col("TransitionPoint")
+        ).collect()
+    df2 = lf.filter(
+        pl.col("SamplingLocation").eq("UZA"),
+        ).collect()
+    if df.is_empty():
+        continue
+    fig, ax = plt.subplots()
+    ax.plot(df2["UTC_Start"], df2["NO_ppb"])
+    ax.plot(df["UTC_Start"], df["NO_ppb"])
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
