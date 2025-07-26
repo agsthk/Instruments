@@ -265,9 +265,9 @@ for inst, lfs in tqdm(data.items()):
                         subset=pl.selectors.float()
                         ).with_columns(
                             pl.when(pl.col(compare).gt(pl.col("SamplingStop")))
-                            .then(pl.lit(True))
-                            .otherwise(pl.lit(False))
-                            .alias("TransitionPoint")
+                            .then(None)
+                            .otherwise(pl.col("SamplingLocation"))
+                            .alias("SamplingLocation")
                             )
             data[inst][date] = lf
 
@@ -276,8 +276,8 @@ for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
     df = lf.filter(
-        pl.col("SamplingLocation").eq("UZA"),
-        ~pl.col("TransitionPoint")
+        pl.col("SamplingLocation").eq("C200"),
+        # ~pl.col("TransitionPoint")
         ).collect()
     if df.is_empty():
         continue
