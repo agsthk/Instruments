@@ -250,11 +250,14 @@ for inst, lfs in tqdm(data.items()):
                 rename = "UTC_Start"
             locs = sampling_locs[inst].rename(
                 {"Start": rename}
-                ).lazy()
+                ).lazy().with_columns(
+                    pl.col(rename).alias("SamplingStart")
+                    )
             lf = pl.concat(
                 [lf, locs], how="diagonal_relaxed"
                 ).sort(by=rename).with_columns(
-                    pl.col("SamplingLocation").forward_fill()
+                    pl.col("SamplingLocation").forward_fill(),
+                    pl.col("SamplingStart").forward_fill()
                     ).drop_nulls(
                         subset=pl.selectors.float()
                         )
