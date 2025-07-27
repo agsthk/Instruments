@@ -304,38 +304,50 @@ inst = "2BTech_205_A"
 for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
-    df = lf.filter(
-        pl.col("SamplingLocation").is_null(),
-        ).collect()
-    if df.is_empty():
-        continue
     fig, ax = plt.subplots()
-    ax.plot(df["UTC_Start"], df["O3_ppb"])
+    df = lf.collect()
+    for loc in df["SamplingLocation"].unique():
+        if loc is None:
+            continue
+            temp_df = df.filter(
+                pl.col("SamplingLocation").is_null()
+                )
+            loc = "Invalid"
+        else:
+            temp_df = df.filter(
+                pl.col("SamplingLocation").eq(loc)
+                )
+        ax.scatter(temp_df["UTC_Start"], temp_df["O3_ppb"], label=loc)
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
     ax.set_title(date)
+    ax.legend()
+
 
 inst = "ThermoScientific_42i-TL"
 for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
-    df = lf.filter(
-        pl.col("SamplingLocation").eq("UZA"),
-        ~pl.col("TransitionPoint")
-        ).collect()
-    df2 = lf.filter(
-        pl.col("SamplingLocation").eq("UZA"),
-        ).collect()
-    if df.is_empty():
-        continue
     fig, ax = plt.subplots()
-    ax.plot(df2["UTC_Start"], df2["NO_ppb"])
-    ax.plot(df["UTC_Start"], df["NO_ppb"])
+    df = lf.collect()
+    for loc in df["SamplingLocation"].unique():
+        if loc is None:
+            continue
+            temp_df = df.filter(
+                pl.col("SamplingLocation").is_null()
+                )
+            loc = "Invalid"
+        else:
+            temp_df = df.filter(
+                pl.col("SamplingLocation").eq(loc)
+                )
+        ax.scatter(temp_df["UTC_Start"], temp_df["NO_ppb"], label=loc)
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
     ax.set_title(date)
+    ax.legend()
 
 inst = "Picarro_G2307"
 for date, lf in data[inst].items():
