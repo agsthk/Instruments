@@ -199,100 +199,77 @@ intvs = pl.concat([intvs, gaps]).sort(by="Start").with_columns(
     pl.col("Stop").dt.offset_by("-20s")
     )
 
+# Time intervals that Picarro is on TG Line
 pic_on_tg = sampling_locs["Picarro_G2307"].filter(
     pl.col("SamplingLocation").eq("TG_Line")
     ).select(
         pl.exclude("SamplingLocation")
         )
-new_intvs = []
-for row in pic_on_tg.iter_rows(named=True):
-    temp_intvs = intvs.filter(
-        pl.col("Start").is_between(row["Start"], row["Stop"])
-        | pl.col("Stop").is_between(row["Start"], row["Stop"])
-        )
-    new_intvs.append(
-        temp_intvs.with_columns(
-            pl.when(pl.col("Start").lt(row["Start"]))
-            .then(pl.lit(row["Start"]))
-            .otherwise(pl.col("Start"))
-            .alias("Start"),
-            pl.when(pl.col("Stop").gt(row["Stop"]))
-            .then(pl.lit(row["Stop"]))
-            .otherwise(pl.col("Stop"))
-            .alias("Stop"),
-            )
-        )
-intvs = pl.concat(new_intvs)
+# Picarro zeroing/sampling intervals that occur while Picarro on TG Line
+intvs_on_tg = intvs.join(
+    pic_on_tg, on=None, how="cross").filter(
+        (pl.col("Start") < pl.col("Stop_right")) &
+        (pl.col("Start_right") < pl.col("Stop"))
+        ).select(
+            pl.col("Start", "Stop", "SamplingLocation")
+            ).unique(maintain_order=True)
 
-for row in sampling_locs["TG_Line"].iter_rows(named=True):
-    intvs = intvs.with_columns(
-        pl.when(
-            pl.col("Start").ge(row["Start"])
-            & pl.col("Stop").le(row["Stop"])
-            & pl.col("SamplingLocation").is_null()
-            )
-        .then(pl.lit(row["SamplingLocation"]))
-        .otherwise(pl.col("SamplingLocation"))
-        .alias("SamplingLocation")
-        )
-
-intvs = intvs.filter(
-    pl.col("Stop").ge(sampling_locs["TG_Line"]["Start"].min())
-    & pl.col("Start").le(sampling_locs["TG_Line"]["Stop"].max())
-    )
-tg_intvs = pl.concat(
-    [intvs,
+# Picarro zeroing/sampling intervals that occur while Picarro on TG Line and
+# TG Line sampling from C200 (normal configuration)
+intvs_on_tg = intvs_on_tg.join(
+    sampling_locs["TG_Line"], on=None, how="cross").filter(
+        (pl.col("Start") < pl.col("Stop_right")) &
+        (pl.col("Start_right") < pl.col("Stop"))
+        ).filter(
+            pl.col("SamplingLocation_right").str.contains("C200")
+            ).select(
+                pl.when(pl.col("Start").lt(pl.col("Start_right")))
+                .then(pl.col("Start_right"))
+                .otherwise(pl.col("Start"))
+                .alias("Start"),
+                pl.when(pl.col("Stop").gt(pl.col("Stop_right")))
+                .then(pl.col("Stop_right"))
+                .otherwise(pl.col("Stop"))
+                .alias("Stop"),
+                pl.when(pl.col("SamplingLocation").is_null())
+                .then(pl.col("SamplingLocation_right"))
+                .otherwise(pl.col("SamplingLocation"))
+                .alias("SamplingLocation")
+                )            
+sampling_locs["TG_Line"] = pl.concat(
+    [intvs_on_tg,
      sampling_locs["TG_Line"].filter(
          ~pl.col("SamplingLocation").str.contains("C200")
          | pl.col("SamplingLocation").is_null()
          )]
     ).sort(by="Start")
 
-tg_intvs = tg_intvs.with_columns(
-    pl.when(
-        pl.col("Stop").gt(pl.col("Start").shift(-1))
-        & pl.col("Stop").is_in(intvs["Stop"].to_list())
-        )
-    .then(pl.col("Start").shift(-1))
-    .otherwise(pl.col("Stop"))
-    .alias("Stop"),
-    pl.when(
-        pl.col("Start").lt(pl.col("Stop").shift(1))
-        & pl.col("Start").is_in(intvs["Start"].to_list())
-        )
-    .then(pl.col("Stop").shift(1))
-    .otherwise(pl.col("Start"))
-    .alias("Start")
-    )
-sampling_locs["TG_Line"] = tg_intvs
-
 for inst, df in sampling_locs.items():
-    on_tg = df.filter(
-        pl.col("SamplingLocation").eq("TG_Line")
+    sampling_locs[inst] = pl.concat(
+        [sampling_locs[inst].filter(
+            ~pl.col("SamplingLocation").eq("TG_Line")
+            | pl.col("SamplingLocation").is_null()
+            ),
+        df.join(
+            sampling_locs["TG_Line"], on=None, how="cross").filter(
+                (pl.col("Start") < pl.col("Stop_right")) &
+                (pl.col("Start_right") < pl.col("Stop"))
+                ).select(
+                    pl.when(pl.col("Start").lt(pl.col("Start_right")))
+                    .then(pl.col("Start_right"))
+                    .otherwise(pl.col("Start"))
+                    .alias("Start"),
+                    pl.when(pl.col("Stop").gt(pl.col("Stop_right")))
+                    .then(pl.col("Stop_right"))
+                    .otherwise(pl.col("Stop"))
+                    .alias("Stop"),
+                    pl.when(pl.col("SamplingLocation").eq("TG_Line"))
+                    .then(pl.col("SamplingLocation_right"))
+                    .otherwise(pl.col("SamplingLocation"))
+                    .alias("SamplingLocation")
+                    )]
         )
-    if on_tg.is_empty():
-        continue
-    for row in on_tg.iter_rows(named=True):
-        tg_locs = sampling_locs["TG_Line"].filter(
-            pl.col("Stop").ge(row["Start"])
-            & pl.col("Start").le(row["Stop"])
-            )
-        tg_locs = tg_locs.with_columns(
-            pl.when(pl.col("Start").lt(row["Start"]))
-            .then(pl.lit(row["Start"]))
-            .otherwise(pl.col("Start")).alias("Start"),
-            pl.when(pl.col("Stop").gt(row["Stop"]))
-            .then(pl.lit(row["Stop"]))
-            .otherwise(pl.col("Stop")).alias("Stop")
-            )
-    df = pl.concat([df, tg_locs]).sort(by="Start").filter(
-        pl.col("SamplingLocation").ne("TG_Line")
-        )
-    sampling_locs[inst] = df
-
-sampling_locs.pop("TG_Line")
-
-sampling_locs["2BTech_205_A"]
+                
 for inst, lfs in tqdm(data.items()):
     if inst in sampling_locs.keys():
         for date, lf in tqdm(lfs.items()):
@@ -329,7 +306,6 @@ for date, lf in data[inst].items():
         continue
     df = lf.filter(
         pl.col("SamplingLocation").is_null(),
-        # ~pl.col("TransitionPoint")
         ).collect()
     if df.is_empty():
         continue
