@@ -198,6 +198,32 @@ intvs = pl.concat([intvs, gaps]).sort(by="Start").with_columns(
     pl.col("Start").dt.offset_by("20s"),
     pl.col("Stop").dt.offset_by("-20s")
     )
+
+pic_on_tg = sampling_locs["Picarro_G2307"].filter(
+    pl.col("SamplingLocation").eq("TG_Line")
+    ).select(
+        pl.exclude("SamplingLocation")
+        )
+new_intvs = []
+for row in pic_on_tg.iter_rows(named=True):
+    temp_intvs = intvs.filter(
+        pl.col("Start").is_between(row["Start"], row["Stop"])
+        | pl.col("Stop").is_between(row["Start"], row["Stop"])
+        )
+    new_intvs.append(
+        temp_intvs.with_columns(
+            pl.when(pl.col("Start").lt(row["Start"]))
+            .then(pl.lit(row["Start"]))
+            .otherwise(pl.col("Start"))
+            .alias("Start"),
+            pl.when(pl.col("Stop").gt(row["Stop"]))
+            .then(pl.lit(row["Stop"]))
+            .otherwise(pl.col("Stop"))
+            .alias("Stop"),
+            )
+        )
+intvs = pl.concat(new_intvs)
+
 for row in sampling_locs["TG_Line"].iter_rows(named=True):
     intvs = intvs.with_columns(
         pl.when(
@@ -209,11 +235,36 @@ for row in sampling_locs["TG_Line"].iter_rows(named=True):
         .otherwise(pl.col("SamplingLocation"))
         .alias("SamplingLocation")
         )
+
 intvs = intvs.filter(
     pl.col("Stop").ge(sampling_locs["TG_Line"]["Start"].min())
     & pl.col("Start").le(sampling_locs["TG_Line"]["Stop"].max())
     )
-sampling_locs["TG_Line"] = intvs
+tg_intvs = pl.concat(
+    [intvs,
+     sampling_locs["TG_Line"].filter(
+         ~pl.col("SamplingLocation").str.contains("C200")
+         | pl.col("SamplingLocation").is_null()
+         )]
+    ).sort(by="Start")
+
+tg_intvs = tg_intvs.with_columns(
+    pl.when(
+        pl.col("Stop").gt(pl.col("Start").shift(-1))
+        & pl.col("Stop").is_in(intvs["Stop"].to_list())
+        )
+    .then(pl.col("Start").shift(-1))
+    .otherwise(pl.col("Stop"))
+    .alias("Stop"),
+    pl.when(
+        pl.col("Start").lt(pl.col("Stop").shift(1))
+        & pl.col("Start").is_in(intvs["Start"].to_list())
+        )
+    .then(pl.col("Stop").shift(1))
+    .otherwise(pl.col("Start"))
+    .alias("Start")
+    )
+sampling_locs["TG_Line"] = tg_intvs
 
 for inst, df in sampling_locs.items():
     on_tg = df.filter(
@@ -241,6 +292,7 @@ for inst, df in sampling_locs.items():
 
 sampling_locs.pop("TG_Line")
 
+sampling_locs["2BTech_205_A"]
 for inst, lfs in tqdm(data.items()):
     if inst in sampling_locs.keys():
         for date, lf in tqdm(lfs.items()):
@@ -276,7 +328,7 @@ for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
     df = lf.filter(
-        pl.col("SamplingLocation").eq("C200"),
+        pl.col("SamplingLocation").is_null(),
         # ~pl.col("TransitionPoint")
         ).collect()
     if df.is_empty():
