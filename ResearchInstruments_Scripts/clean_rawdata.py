@@ -222,41 +222,75 @@ valve_on_tg = valve_on_tg.join(
     ).filter(
         pl.col("UTC_Start").lt(pl.col("UTC_Stop_right"))
         & pl.col("UTC_Start_right").lt(pl.col("UTC_Stop"))
-        ).select(
-            pl.when(pl.col("UTC_Start").lt(pl.col("UTC_Start_right")))
-            .then(pl.col("UTC_Start_right"))
-            .otherwise(pl.col("UTC_Start"))
-            .alias("UTC_Start"),
-            pl.when(pl.col("UTC_Stop").gt(pl.col("UTC_Stop_right")))
-            .then(pl.col("UTC_Stop_right"))
-            .otherwise(pl.col("UTC_Stop"))
-            .alias("UTC_Stop"),
-            pl.when(pl.col("SamplingLocation").is_null())
-            .then(pl.col("SamplingLocation_right"))
-            .otherwise(pl.col("SamplingLocation"))
-            .alias("SamplingLocation")
-            )
+        ).filter(
+            pl.col("SamplingLocation_right").str.contains("C200")
+            ).select(
+                pl.when(pl.col("UTC_Start").lt(pl.col("UTC_Start_right")))
+                .then(pl.col("UTC_Start_right"))
+                .otherwise(pl.col("UTC_Start"))
+                .alias("UTC_Start"),
+                pl.when(pl.col("UTC_Stop").gt(pl.col("UTC_Stop_right")))
+                .then(pl.col("UTC_Stop_right"))
+                .otherwise(pl.col("UTC_Stop"))
+                .alias("UTC_Stop"),
+                pl.when(pl.col("SamplingLocation").is_null())
+                .then(pl.col("SamplingLocation_right"))
+                .otherwise(pl.col("SamplingLocation"))
+                .alias("SamplingLocation")
+                )
 
 valve_off_tg = pic_off_tg.join(
     sampling_locs["TG_Line"], on=None, how="cross"
     ).filter(
         pl.col("UTC_Start").lt(pl.col("UTC_Stop_right"))
         & pl.col("UTC_Start_right").lt(pl.col("UTC_Stop"))
-        ).select(
-            pl.when(pl.col("UTC_Start").lt(pl.col("UTC_Start_right")))
-            .then(pl.col("UTC_Start_right"))
-            .otherwise(pl.col("UTC_Start"))
-            .alias("UTC_Start"),
-            pl.when(pl.col("UTC_Stop").gt(pl.col("UTC_Stop_right")))
-            .then(pl.col("UTC_Stop_right"))
-            .otherwise(pl.col("UTC_Stop"))
-            .alias("UTC_Stop"),
-            pl.col("SamplingLocation")
-            )
+        ).filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).select(
+                pl.when(pl.col("UTC_Start").lt(pl.col("UTC_Start_right")))
+                .then(pl.col("UTC_Start_right"))
+                .otherwise(pl.col("UTC_Start"))
+                .alias("UTC_Start"),
+                pl.when(pl.col("UTC_Stop").gt(pl.col("UTC_Stop_right")))
+                .then(pl.col("UTC_Stop_right"))
+                .otherwise(pl.col("UTC_Stop"))
+                .alias("UTC_Stop"),
+                pl.col("SamplingLocation")
+                )
 
-sampling_locs["TG_Line"] = pl.concat(
-    [valve_on_tg, valve_off_tg]
-    ).sort(by="UTC_Start")
+sampling_locs["TG_Line"] = pl.concat([
+    valve_on_tg,
+    valve_off_tg,
+    sampling_locs["TG_Line"].filter(
+        ~pl.col("SamplingLocation").str.contains("C200")
+        )
+    ]).sort(by="UTC_Start")
+
+for inst, df in sampling_locs.items():
+    sampling_locs[inst] = pl.concat(
+        [sampling_locs[inst].filter(
+            ~pl.col("SamplingLocation").eq("TG_Line")
+            | pl.col("SamplingLocation").is_null()
+            ),
+        df.join(
+            sampling_locs["TG_Line"], on=None, how="cross").filter(
+                (pl.col("UTC_Start") < pl.col("UTC_Stop_right")) &
+                (pl.col("UTC_Start_right") < pl.col("UTC_Stop"))
+                ).select(
+                    pl.when(pl.col("UTC_Start").lt(pl.col("UTC_Start_right")))
+                    .then(pl.col("UTC_Start_right"))
+                    .otherwise(pl.col("UTC_Start"))
+                    .alias("UTC_Start"),
+                    pl.when(pl.col("UTC_Stop").gt(pl.col("UTC_Stop_right")))
+                    .then(pl.col("UTC_Stop_right"))
+                    .otherwise(pl.col("UTC_Stop"))
+                    .alias("UTC_Stop"),
+                    pl.when(pl.col("SamplingLocation").eq("TG_Line"))
+                    .then(pl.col("SamplingLocation_right"))
+                    .otherwise(pl.col("SamplingLocation"))
+                    .alias("SamplingLocation")
+                    )]
+        )
 
 data = {inst: {} for inst in insts}
 
@@ -274,31 +308,7 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
             )
         data[inst][path[-12:-4]] = lf
 
-for inst, df in sampling_locs.items():
-    sampling_locs[inst] = pl.concat(
-        [sampling_locs[inst].filter(
-            ~pl.col("SamplingLocation").eq("TG_Line")
-            | pl.col("SamplingLocation").is_null()
-            ),
-        df.join(
-            sampling_locs["TG_Line"], on=None, how="cross").filter(
-                (pl.col("Start") < pl.col("Stop_right")) &
-                (pl.col("Start_right") < pl.col("Stop"))
-                ).select(
-                    pl.when(pl.col("Start").lt(pl.col("Start_right")))
-                    .then(pl.col("Start_right"))
-                    .otherwise(pl.col("Start"))
-                    .alias("Start"),
-                    pl.when(pl.col("Stop").gt(pl.col("Stop_right")))
-                    .then(pl.col("Stop_right"))
-                    .otherwise(pl.col("Stop"))
-                    .alias("Stop"),
-                    pl.when(pl.col("SamplingLocation").eq("TG_Line"))
-                    .then(pl.col("SamplingLocation_right"))
-                    .otherwise(pl.col("SamplingLocation"))
-                    .alias("SamplingLocation")
-                    )]
-        )
+
                 
 for inst, lfs in tqdm(data.items()):
     if inst in sampling_locs.keys():
@@ -313,7 +323,7 @@ for inst, lfs in tqdm(data.items()):
                 rename = "UTC_Start"
                 compare = "UTC_Stop"
             locs = sampling_locs[inst].rename(
-                {"Start": rename, "Stop": "SamplingStop"}
+                {"UTC_Start": rename, "UTC_Stop": "SamplingStop"}
                 ).lazy()
             lf = pl.concat(
                 [lf, locs], how="diagonal_relaxed"
