@@ -36,6 +36,7 @@ insts = ["2BTech_202",
          "ThermoScientific_42i-TL"]
 
 sampling_locs = {
+    # "2BTech_202" : [[]],
     "2BTech_205_A": [
         ["2025-01-15T09:03:00-0700", "Calibration Source"],
         ["2025-01-17T10:00:00-0700", "B211"],
@@ -53,6 +54,7 @@ sampling_locs = {
         ["2025-03-03T07:05:00-0700", None], #?
         ["2025-03-03T07:07:00-0700", "C200_Vent"], #?
         ],
+    # "2BTech_405nm" : [[]],
     "LI-COR_LI-840A_A": [
         ["2025-01-10T10:10:01-0700", "C200"]
         ],
@@ -82,6 +84,7 @@ sampling_locs = {
         ["2025-02-06T16:54:00-0700", "B203"],
         ["2025-02-07T08:07:00-0700", "TG_Line"]
         ],
+    # "Teledyne_N300": [[]],
     "TG_Line": [
         ["2025-01-17T19:08:00-0700", "C200/B203/Exhaust"],
         ["2025-01-20T16:20:00-0700", None],
@@ -305,8 +308,8 @@ for inst, df in sampling_locs.items():
 
 data = {inst: {} for inst in insts}
 
-for root, dirs, files in os.walk(STRUCT_DATA_DIR):
-    for file in files:
+for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
+    for file in tqdm(files):
         if file.startswith("."):
             continue
         path = os.path.join(root, file)
@@ -317,11 +320,7 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
             pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
             pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
             )
-        data[inst][path[-12:-4]] = lf
-    
-for inst, lfs in tqdm(data.items()):
-    if inst in sampling_locs.keys():
-        for date, lf in tqdm(lfs.items()):
+        if inst in sampling_locs.keys():
             if "UTC_DateTime" in lf.collect_schema().names():
                 on = "UTC_DateTime"
                 compare = on
@@ -344,8 +343,7 @@ for inst, lfs in tqdm(data.items()):
                 .otherwise(pl.col("SamplingLocation"))
                 .alias("SamplingLocation")
                 )
-            data[inst][date] = lf
-            
+        data[inst][path[-12:-4]] = lf        
 
 inst = "2BTech_205_A"
 for date, lf in data[inst].items():
