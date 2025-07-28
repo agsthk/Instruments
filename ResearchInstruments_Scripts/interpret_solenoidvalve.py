@@ -21,7 +21,7 @@ STRUCT_DATA_DIR = os.path.join(data_dir,
                                "Picarro_G2307_StructuredData")
 # Full path to directory containing data derived from Picarro G2307
 DERIVED_DATA_DIR = os.path.join(data_dir,
-                                "ResearchInstruments_StructuredData",
+                                "ResearchInstruments_DerivedData",
                                 "Picarro_G2307_DerivedData")
 if not os.path.exists(DERIVED_DATA_DIR):
     os.makedirs(DERIVED_DATA_DIR)
@@ -69,16 +69,13 @@ intvs = intv_starts.join(intv_stops,
                          on="intv",
                          coalesce=True,
                          maintain_order="left")
-# Interprets SolenoidValve values and drops times where valve is switching
-# between open and closed
-intvs = intvs.select(
-    pl.selectors.contains("UTC"),
-    pl.when(pl.col("SolenoidValves").eq(0))
-    .then(pl.lit("Closed"))
-    .when(pl.col("SolenoidValves").eq(1))
-    .then(pl.lit("Open"))
-    .alias("ValveState")
-    ).drop_nulls()
+# Filters out times where valve is switching states
+intvs = intvs.filter(
+    pl.col("SolenoidValves").eq(intvs["SolenoidValves"].cast(pl.Int64))
+    ).select(
+        pl.selectors.contains("UTC"),
+        pl.col("SolenoidValves")
+        )
 # Exports valve state information as CSV file
 intvs.write_csv(
     os.path.join(
