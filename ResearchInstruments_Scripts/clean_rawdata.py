@@ -22,17 +22,7 @@ data_dir = os.path.join(data_dir, "ResearchInstruments_Data")
 
 # Full path to directory containing all structured raw data
 STRUCT_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_StructuredData")
-
-valve_states = pl.read_csv(
-    os.path.join(
-        data_dir,
-        "ResearchInstruments_DerivedData",
-        "Picarro_G2307_DerivedData",
-        "Picarro_G2307_SolenoidValveStates.csv"
-        )
-    ).with_columns(
-        pl.selectors.contains("UTC").str.to_datetime()
-        )
+        
 
 insts = ["2BTech_202",
          "2BTech_205_A",
@@ -110,7 +100,7 @@ sampling_locs = {
         ["2025-02-04T09:00:00-0700", None], #?
         ["2025-02-04T09:01:00-0700", "C200"], #?
         ["2025-02-06T14:22:00-0700", None], #?
-        ["2025-02-06T14:23:00-0700", "C200"], #?
+        ["2025-02-06T14:23:00-0700", "C200"], #? 
         ["2025-02-06T15:17:00-0700", None], #?
         ["2025-02-06T16:22:00-0700", "C200"], #?
         ["2025-02-06T16:54:00-0700", None], #?
@@ -149,19 +139,124 @@ sampling_locs = {
     }
 sampling_locs = {
     inst: pl.DataFrame(
-        locs, schema=["Start", "SamplingLocation"], orient="row"
+        locs, schema=["UTC_Start", "SamplingLocation"], orient="row"
         ).with_columns(
-            pl.col("Start").str.to_datetime()
+            pl.col("UTC_Start").str.to_datetime()
             ).select(
-                pl.col("Start"),#.dt.offset_by("1m"),
-                pl.col("Start").shift(-1).dt.offset_by("-1s").alias("Stop"),
+                pl.col("UTC_Start"),
+                pl.col("UTC_Start").shift(-1).alias("UTC_Stop"),
                 pl.col("SamplingLocation")
                 ).with_columns(
-                    pl.col("Stop").fill_null(pl.col("Start").dt.offset_by("1y"))
+                    pl.col("UTC_Stop").fill_null(
+                        pl.col("UTC_Start").dt.offset_by("1y")
+                        )
                     )
     for inst, locs in sampling_locs.items()
     }
 
+valve_states = pl.read_csv(
+    os.path.join(
+        data_dir,
+        "ResearchInstruments_DerivedData",
+        "Picarro_G2307_DerivedData",
+        "Picarro_G2307_SolenoidValveStates.csv"
+        )
+    ).with_columns(
+        pl.selectors.contains("UTC").str.to_datetime()
+        )
+        
+valve_states = valve_states.select(
+    pl.selectors.contains("UTC"),
+    pl.when(
+        pl.col("UTC_Start").gt(datetime(2025, 3, 20, 15, 57, tzinfo=pytz.UTC))
+        & pl.col("UTC_Stop").lt(datetime(2025, 3, 20, 20, 35, tzinfo=pytz.UTC))
+        & pl.col("SolenoidValves").eq(1))
+    .then(pl.lit("B203"))
+    .when(pl.col("SolenoidValves").eq(1))
+    .then(pl.lit("UZA"))
+    .alias("SamplingLocation")
+    )
+# Intervals that Picarro G2307 is on the Trace Gas Line
+pic_on_tg = sampling_locs["Picarro_G2307"].filter(
+    pl.col("SamplingLocation").eq("TG_Line")
+    ).select(
+        pl.exclude("SamplingLocation")
+        )
+# Intervals that Picarro G2307 is not on the Trace Gas Line
+pic_off_tg = pl.concat(
+    [pic_on_tg.with_columns(
+        pl.col("UTC_Start").alias("UTC_Stop"),
+        pl.col("UTC_Stop").shift(1).alias("UTC_Start")
+        ),
+    pic_on_tg.with_columns(
+        pl.col("UTC_Start").shift(-1).alias("UTC_Stop"),
+        pl.col("UTC_Stop").alias("UTC_Start")
+        )]
+    ).unique(maintain_order=True).with_columns(
+        pl.col("UTC_Start").fill_null(
+            pl.col("UTC_Stop").dt.offset_by("-1y")
+            ),
+        pl.col("UTC_Stop").fill_null(
+            pl.col("UTC_Start").dt.offset_by("1y")
+            )
+        )
+
+# Valve states while Picarro G2307 is on the Trace Gas Line
+valve_on_tg = valve_states.join(pic_on_tg, on=None, how="cross").filter(
+    pl.col("UTC_Start").lt(pl.col("UTC_Stop_right"))
+    & pl.col("UTC_Start_right").lt(pl.col("UTC_Stop"))
+    ).select(
+        pl.when(pl.col("UTC_Start").lt(pl.col("UTC_Start_right")))
+        .then(pl.col("UTC_Start_right"))
+        .otherwise(pl.col("UTC_Start"))
+        .alias("UTC_Start"),
+        pl.when(pl.col("UTC_Stop").gt(pl.col("UTC_Stop_right")))
+        .then(pl.col("UTC_Stop_right"))
+        .otherwise(pl.col("UTC_Stop"))
+        .alias("UTC_Stop"),
+        pl.col("SamplingLocation")
+        )
+# Assigns sampling locations
+valve_on_tg = valve_on_tg.join(
+    sampling_locs["TG_Line"], on=None, how="cross"
+    ).filter(
+        pl.col("UTC_Start").lt(pl.col("UTC_Stop_right"))
+        & pl.col("UTC_Start_right").lt(pl.col("UTC_Stop"))
+        ).select(
+            pl.when(pl.col("UTC_Start").lt(pl.col("UTC_Start_right")))
+            .then(pl.col("UTC_Start_right"))
+            .otherwise(pl.col("UTC_Start"))
+            .alias("UTC_Start"),
+            pl.when(pl.col("UTC_Stop").gt(pl.col("UTC_Stop_right")))
+            .then(pl.col("UTC_Stop_right"))
+            .otherwise(pl.col("UTC_Stop"))
+            .alias("UTC_Stop"),
+            pl.when(pl.col("SamplingLocation").is_null())
+            .then(pl.col("SamplingLocation_right"))
+            .otherwise(pl.col("SamplingLocation"))
+            .alias("SamplingLocation")
+            )
+
+valve_off_tg = pic_off_tg.join(
+    sampling_locs["TG_Line"], on=None, how="cross"
+    ).filter(
+        pl.col("UTC_Start").lt(pl.col("UTC_Stop_right"))
+        & pl.col("UTC_Start_right").lt(pl.col("UTC_Stop"))
+        ).select(
+            pl.when(pl.col("UTC_Start").lt(pl.col("UTC_Start_right")))
+            .then(pl.col("UTC_Start_right"))
+            .otherwise(pl.col("UTC_Start"))
+            .alias("UTC_Start"),
+            pl.when(pl.col("UTC_Stop").gt(pl.col("UTC_Stop_right")))
+            .then(pl.col("UTC_Stop_right"))
+            .otherwise(pl.col("UTC_Stop"))
+            .alias("UTC_Stop"),
+            pl.col("SamplingLocation")
+            )
+
+sampling_locs["TG_Line"] = pl.concat(
+    [valve_on_tg, valve_off_tg]
+    ).sort(by="UTC_Start")
 
 data = {inst: {} for inst in insts}
 
@@ -178,65 +273,6 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
             pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
             )
         data[inst][path[-12:-4]] = lf
-
-
-intvs = valve_states.select(
-    pl.col("UTC_Start").alias("Start"),
-    pl.col("UTC_Stop").alias("Stop"),
-    pl.when(
-        pl.col("UTC_Start").gt(datetime(2025, 3, 20, 15, 57, tzinfo=pytz.UTC))
-        & pl.col("UTC_Stop").lt(datetime(2025, 3, 20, 20, 35, tzinfo=pytz.UTC))
-        & pl.col("SolenoidValves").eq(1))
-    .then(pl.lit("B203"))
-    .when(pl.col("SolenoidValves").eq(1))
-    .then(pl.lit("UZA"))
-    .alias("SamplingLocation")
-    )
-
-# Time intervals that Picarro is on TG Line
-pic_on_tg = sampling_locs["Picarro_G2307"].filter(
-    pl.col("SamplingLocation").eq("TG_Line")
-    ).select(
-        pl.exclude("SamplingLocation")
-        )
-# Picarro zeroing/sampling intervals that occur while Picarro on TG Line
-intvs_on_tg = intvs.join(
-    pic_on_tg, on=None, how="cross").filter(
-        (pl.col("Start") < pl.col("Stop_right")) &
-        (pl.col("Start_right") < pl.col("Stop"))
-        ).select(
-            pl.col("Start", "Stop", "SamplingLocation")
-            ).unique(maintain_order=True)
-
-# Picarro zeroing/sampling intervals that occur while Picarro on TG Line and
-# TG Line sampling from C200 (normal configuration)
-intvs_on_tg = intvs_on_tg.join(
-    sampling_locs["TG_Line"], on=None, how="cross").filter(
-        (pl.col("Start") < pl.col("Stop_right")) &
-        (pl.col("Start_right") < pl.col("Stop"))
-        ).filter(
-            pl.col("SamplingLocation_right").str.contains("C200")
-            ).select(
-                pl.when(pl.col("Start").lt(pl.col("Start_right")))
-                .then(pl.col("Start_right"))
-                .otherwise(pl.col("Start"))
-                .alias("Start"),
-                pl.when(pl.col("Stop").gt(pl.col("Stop_right")))
-                .then(pl.col("Stop_right"))
-                .otherwise(pl.col("Stop"))
-                .alias("Stop"),
-                pl.when(pl.col("SamplingLocation").is_null())
-                .then(pl.col("SamplingLocation_right"))
-                .otherwise(pl.col("SamplingLocation"))
-                .alias("SamplingLocation")
-                )            
-sampling_locs["TG_Line"] = pl.concat(
-    [intvs_on_tg,
-     sampling_locs["TG_Line"].filter(
-         ~pl.col("SamplingLocation").str.contains("C200")
-         | pl.col("SamplingLocation").is_null()
-         )]
-    ).sort(by="Start")
 
 for inst, df in sampling_locs.items():
     sampling_locs[inst] = pl.concat(
