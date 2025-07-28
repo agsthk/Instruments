@@ -307,38 +307,33 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
             pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
             )
         data[inst][path[-12:-4]] = lf
-
-
-                
+    
 for inst, lfs in tqdm(data.items()):
     if inst in sampling_locs.keys():
         for date, lf in tqdm(lfs.items()):
-            lf = lf.with_columns(
-                pl.lit(None).alias("SamplingLocation")
-                )
+            
             if "UTC_DateTime" in lf.collect_schema().names():
-                rename = "UTC_DateTime"
-                compare = rename
+                on = "UTC_DateTime"
+                compare = on
+                locs = sampling_locs[inst].rename(
+                    {"UTC_Start": "UTC_DateTime",
+                     "UTC_Stop": "Sampling_Stop"}
+                    ).lazy()
             else:
-                rename = "UTC_Start"
+                on = "UTC_Start"
                 compare = "UTC_Stop"
-            locs = sampling_locs[inst].rename(
-                {"UTC_Start": rename, "UTC_Stop": "SamplingStop"}
-                ).lazy()
-            lf = pl.concat(
-                [lf, locs], how="diagonal_relaxed"
-                ).sort(by=rename).with_columns(
-                    pl.col("SamplingLocation").forward_fill(),
-                    pl.col("SamplingStop").forward_fill()
-                    ).drop_nulls(
-                        subset=pl.selectors.float()
-                        ).with_columns(
-                            pl.when(pl.col(compare).gt(pl.col("SamplingStop")))
-                            .then(None)
-                            .otherwise(pl.col("SamplingLocation"))
-                            .alias("SamplingLocation")
-                            )
+                locs = sampling_locs[inst].rename(
+                    {"UTC_Stop": "Sampling_Stop"}
+                    ).lazy()
+            lf = lf.join_asof(locs, on=on, strategy="backward", coalesce=True)
+            lf = lf.with_columns(
+                pl.when(pl.col(compare).gt(pl.col("Sampling_Stop")))
+                .then(pl.lit(None))
+                .otherwise(pl.col("SamplingLocation"))
+                .alias("SamplingLocation")
+                )
             data[inst][date] = lf
+            
 
 inst = "2BTech_205_A"
 for date, lf in data[inst].items():
