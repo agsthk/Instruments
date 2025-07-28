@@ -302,8 +302,8 @@ for inst, df in sampling_locs.items():
                     )]
         ).sort(by="UTC_Start")
     sampling_locs[inst] = temp_locs.with_columns(
-        pl.col("UTC_Start").dt.offset_by("30s"),
-        pl.col("UTC_Stop").dt.offset_by("-30s")
+        pl.col("UTC_Start").dt.offset_by("60s"),
+        pl.col("UTC_Stop").dt.offset_by("-60s")
         )
 
 data = {inst: {} for inst in insts}
