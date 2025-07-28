@@ -23,8 +23,6 @@ data_dir = os.path.join(data_dir, "ResearchInstruments_Data")
 # Full path to directory containing all structured raw data
 STRUCT_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_StructuredData")
 
-   
-
 insts = ["2BTech_202",
          "2BTech_205_A",
          "2BTech_205_B",
@@ -105,6 +103,8 @@ sampling_locs = {
         ["2025-02-03T12:07:00-0700", "C200"],
         ["2025-02-03T13:55:00-0700", None], #?
         ["2025-02-03T13:56:00-0700", "C200"], #?
+        ["2025-02-03T14:35:00-0700", None], #?
+        ["2025-02-03T14:37:00-0700", "C200"], #?
         ["2025-02-03T16:22:00-0700", None],
         ["2025-02-03T17:30:00-0700", "C200"],
         ["2025-02-04T09:00:00-0700", None], #?
@@ -127,6 +127,8 @@ sampling_locs = {
         ["2025-02-12T09:23:00-0700", "C200"], #?
         ["2025-02-12T15:30:00-0700", None], #?
         ["2025-02-13T09:20:00-0700", "C200"], #?
+        ["2025-02-17T12:33:00-0700", "UZA"],
+        ["2025-02-17T12:35:00-0700", "C200"],
         ["2025-03-06T07:55:00-0700", None], #?
         ["2025-03-06T07:57:00-0700", "C200"], #?
         ["2025-03-06T08:52:00-0700", None], #?
@@ -343,7 +345,40 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 .otherwise(pl.col("SamplingLocation"))
                 .alias("SamplingLocation")
                 )
+        if "WarmUp" in lf.collect_schema().names():
+            lf = lf.filter(
+                pl.col("WarmUp").eq(0)
+                )
+        if inst == "ThermoScientific_42i-TL":
+            lf = lf.filter(
+                pl.col("SampleFlow_LPM").gt(0.5)
+                )
         data[inst][path[-12:-4]] = lf        
+
+inst = "ThermoScientific_42i-TL"
+df = (
+      data[inst]["20250227"].collect()
+      # .filter(
+      #     pl.col("SampleFlow_LPM").gt(0.5)
+      #     )
+      )
+fig, ax = plt.subplots()
+for loc in df["SamplingLocation"].unique():
+    if loc is None:
+        continue
+        temp_df = df.filter(
+            pl.col("SamplingLocation").is_null()
+            )
+        loc = "Invalid"
+    else:
+        temp_df = df.filter(
+            pl.col("SamplingLocation").eq(loc)
+            )
+    ax.scatter(temp_df["UTC_Start"], temp_df["NO_ppb"] + temp_df["NO2_ppb"], label=loc)
+ax.xaxis.set_major_formatter(
+    mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+    )
+ax.legend()
 
 inst = "2BTech_205_A"
 for date, lf in data[inst].items():
