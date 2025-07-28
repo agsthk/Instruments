@@ -290,7 +290,7 @@ for inst, df in sampling_locs.items():
                     .otherwise(pl.col("SamplingLocation"))
                     .alias("SamplingLocation")
                     )]
-        )
+        ).sort(by="UTC_Start")
 
 data = {inst: {} for inst in insts}
 
@@ -325,7 +325,9 @@ for inst, lfs in tqdm(data.items()):
                 locs = sampling_locs[inst].rename(
                     {"UTC_Stop": "Sampling_Stop"}
                     ).lazy()
-            lf = lf.join_asof(locs, on=on, strategy="backward", coalesce=True)
+            lf = lf.join_asof(
+                locs, on=on, strategy="backward", coalesce=True
+                )
             lf = lf.with_columns(
                 pl.when(pl.col(compare).gt(pl.col("Sampling_Stop")))
                 .then(pl.lit(None))
