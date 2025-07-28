@@ -22,7 +22,8 @@ data_dir = os.path.join(data_dir, "ResearchInstruments_Data")
 
 # Full path to directory containing all structured raw data
 STRUCT_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_StructuredData")
-        
+
+   
 
 insts = ["2BTech_202",
          "2BTech_205_A",
@@ -91,6 +92,12 @@ sampling_locs = {
         ["2025-01-27T12:01:00-0700", "C200"],
         ["2025-01-27T17:07:00-0700", None],
         ["2025-01-27T17:45:00-0700", "C200"],
+        ["2025-01-28T01:44:08-0700", "UZA"],
+        ["2025-01-28T01:54:05-0700", "C200"],
+        ["2025-01-28T05:44:08-0700", "UZA"],
+        ["2025-01-28T05:54:05-0700", "C200"],
+        ["2025-01-28T09:44:08-0700", "UZA"],
+        ["2025-01-28T09:54:05-0700", "C200"],
         ["2025-02-03T09:45:00-0700", None],
         ["2025-02-03T12:07:00-0700", "C200"],
         ["2025-02-03T13:55:00-0700", None], #?
@@ -267,7 +274,7 @@ sampling_locs["TG_Line"] = pl.concat([
     ]).sort(by="UTC_Start")
 
 for inst, df in sampling_locs.items():
-    sampling_locs[inst] = pl.concat(
+    temp_locs = pl.concat(
         [sampling_locs[inst].filter(
             ~pl.col("SamplingLocation").eq("TG_Line")
             | pl.col("SamplingLocation").is_null()
@@ -291,6 +298,10 @@ for inst, df in sampling_locs.items():
                     .alias("SamplingLocation")
                     )]
         ).sort(by="UTC_Start")
+    sampling_locs[inst] = temp_locs.with_columns(
+        pl.col("UTC_Start").dt.offset_by("30s"),
+        pl.col("UTC_Stop").dt.offset_by("-30s")
+        )
 
 data = {inst: {} for inst in insts}
 
@@ -311,7 +322,6 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
 for inst, lfs in tqdm(data.items()):
     if inst in sampling_locs.keys():
         for date, lf in tqdm(lfs.items()):
-            
             if "UTC_DateTime" in lf.collect_schema().names():
                 on = "UTC_DateTime"
                 compare = on
@@ -379,7 +389,7 @@ for date, lf in data[inst].items():
             temp_df = df.filter(
                 pl.col("SamplingLocation").eq(loc)
                 )
-        ax.scatter(temp_df["UTC_Start"], temp_df["NO_ppb"], label=loc)
+        ax.scatter(temp_df["UTC_Start"], temp_df["NO_ppb"] + temp_df["NO2_ppb"], label=loc)
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
@@ -390,17 +400,25 @@ inst = "Picarro_G2307"
 for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
-    df = lf.filter(
-        pl.col("SamplingLocation").eq("UZA")
-        ).collect()
-    if df.is_empty():
-        continue
     fig, ax = plt.subplots()
-    ax.plot(df["UTC_DateTime"], df["CH2O_ppm"])
+    df = lf.collect()
+    for loc in df["SamplingLocation"].unique():
+        if loc is None:
+            continue
+            temp_df = df.filter(
+                pl.col("SamplingLocation").is_null()
+                )
+            loc = "Invalid"
+        else:
+            temp_df = df.filter(
+                pl.col("SamplingLocation").eq(loc)
+                )
+        ax.scatter(temp_df["UTC_DateTime"], temp_df["CH2O_ppm"], label=loc)
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
     ax.set_title(date)
+    ax.legend()
 
 inst = "LI-COR_LI-840A_A"
 for date, lf in data[inst].items():
