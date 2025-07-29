@@ -146,7 +146,8 @@ sampling_locs = {
         ["2025-03-20T08:50:44-0600", "B203"],
         ["2025-03-20T09:03:55-0600", "C200"],
         ["2025-03-20T09:13:15-0600", "B203"],
-        ["2025-03-20T09:23:10-0600", "C200"]
+        ["2025-03-20T09:23:10-0600", "C200"],
+        ["2025-05-05T12:47:00-0600", None]
         ]
     }
 sampling_locs = {
@@ -355,30 +356,42 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 )
         data[inst][path[-12:-4]] = lf        
 
-inst = "ThermoScientific_42i-TL"
-df = (
-      data[inst]["20250227"].collect()
-      # .filter(
-      #     pl.col("SampleFlow_LPM").gt(0.5)
-      #     )
-      )
-fig, ax = plt.subplots()
-for loc in df["SamplingLocation"].unique():
-    if loc is None:
-        continue
-        temp_df = df.filter(
-            pl.col("SamplingLocation").is_null()
-            )
-        loc = "Invalid"
-    else:
-        temp_df = df.filter(
-            pl.col("SamplingLocation").eq(loc)
-            )
-    ax.scatter(temp_df["UTC_Start"], temp_df["NO_ppb"] + temp_df["NO2_ppb"], label=loc)
-ax.xaxis.set_major_formatter(
-    mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+inst = "2BTech_205_A"
+df = data[inst]["20250217"].collect().filter(pl.col("SamplingLocation").eq("C200"))
+dt = df.with_columns(
+    pl.col("UTC_Start"),
+    pl.col("O3_ppb").sub(pl.col("O3_ppb").shift(1)).truediv(
+        pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(1)).dt.total_seconds()
+        ).alias("dcdt")
+    ).drop_nulls()
+dt = dt.with_columns(
+    med=pl.col("O3_ppb").rolling_median_by("UTC_Start", "5m"),
+    dmed=pl.col("dcdt").rolling_median_by("UTC_Start", "5m")
     )
-ax.legend()
+stats = df.with_columns(
+    pl.col("UTC_Start"),
+    pl.col("O3_ppb").ewm_mean_by(pl.col("UTC_Start"), half_life="1m")
+    )
+    # pl.col("O3_ppb").rolling_median_by("UTC_Start", "5m").alias("median")
+    # ).with_columns(
+    #     pl.col("O3_ppb").sub(pl.col("median")).abs().mul(1.4825).alias("mad")
+    #     ).filter(
+    #         pl.col("median").abs().gt(pl.col("mad").mul(2))
+    #         )
+    # pl.col("O3_ppb").rolling_quantile_by("UTC_Start", quantile=0.25, window_size="10m").alias("lq"),
+    # pl.col("O3_ppb").rolling_quantile_by("UTC_Start", quantile=0.75, window_size="10m").alias("uq"),
+    # ).with_columns(
+    #     pl.col("uq").sub(pl.col("lq")).alias("iqr")
+    #     )
+fig, ax = plt.subplots()
+ax.scatter(df["UTC_Start"], df["O3_ppb"], color="orange")
+ax.plot(dt["UTC_Start"], dt["med"], color="orange")
+ax.scatter(dt["UTC_Start"], dt["dcdt"], color="blue")
+ax.plot(dt["UTC_Start"], dt["dmed"], color="blue")
+
+# ax.plot(stats["UTC_Start"], stats["median"], color="blue")
+ax.plot(stats["UTC_Start"], stats["median"] + 1.5*stats["iqr"], color="blue")
+ax.plot(stats["UTC_Start"], stats["median"] - 1.5*stats["iqr"], color="blue")
 
 inst = "2BTech_205_A"
 for date, lf in data[inst].items():
@@ -431,7 +444,7 @@ for date, lf in data[inst].items():
 
 inst = "Picarro_G2307"
 for date, lf in data[inst].items():
-    if date[:4] != "2025":
+    if date != "20250505":
         continue
     fig, ax = plt.subplots()
     df = lf.collect()
