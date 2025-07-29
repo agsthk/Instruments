@@ -69,12 +69,12 @@ intvs = intv_starts.join(intv_stops,
                          on="intv",
                          coalesce=True,
                          maintain_order="left")
+
 # Filters out intervals where door is closed
-intvs = intvs.filter(
-    pl.col("DoorStatus").eq(1)
-    ).select(
-        pl.selectors.contains("UTC")
-        )
+intvs = intvs.select(
+    pl.selectors.contains("UTC"),
+    pl.col("DoorStatus")
+    )
 # Exports door open intervals as CSVfile
 intvs.write_csv(
     os.path.join(
