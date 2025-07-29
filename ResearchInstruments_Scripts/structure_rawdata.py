@@ -54,6 +54,25 @@ schemas = {
             "InstrumentStatus": pl.Int64()
             }
         },
+    "AdditionValves": {
+        "Igor": {
+            "IgorTime": pl.Int64(),
+            "Date": pl.String(),
+            "Time": pl.String(),
+            "SetPosition": pl.String(),
+            "ReadVoltage_V": pl.Float64(),
+            "ReadPosition": pl.String()
+            }
+        },
+    "Aranet4_1F16F": {
+        "Logger": {
+            "FTC_DateTime": pl.String(),
+            "CO2_ppm": pl.Float64(),
+            "RoomTemp_C": pl.Float64(),
+            "RoomRH_percent": pl.Float64(),
+            "AtmosphericPressure_hPa": pl.Float64()
+            }
+        },
     "LI-COR_LI-840A_A": {
         "Logger": {
             "Date": pl.String(),
@@ -193,9 +212,11 @@ schemas["2BTech_202"]["DAQ"] = (
        "WarmUp": pl.Int64()}
     )
 schemas["2BTech_205_A"] = schemas["2BTech_205_B"] = schemas["2BTech_202"]
+schemas["Aranet4_1FB20"] = schemas["Aranet4_1F16F"]
 schemas["LI-COR_LI-840A_B"] = schemas["LI-COR_LI-840A_A"]
 
 date_fmts = {"2BTech_202": "%d/%m/%y",
+             "AdditionValves": "%Y/%m/%d",
              "LI-COR_LI-840A_A": "%Y-%m-%d",
              "TempRHDoor": "%Y-%m-%d",
              "ThermoScientific_42i-TL": "%m-%d-%y"}
@@ -208,15 +229,21 @@ time_fmts = {"2BTech_202": "%H:%M:%S",
              "ThermoScientific_42i-TL": "%H:%M"}
 
 for inst in ["2BTech_205_A", "2BTech_205_B", "2BTech_405nm",
-             "LI-COR_LI-840A_A", "LI-COR_LI-840A_B", "TempRHDoor"]:
+             "AdditionValves", "LI-COR_LI-840A_A", "LI-COR_LI-840A_B",
+             "TempRHDoor"]:
     time_fmts[inst] = time_fmts["2BTech_202"]
     
-datetime_fmts = {"Teledyne_N300": "%m/%d/%Y %H:%M:%S"}
+datetime_fmts = {"Aranet4_1F16F": "%d/%m/%Y %H:%M:%S",
+                 "Teledyne_N300": "%m/%d/%Y %H:%M:%S"}
+datetime_fmts["Aranet4_1FB20"] = datetime_fmts["Aranet4_1F16F"]
 
 timezones = {"2BTech_202": "MST",
              "2BTech_205_A": "MST",
              "2BTech_205_B": "MST",
              "2BTech_405nm": "MST",
+             "AdditionValves": "America/Denver",
+             "Aranet4_1F16F": "America/Denver",
+             "Aranet4_1FB20": "America/Denver",
              "LI-COR_LI-840A_A": "America/Denver",
              "LI-COR_LI-840A_B": "America/Denver",
              "Picarro_G2307": "UTC",
@@ -258,6 +285,12 @@ avg_times = {
         "2024-06-25 21:09:43+00:00": "60s",
         "2024-07-02 15:42:36+00:00": "5s",
         "2024-07-02 20:17:40+00:00": "60s",
+        },
+    "Aranet4_1F16F": {
+        "2025-03-21 02:14:00+00:00": "60s"
+        },
+    "Aranet4_1FB20": {
+        "2025-03-21 02:15:00+00:00": "60s"
         },
     "ThermoScientific_42i-TL": {
         "2024-01-19 17:39:00+00:00": "60s"
