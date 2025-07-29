@@ -27,6 +27,9 @@ insts = ["2BTech_202",
          "2BTech_205_A",
          "2BTech_205_B",
          "2BTech_405nm",
+         "AdditionValves",
+         "Aranet4_1F16F",
+         "Aranet4_1FB20",
          "LI-COR_LI-840A_A",
          "LI-COR_LI-840A_B",
          "Picarro_G2307",
@@ -393,7 +396,7 @@ ax.plot(dt["UTC_Start"], dt["dmed"], color="blue")
 ax.plot(stats["UTC_Start"], stats["median"] + 1.5*stats["iqr"], color="blue")
 ax.plot(stats["UTC_Start"], stats["median"] - 1.5*stats["iqr"], color="blue")
 
-inst = "2BTech_205_A"
+inst = "2BTech_205_B"
 for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
@@ -444,7 +447,7 @@ for date, lf in data[inst].items():
 
 inst = "Picarro_G2307"
 for date, lf in data[inst].items():
-    if date != "20250505":
+    if date[:4] != "2025":
         continue
     fig, ax = plt.subplots()
     df = lf.collect()
@@ -474,13 +477,27 @@ for date, lf in data[inst].items():
         pl.col("SamplingLocation").eq("C200")
         ).collect()
     fig, ax = plt.subplots()
-    ax.plot(df["UTC_DateTime"], df["CO2_ppm"])
+    ax.scatter(df["UTC_DateTime"], df["CO2_ppm"])
     if date in data[inst[:-1] + "B"].keys():
         df2 = data[inst[:-1] + "B"][date].filter(
             pl.col("SamplingLocation").eq("C200_Vent")
             ).collect()
-        ax.plot(df2["UTC_DateTime"], df2["CO2_ppm"])
+        ax.scatter(df2["UTC_DateTime"], df2["CO2_ppm"])
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
     ax.set_title(date)
+    
+    
+inst = "TempRHDoor"
+for date, lf in data[inst].items():
+    if date[:4] != "2025":
+        continue
+    df = lf.collect()
+    fig, ax = plt.subplots()
+    ax.scatter(df["UTC_DateTime"], df["DoorStatus"])
+    ax.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax.set_title(date)
+
