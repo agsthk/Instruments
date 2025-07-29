@@ -66,7 +66,7 @@ schemas = {
         },
     "Aranet4_1F16F": {
         "Logger": {
-            "FTC_DateTime": pl.String(),
+            "DateTime": pl.String(),
             "CO2_ppm": pl.Float64(),
             "RoomTemp_C": pl.Float64(),
             "RoomRH_percent": pl.Float64(),
@@ -224,6 +224,7 @@ date_fmts = {"2BTech_202": "%d/%m/%y",
 for inst in ["2BTech_205_A", "2BTech_205_B", "2BTech_405nm"]:
     date_fmts[inst] = date_fmts["2BTech_202"]
 date_fmts["LI-COR_LI-840A_B"] = date_fmts["LI-COR_LI-840A_A"]
+
 
 time_fmts = {"2BTech_202": "%H:%M:%S",
              "ThermoScientific_42i-TL": "%H:%M"}
