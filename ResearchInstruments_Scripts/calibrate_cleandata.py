@@ -9,9 +9,6 @@ import os
 import polars as pl
 import pytz
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import pytz
 
 # Declares full path to ResearchInstruments_Data/ directory
 data_dir = os.getcwd()
