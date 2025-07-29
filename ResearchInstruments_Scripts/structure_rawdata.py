@@ -394,6 +394,20 @@ def read_rawdata(path, inst, source, schema):
         data = read_picarro(path, schema)
     elif inst.find("2BTech") != -1:
         data = read_2bdata(path, schema)
+    elif inst == "AdditionValves":
+        data = pl.read_csv(path,
+                           skip_rows=1,
+                           has_header=False,
+                           schema=schema,
+                           ignore_errors=True,
+                           eol_char="\r")
+    elif inst.find("Aranet4") != -1:
+        data = pl.read_csv(path,
+                           separator=",",
+                           has_header=False,
+                           schema=schema,
+                           ignore_errors=True,
+                           skip_rows=1)
     elif inst == "ThermoScientific_42i-TL":
         data = pd.read_csv(path,
                            sep="\s+",
