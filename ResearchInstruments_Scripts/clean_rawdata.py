@@ -376,6 +376,8 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 pl.col("SampleFlow_LPM").gt(0.5)
                 )
         df = lf.collect()
+        if df.is_empty():
+            continue
         _, source = file[:-17].split("_Structured")
         f_name = inst + "_Clean" + source + "Data_" + path[-12:-4] + ".csv"
         f_dir = os.path.join(CLEAN_DATA_DIR,
