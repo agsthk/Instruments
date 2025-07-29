@@ -27,7 +27,6 @@ insts = ["2BTech_202",
          "2BTech_205_A",
          "2BTech_205_B",
          "2BTech_405nm",
-         "AdditionValves",
          "Aranet4_1F16F",
          "Aranet4_1FB20",
          "LI-COR_LI-840A_A",
@@ -37,7 +36,10 @@ insts = ["2BTech_202",
          "ThermoScientific_42i-TL"]
 
 sampling_locs = {
-    # "2BTech_202" : [[]],
+    "2BTech_202" : [
+        ["2024-01-18T13:39:00-0700", "Calibration Source"],
+        ["2024-01-18T17:14:00-0700", "B213"]
+        ],
     "2BTech_205_A": [
         ["2025-01-15T09:03:00-0700", "Calibration Source"],
         ["2025-01-17T10:00:00-0700", "B211"],
@@ -55,7 +57,15 @@ sampling_locs = {
         ["2025-03-03T07:05:00-0700", None], #?
         ["2025-03-03T07:07:00-0700", "C200_Vent"], #?
         ],
-    # "2BTech_405nm" : [[]],
+    "2BTech_405nm" : [
+        ["2024-12-16T15:59:00-0700", "Calibration Source"]
+        ],
+    "Aranet4_1F16F": [
+        ["2025-03-20T20:13:00-0600", "C200"]
+        ],
+    "Aranet4_1FB20": [
+        ["2025-03-20T20:15:00-0600", "C200"]
+        ],
     "LI-COR_LI-840A_A": [
         ["2025-01-10T10:10:01-0700", "C200"]
         ],
@@ -85,7 +95,6 @@ sampling_locs = {
         ["2025-02-06T16:54:00-0700", "B203"],
         ["2025-02-07T08:07:00-0700", "TG_Line"]
         ],
-    # "Teledyne_N300": [[]],
     "TG_Line": [
         ["2025-01-17T19:08:00-0700", "C200/B203/Exhaust"],
         ["2025-01-20T16:20:00-0700", None],
@@ -322,7 +331,11 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         for inst in insts:
             if path.find(inst) != -1:
                 break
-        lf = pl.scan_csv(path).with_columns(
+        if inst == "2BTech_405nm":
+            lf = pl.scan_csv(path, infer_schema_length=None)
+        else:
+            lf = pl.scan_csv(path)
+        lf = lf.with_columns(
             pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
             pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
             )
@@ -359,42 +372,6 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 )
         data[inst][path[-12:-4]] = lf        
 
-inst = "2BTech_205_A"
-df = data[inst]["20250217"].collect().filter(pl.col("SamplingLocation").eq("C200"))
-dt = df.with_columns(
-    pl.col("UTC_Start"),
-    pl.col("O3_ppb").sub(pl.col("O3_ppb").shift(1)).truediv(
-        pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(1)).dt.total_seconds()
-        ).alias("dcdt")
-    ).drop_nulls()
-dt = dt.with_columns(
-    med=pl.col("O3_ppb").rolling_median_by("UTC_Start", "5m"),
-    dmed=pl.col("dcdt").rolling_median_by("UTC_Start", "5m")
-    )
-stats = df.with_columns(
-    pl.col("UTC_Start"),
-    pl.col("O3_ppb").ewm_mean_by(pl.col("UTC_Start"), half_life="1m")
-    )
-    # pl.col("O3_ppb").rolling_median_by("UTC_Start", "5m").alias("median")
-    # ).with_columns(
-    #     pl.col("O3_ppb").sub(pl.col("median")).abs().mul(1.4825).alias("mad")
-    #     ).filter(
-    #         pl.col("median").abs().gt(pl.col("mad").mul(2))
-    #         )
-    # pl.col("O3_ppb").rolling_quantile_by("UTC_Start", quantile=0.25, window_size="10m").alias("lq"),
-    # pl.col("O3_ppb").rolling_quantile_by("UTC_Start", quantile=0.75, window_size="10m").alias("uq"),
-    # ).with_columns(
-    #     pl.col("uq").sub(pl.col("lq")).alias("iqr")
-    #     )
-fig, ax = plt.subplots()
-ax.scatter(df["UTC_Start"], df["O3_ppb"], color="orange")
-ax.plot(dt["UTC_Start"], dt["med"], color="orange")
-ax.scatter(dt["UTC_Start"], dt["dcdt"], color="blue")
-ax.plot(dt["UTC_Start"], dt["dmed"], color="blue")
-
-# ax.plot(stats["UTC_Start"], stats["median"], color="blue")
-ax.plot(stats["UTC_Start"], stats["median"] + 1.5*stats["iqr"], color="blue")
-ax.plot(stats["UTC_Start"], stats["median"] - 1.5*stats["iqr"], color="blue")
 
 inst = "2BTech_205_B"
 for date, lf in data[inst].items():
@@ -469,35 +446,47 @@ for date, lf in data[inst].items():
     ax.set_title(date)
     ax.legend()
 
-inst = "LI-COR_LI-840A_A"
+inst = "Teledyne_N300"
+for date, lf in data[inst].items():
+    fig, ax = plt.subplots()
+    df = lf.collect()
+    
+    ax.scatter(df["UTC_DateTime"], df["CO_ppm"])
+    ax.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax.set_title(date)
+    ax.legend()
+
+inst = "Aranet4_1FB20"
 for date, lf in data[inst].items():
     if date[:4] != "2025":
         continue
-    df = lf.filter(
-        pl.col("SamplingLocation").eq("C200")
-        ).collect()
+    df = lf.collect()
+    # filter(
+        # pl.col("SamplingLocation").eq("C200")
+        # ).collect()
     fig, ax = plt.subplots()
-    ax.scatter(df["UTC_DateTime"], df["CO2_ppm"])
-    if date in data[inst[:-1] + "B"].keys():
-        df2 = data[inst[:-1] + "B"][date].filter(
-            pl.col("SamplingLocation").eq("C200_Vent")
-            ).collect()
-        ax.scatter(df2["UTC_DateTime"], df2["CO2_ppm"])
+    ax.scatter(df["UTC_Start"], df["CO2_ppm"])
+    # if date in data[inst[:-1] + "B"].keys():
+    #     df2 = data[inst[:-1] + "B"][date].filter(
+    #         pl.col("SamplingLocation").eq("C200_Vent")
+    #         ).collect()
+    #     ax.scatter(df2["UTC_DateTime"], df2["CO2_ppm"])
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
     ax.set_title(date)
     
     
-inst = "TempRHDoor"
+inst = "2BTech_405nm"
 for date, lf in data[inst].items():
-    if date[:4] != "2025":
-        continue
     df = lf.collect()
     fig, ax = plt.subplots()
-    ax.scatter(df["UTC_DateTime"], df["DoorStatus"])
+    ax.scatter(df["UTC_Start"], df["NOx_ppb"])
     ax.xaxis.set_major_formatter(
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
     ax.set_title(date)
 
+data[inst]["20250320"].collect().min()
