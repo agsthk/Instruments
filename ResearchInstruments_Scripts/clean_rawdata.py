@@ -8,6 +8,7 @@ Created on Mon Jul 21 16:52:19 2025
 import os
 import polars as pl
 import pytz
+from datetime import datetime
 from tqdm import tqdm
 
 # Declares full path to ResearchInstruments_Data/ directory
