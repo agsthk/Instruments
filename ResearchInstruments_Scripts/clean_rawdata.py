@@ -22,6 +22,11 @@ data_dir = os.path.join(data_dir, "ResearchInstruments_Data")
 
 # Full path to directory containing all structured raw data
 STRUCT_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_StructuredData")
+# Full path to directory containing all clean raw data
+CLEAN_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_CleanData")
+# Creates ResearchInstruments_CleanData/ directory if needed
+if not os.path.exists(CLEAN_DATA_DIR):
+    os.makedirs(CLEAN_DATA_DIR)
 
 insts = ["2BTech_202",
          "2BTech_205_A",
@@ -331,6 +336,8 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         for inst in insts:
             if path.find(inst) != -1:
                 break
+        if inst == "ThermoScientific_42i-TL" and path.find(inst) == -1:
+            continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -365,128 +372,20 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         if "WarmUp" in lf.collect_schema().names():
             lf = lf.filter(
                 pl.col("WarmUp").eq(0)
-                )
+                ).select(
+                    pl.exclude("WarmUp"))
         if inst == "ThermoScientific_42i-TL":
             lf = lf.filter(
                 pl.col("SampleFlow_LPM").gt(0.5)
                 )
-        data[inst][path[-12:-4]] = lf        
-
-
-inst = "2BTech_205_B"
-for date, lf in data[inst].items():
-    if date[:4] != "2025":
-        continue
-    fig, ax = plt.subplots()
-    df = lf.collect()
-    for loc in df["SamplingLocation"].unique():
-        if loc is None:
-            continue
-            temp_df = df.filter(
-                pl.col("SamplingLocation").is_null()
-                )
-            loc = "Invalid"
-        else:
-            temp_df = df.filter(
-                pl.col("SamplingLocation").eq(loc)
-                )
-        ax.scatter(temp_df["UTC_Start"], temp_df["O3_ppb"], label=loc)
-    ax.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax.set_title(date)
-    ax.legend()
-
-
-inst = "ThermoScientific_42i-TL"
-for date, lf in data[inst].items():
-    if date[:4] != "2025":
-        continue
-    fig, ax = plt.subplots()
-    df = lf.collect()
-    for loc in df["SamplingLocation"].unique():
-        if loc is None:
-            continue
-            temp_df = df.filter(
-                pl.col("SamplingLocation").is_null()
-                )
-            loc = "Invalid"
-        else:
-            temp_df = df.filter(
-                pl.col("SamplingLocation").eq(loc)
-                )
-        ax.scatter(temp_df["UTC_Start"], temp_df["NO_ppb"] + temp_df["NO2_ppb"], label=loc)
-    ax.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax.set_title(date)
-    ax.legend()
-
-inst = "Picarro_G2307"
-for date, lf in data[inst].items():
-    if date[:4] != "2025":
-        continue
-    fig, ax = plt.subplots()
-    df = lf.collect()
-    for loc in df["SamplingLocation"].unique():
-        if loc is None:
-            continue
-            temp_df = df.filter(
-                pl.col("SamplingLocation").is_null()
-                )
-            loc = "Invalid"
-        else:
-            temp_df = df.filter(
-                pl.col("SamplingLocation").eq(loc)
-                )
-        ax.scatter(temp_df["UTC_DateTime"], temp_df["CH2O_ppm"], label=loc)
-    ax.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax.set_title(date)
-    ax.legend()
-
-inst = "Teledyne_N300"
-for date, lf in data[inst].items():
-    fig, ax = plt.subplots()
-    df = lf.collect()
-    
-    ax.scatter(df["UTC_DateTime"], df["CO_ppm"])
-    ax.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax.set_title(date)
-    ax.legend()
-
-inst = "Aranet4_1FB20"
-for date, lf in data[inst].items():
-    if date[:4] != "2025":
-        continue
-    df = lf.collect()
-    # filter(
-        # pl.col("SamplingLocation").eq("C200")
-        # ).collect()
-    fig, ax = plt.subplots()
-    ax.scatter(df["UTC_Start"], df["CO2_ppm"])
-    # if date in data[inst[:-1] + "B"].keys():
-    #     df2 = data[inst[:-1] + "B"][date].filter(
-    #         pl.col("SamplingLocation").eq("C200_Vent")
-    #         ).collect()
-    #     ax.scatter(df2["UTC_DateTime"], df2["CO2_ppm"])
-    ax.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax.set_title(date)
-    
-    
-inst = "2BTech_405nm"
-for date, lf in data[inst].items():
-    df = lf.collect()
-    fig, ax = plt.subplots()
-    ax.scatter(df["UTC_Start"], df["NOx_ppb"])
-    ax.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax.set_title(date)
-
-data[inst]["20250320"].collect().min()
+        df = lf.collect()
+        _, source = file[:-17].split("_Structured")
+        f_name = inst + "_Clean" + source + "Data_" + path[-12:-4] + ".csv"
+        f_dir = os.path.join(CLEAN_DATA_DIR,
+                             inst + "_CleanData",
+                             inst + "_Clean" + source + "Data")
+        if not os.path.exists(f_dir):
+            os.makedirs(f_dir)
+        path = os.path.join(f_dir,
+                            f_name)
+        df.write_csv(path)
