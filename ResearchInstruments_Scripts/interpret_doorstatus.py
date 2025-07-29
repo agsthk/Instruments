@@ -79,6 +79,6 @@ intvs = intvs.select(
 intvs.write_csv(
     os.path.join(
         DERIVED_DATA_DIR,
-        "TempRHDoor_DoorOpen.csv"
+        "TempRHDoor_DoorStatus.csv"
         )
     )
