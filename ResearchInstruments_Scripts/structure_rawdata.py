@@ -596,8 +596,19 @@ for inst in data.keys():
             concat_df = concat_df.with_columns(
                 pl.selectors.contains("UTC", "FTC").dt.offset_by("-12m15s")
                 )
+        if inst == "ThermoScientific_42i-TL":
+            if source == "DAQ":
+                concat_df.insert_column(
+                    7,
+                    pl.col("NO_ppb").add(pl.col("NO2_ppb")).alias("NOx_ppb")
+                    )
+            else:
+                concat_df.insert_column(
+                    6,
+                    pl.col("NOx_ppb").sub(pl.col("NO_ppb")).alias("NO2_ppb")
+                    )
         data[inst][source] = split_by_date(concat_df)
-
+        
 for inst in data.keys():
     for source in data[inst].keys():
         for date, df in data[inst][source].items():
