@@ -102,7 +102,9 @@ for inst, dic in cal_info.items():
         dic[date] = conc
     cal_info[inst] = dic
 
+calfactors = {}
 for inst, datecal in cal_info.items():
+    instcalfactors = {}
     for date, cal in datecal.items():
         for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             for file in tqdm(files):
@@ -149,6 +151,17 @@ for inst, datecal in cal_info.items():
                 slope, intercept = output.beta
                 unc_slope, unc_intercept = output.sd_beta
                 
+                instcalfactors[date] = pl.DataFrame([[slope,
+                                                     unc_slope,
+                                                     intercept,
+                                                     unc_intercept]],
+                                                    schema={"Slope": pl.Float64(),
+                                                             "Slope_Unc": pl.Float64(),
+                                                             "Offset": pl.Float64(),
+                                                             "Offset_Unc": pl.Float64()},
+                                                    orient="row"
+                                                    )
+                
                 fig, ax = plt.subplots()
                 ax.errorbar(calib["O3_ppb_delivered"], calib["O3_ppb_measured"],
                            xerr=calib["Uncertainty_O3_ppb"],
@@ -157,3 +170,5 @@ for inst, datecal in cal_info.items():
                 ax.plot(calib["O3_ppb_delivered"],
                         calib["O3_ppb_delivered"] * slope + intercept)
                 ax.set_title(inst + " " + date)
+        calfactors[inst] = instcalfactors
+        
