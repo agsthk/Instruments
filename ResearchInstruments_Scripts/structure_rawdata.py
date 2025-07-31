@@ -122,10 +122,10 @@ schemas = {
             "MPVPosition": pl.Float64(),
             "OutletValve_DN": pl.Float64(),
             "SolenoidValves": pl.Float64(),
-            "CH2O_ppm": pl.Float64(),
-            "CH2O_30s_ppm": pl.Float64(),
-            "CH2O_2min_ppm": pl.Float64(),
-            "CH2O_5min_ppm": pl.Float64(),
+            "CH2O_ppb": pl.Float64(),
+            "CH2O_30s_ppb": pl.Float64(),
+            "CH2O_2min_ppb": pl.Float64(),
+            "CH2O_5min_ppb": pl.Float64(),
             "H2O_percent": pl.Float64(),
             "CH4_ppm": pl.Float64(),
             "YMD": pl.Float64(),
@@ -375,10 +375,10 @@ def read_picarro(path, schema):
               "MPVPosition": "MPVPosition",
               "OutletValve": "OutletValve_DN",
               "solenoid_valves": "SolenoidValves",
-              "H2CO": "CH2O_ppm",
-              "H2CO_30s": "CH2O_30_ppm",
-              "H2CO_2min": "CH2O_2min_ppm",
-              "H2CO_5min": "CH2O_5min_ppm",
+              "H2CO": "CH2O_ppb",
+              "H2CO_30s": "CH2O_30_ppb",
+              "H2CO_2min": "CH2O_2min_ppb",
+              "H2CO_5min": "CH2O_5min_ppb",
               "H2O": "H2O_percent",
               "CH4": "CH4_ppm"}
     data = pd.read_hdf(path, "results")
@@ -608,7 +608,7 @@ for inst in data.keys():
                     pl.col("NOx_ppb").sub(pl.col("NO_ppb")).alias("NO2_ppb")
                     )
         data[inst][source] = split_by_date(concat_df)
-        
+
 for inst in data.keys():
     for source in data[inst].keys():
         for date, df in data[inst][source].items():
