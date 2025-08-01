@@ -148,6 +148,16 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         odr_cal_data = cal_data.filter(
                             pl.col("NO2_ppb_Delivered").eq(0)
                             )
+                    elif var == "NO2_ppb":
+                        odr_cal_data = cal_data.filter(
+                            (
+                                pl.col("NO_ppb_Delivered").eq(0)
+                                & pl.col("NO2_ppb_Delivered").eq(0)
+                            )
+                            | pl.col("NO2_ppb_Delivered").ne(0)
+                            )
+                    elif var == "NOx_ppb":
+                        continue
                     else:
                         odr_cal_data = cal_data
                     sens, off, unc_sens, unc_off = perform_odr(
