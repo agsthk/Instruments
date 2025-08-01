@@ -7,6 +7,7 @@ Created on Thu Jul 31 12:23:33 2025
 
 import os
 import polars as pl
+import polars.selectors as cs
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import scipy as sp
@@ -62,12 +63,9 @@ for inst, inst_cal_inputs in cal_inputs.items():
     inst_cal_factors = []
     for date, inst_cal_input in inst_cal_inputs.items():
         cal_vars = inst_cal_input.select(
-            pl.exclude(
-                pl.Datetime(time_zone="UTC")
-                )
-            ).select(
-                ~pl.selectors.contains("Unc")
-                ).columns
+            ~cs.contains("Unc") &
+            ~cs.datetime()
+            ).columns
         for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             for file in tqdm(files):
                 if file.find(inst) == -1 or file.find(date) == -1:
@@ -82,8 +80,8 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     stop_compare = "UTC_Stop"
                 else:
                     left_on = stop_compare = "UTC_DateTime"
-                cal_data = cal_data.with_columns(
-                            pl.selectors.contains("UTC").str.to_datetime()
+                cal_plot_data = cal_data.with_columns(
+                            cs.contains("UTC").str.to_datetime()
                             ).join_asof(inst_cal_input,
                                         left_on=left_on,
                                         right_on="Start",
@@ -95,14 +93,19 @@ for inst, inst_cal_inputs in cal_inputs.items():
                                                 .sub(pl.col("Start"))
                                                 .truediv(2)
                                                 )
-                                            .alias("Mid")
+                                            .alias("Mid"),
                                             ).fill_null(np.nan).filter(
-                                               pl.col(stop_compare).lt(pl.col("Stop"))
-                                               )
+                                                pl.col(stop_compare).gt(pl.min("Start"))
+                                                & pl.col(left_on).lt(pl.max("Stop"))
+                                                )
+                cal_data = cal_plot_data.filter(
+                    pl.col(stop_compare).lt(pl.col("Stop"))
+                    )
+                
                 for var in cal_vars:
                     var_nounits = var.split("_")[0]
                     fig, ax = plt.subplots()
-                    ax.scatter(cal_data[left_on], cal_data[var])
+                    ax.scatter(cal_plot_data[left_on], cal_plot_data[var])
                     ax.errorbar(cal_data["Mid"], cal_data[var + "_Delivered"],
                                 xerr=(cal_data["Mid"] - cal_data["Start"]),
                                 yerr=cal_data["Unc_" + var],
@@ -111,37 +114,38 @@ for inst, inst_cal_inputs in cal_inputs.items():
                                 )
                     ax.set_ylabel(var)
                     ax.set_title(inst + " " + date)
-                    
-                    var_cal_data = cal_data.group_by(var + "_Delivered").agg(
-                        pl.col("Unc_" + var).mean().alias("Unc_" + var + "_Delivered"),
-                        pl.col(var).mean().alias(var + "_Measured"),
-                        pl.col(var).std().alias("Unc_" + var + "_Measured")
-                        )
-                    var_cal_data = var_cal_data.with_columns(
-                        pl.when(pl.col("Unc_" + var + "_Delivered").eq(0))
-                        .then(pl.lit(1e-15))
-                        .otherwise(pl.col("Unc_" + var + "_Delivered"))
-                        .alias("Unc_" + var + "_Delivered")
-                        )
-                    
+                cal_data = cal_data.group_by(
+                    cs.ends_with("Delivered")
+                    ).agg(
+                        cs.ends_with("Delivered"),
+                        cs.starts_with("Unc").mean()
+                        .name.suffix("_Delivered"),
+                        cs.by_name(cal_vars).mean()
+                        .name.suffix("_Measured"),
+                        cs.by_name(cal_vars).std()
+                        .name.map(lambda c: "Unc_" + c + "_Measured")
+                        ).with_columns(
+                            cs.starts_with("Unc").replace(0, 1e-15)
+                            )
+                for var in cal_vars:
                     model = sp.odr.Model(linear)
-                    data = sp.odr.RealData(var_cal_data[var + "_Delivered"],
-                                           var_cal_data[var + "_Measured"],
-                                           sx=var_cal_data["Unc_" + var + "_Delivered"],
-                                           sy=var_cal_data["Unc_" + var + "_Measured"])
+                    data = sp.odr.RealData(cal_data[var + "_Delivered"],
+                                           cal_data[var + "_Measured"],
+                                           sx=cal_data["Unc_" + var + "_Delivered"],
+                                           sy=cal_data["Unc_" + var + "_Measured"])
                     output = sp.odr.ODR(data, model, beta0=[1, 0]).run()
                     sens, off = output.beta
                     unc_sens, unc_off = output.sd_beta
                     inst_cal_factors.append([date, var_nounits, sens, unc_sens, off, unc_off])
                     
                     fig, ax = plt.subplots()
-                    ax.errorbar(var_cal_data[var + "_Delivered"],
-                                var_cal_data[var + "_Measured"],
-                                xerr=var_cal_data["Unc_" + var + "_Delivered"],
-                                yerr=var_cal_data["Unc_" + var + "_Measured"],
+                    ax.errorbar(cal_data[var + "_Delivered"],
+                                cal_data[var + "_Measured"],
+                                xerr=cal_data["Unc_" + var + "_Delivered"],
+                                yerr=cal_data["Unc_" + var + "_Measured"],
                                 linestyle="")
-                    ax.plot(var_cal_data[var + "_Delivered"],
-                            var_cal_data[var + "_Delivered"] * sens + off)
+                    ax.plot(cal_data[var + "_Delivered"],
+                            cal_data[var + "_Delivered"] * sens + off)
                     ax.set_title(inst + " " + date)
                 cal_factors[inst] = inst_cal_factors
 
