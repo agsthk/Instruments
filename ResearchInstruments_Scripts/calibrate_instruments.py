@@ -116,14 +116,19 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         pl.col("Unc_" + var).mean().alias("Unc_" + var + "_Delivered"),
                         pl.col(var).mean().alias(var + "_Measured"),
                         pl.col(var).std().alias("Unc_" + var + "_Measured")
-                        
+                        )
+                    var_cal_data = var_cal_data.with_columns(
+                        pl.when(pl.col("Unc_" + var + "_Delivered").eq(0))
+                        .then(pl.lit(1e-15))
+                        .otherwise(pl.col("Unc_" + var + "_Delivered"))
+                        .alias("Unc_" + var + "_Delivered")
                         )
                     
                     model = sp.odr.Model(linear)
                     data = sp.odr.RealData(var_cal_data[var + "_Delivered"],
                                            var_cal_data[var + "_Measured"],
-                                           var_cal_data["Unc_" + var + "_Delivered"],
-                                           var_cal_data["Unc_" + var + "_Measured"])
+                                           sx=var_cal_data["Unc_" + var + "_Delivered"],
+                                           sy=var_cal_data["Unc_" + var + "_Measured"])
                     output = sp.odr.ODR(data, model, beta0=[1, 0]).run()
                     sens, off = output.beta
                     unc_sens, unc_off = output.sd_beta
@@ -139,3 +144,4 @@ for inst, inst_cal_inputs in cal_inputs.items():
                             var_cal_data[var + "_Delivered"] * sens + off)
                     ax.set_title(inst + " " + date)
                 cal_factors[inst] = inst_cal_factors
+
