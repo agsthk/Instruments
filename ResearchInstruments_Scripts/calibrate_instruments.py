@@ -51,10 +51,15 @@ def calc_r2(delivered, measured, sensitivity, offset):
     r2 = 1 - (ss_residual / ss_total)
     return r2
 
+def calc_no2_delivered(nox_delivered, no_measured, no_sensitivity, no_offset):
+    no_delivered = (no_measured - no_offset) / no_sensitivity
+    no2_delivered = nox_delivered = no_measured
+    return no2_delivered
+
 cal_inputs = {}
 
-for root, dirs, files in tqdm(os.walk(CAL_DIR)):
-    for file in tqdm(files):
+for root, dirs, files in (os.walk(CAL_DIR)):
+    for file in (files):
         inst = file.split("_CalibrationInputs.txt")[0]
         inst_cal_inputs = pl.read_csv(
             os.path.join(root, file)
@@ -84,8 +89,8 @@ for inst, inst_cal_inputs in cal_inputs.items():
             ~cs.contains("Unc") &
             ~cs.datetime()
             ).columns
-        for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
-            for file in tqdm(files):
+        for root, dirs, files in (os.walk(STRUCT_DATA_DIR)):
+            for file in (files):
                 if file.find(inst) == -1 or file.find(date) == -1:
                     continue
                 try:
