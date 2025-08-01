@@ -30,6 +30,27 @@ CAL_DIR = os.path.join(data_dir,
 def linear(B, x):
     return B[0] * x + B[1]
 
+
+def perform_odr(delivered, measured, unc_delivered, unc_measured):
+    model = sp.odr.Model(linear)
+    unc_delivered = unc_delivered.replace(0, 1e-15)
+    unc_measured = unc_measured.replace(0, 1e-15)
+    data = sp.odr.RealData(delivered,
+                           measured,
+                           sx=unc_delivered,
+                           sy=unc_measured)
+    output = sp.odr.ODR(data, model, beta0=[1, 0]).run()
+    sensitivity, offset = output.beta
+    unc_sensitivity, unc_offset = output.sd_beta
+    return sensitivity, offset, unc_sensitivity, unc_offset
+
+def calc_r2(delivered, measured, sensitivity, offset):
+    ideal_measured = linear([sensitivity, offset], delivered)
+    ss_residual = ((measured - ideal_measured) ** 2).sum()
+    ss_total = ((measured - measured.mean()) ** 2).sum()
+    r2 = 1 - (ss_residual / ss_total)
+    return r2
+
 cal_inputs = {}
 
 for root, dirs, files in tqdm(os.walk(CAL_DIR)):
@@ -121,9 +142,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         .name.suffix("_Measured"),
                         cs.by_name(cal_vars).std()
                         .name.map(lambda c: "Unc_" + c + "_Measured")
-                        ).with_columns(
-                            cs.starts_with("Unc").replace(0, 1e-15)
-                            )
+                        )
                 for var in cal_vars:
                     if var == "NO_ppb":
                         odr_cal_data = cal_data.filter(
@@ -131,15 +150,20 @@ for inst, inst_cal_inputs in cal_inputs.items():
                             )
                     else:
                         odr_cal_data = cal_data
-                    model = sp.odr.Model(linear)
-                    data = sp.odr.RealData(odr_cal_data[var + "_Delivered"],
-                                           odr_cal_data[var + "_Measured"],
-                                           sx=odr_cal_data["Unc_" + var + "_Delivered"],
-                                           sy=odr_cal_data["Unc_" + var + "_Measured"])
-                    output = sp.odr.ODR(data, model, beta0=[1, 0]).run()
-                    sens, off = output.beta
-                    unc_sens, unc_off = output.sd_beta
-                    inst_cal_factors.append([date, var_nounits, sens, unc_sens, off, unc_off])
+                    sens, off, unc_sens, unc_off = perform_odr(
+                        odr_cal_data[var + "_Delivered"],
+                        odr_cal_data[var + "_Measured"],
+                        odr_cal_data["Unc_" + var + "_Delivered"],
+                        odr_cal_data["Unc_" + var + "_Measured"]
+                        )
+                    r2 = calc_r2(
+                        odr_cal_data[var + "_Delivered"],
+                        odr_cal_data[var + "_Measured"],
+                        sens,
+                        off
+                        )
+                    inst_cal_factors.append(
+                        [date, var_nounits, sens, unc_sens, off, unc_off, r2])
                     
                     fig, ax = plt.subplots(figsize=(5, 5))
                     ax.errorbar(odr_cal_data[var + "_Delivered"],
@@ -153,33 +177,3 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     ax.set_xlabel(var + "_Delivered")
                     ax.set_ylabel(var + "_Measured")
                 cal_factors[inst] = inst_cal_factors
-
-
-def perform_odr(delivered, measured, unc_delivered, unc_measured):
-    model = sp.odr.Model(linear)
-    unc_delivered = unc_delivered.replace(0, 1e-15)
-    unc_measured = unc_measured.replace(0, 1e-15)
-    data = sp.odr.RealData(delivered,
-                           measured,
-                           sx=unc_delivered,
-                           sy=unc_measured)
-    output = sp.odr.ODR(data, model, beta0=[1, 0]).run()
-    sensitivity, offset = output.beta
-    unc_sensitivity, unc_offset = output.sd_beta
-    return sensitivity, offset, unc_sensitivity, unc_offset
-
-def calc_r2(delivered, measured, sensitivity, offset):
-    ideal_measured = linear([sensitivity, offset], delivered)
-    ss_residual = ((measured - ideal_measured) ** 2).sum()
-    ss_total = ((measured - measured.mean()) ** 2).sum()
-    r2 = 1 - (ss_residual / ss_total)
-    return r2
-    
-sens, off, unc_sens, unc_off = perform_odr(odr_cal_data[var + "_Delivered"],
-                                           odr_cal_data[var + "_Measured"],
-                                           odr_cal_data["Unc_" + var + "_Delivered"],
-                                           odr_cal_data["Unc_" + var + "_Measured"])
-calc_r2(odr_cal_data[var + "_Delivered"],
-        odr_cal_data[var + "_Measured"],
-        sens,
-        off)
