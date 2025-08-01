@@ -27,9 +27,6 @@ CAL_DIR = os.path.join(data_dir,
                        "ResearchInstruments_ManualData",
                        "ResearchInstruments_Calibrations")
 
-
-
-
 def linear(B, x):
     return B[0] * x + B[1]
 
@@ -128,24 +125,31 @@ for inst, inst_cal_inputs in cal_inputs.items():
                             cs.starts_with("Unc").replace(0, 1e-15)
                             )
                 for var in cal_vars:
+                    if var == "NO_ppb":
+                        odr_cal_data = cal_data.filter(
+                            pl.col("NO2_ppb_Delivered").eq(0)
+                            )
+                    else:
+                        odr_cal_data = cal_data
                     model = sp.odr.Model(linear)
-                    data = sp.odr.RealData(cal_data[var + "_Delivered"],
-                                           cal_data[var + "_Measured"],
-                                           sx=cal_data["Unc_" + var + "_Delivered"],
-                                           sy=cal_data["Unc_" + var + "_Measured"])
+                    data = sp.odr.RealData(odr_cal_data[var + "_Delivered"],
+                                           odr_cal_data[var + "_Measured"],
+                                           sx=odr_cal_data["Unc_" + var + "_Delivered"],
+                                           sy=odr_cal_data["Unc_" + var + "_Measured"])
                     output = sp.odr.ODR(data, model, beta0=[1, 0]).run()
                     sens, off = output.beta
                     unc_sens, unc_off = output.sd_beta
                     inst_cal_factors.append([date, var_nounits, sens, unc_sens, off, unc_off])
                     
-                    fig, ax = plt.subplots()
-                    ax.errorbar(cal_data[var + "_Delivered"],
-                                cal_data[var + "_Measured"],
-                                xerr=cal_data["Unc_" + var + "_Delivered"],
-                                yerr=cal_data["Unc_" + var + "_Measured"],
+                    fig, ax = plt.subplots(figsize=(5, 5))
+                    ax.errorbar(odr_cal_data[var + "_Delivered"],
+                                odr_cal_data[var + "_Measured"],
+                                xerr=odr_cal_data["Unc_" + var + "_Delivered"],
+                                yerr=odr_cal_data["Unc_" + var + "_Measured"],
                                 linestyle="")
-                    ax.plot(cal_data[var + "_Delivered"],
-                            cal_data[var + "_Delivered"] * sens + off)
+                    ax.plot(odr_cal_data[var + "_Delivered"],
+                            odr_cal_data[var + "_Delivered"] * sens + off)
                     ax.set_title(inst + " " + date)
+                    ax.set_xlabel(var + "_Delivered")
+                    ax.set_ylabel(var + "_Measured")
                 cal_factors[inst] = inst_cal_factors
-
