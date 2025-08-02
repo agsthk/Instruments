@@ -34,7 +34,9 @@ def linear(B, x):
 def perform_odr(delivered, measured, unc_delivered, unc_measured):
     model = sp.odr.Model(linear)
     unc_delivered = unc_delivered.replace(0, 1e-15)
+    unc_delivered = unc_delivered.replace(None, 1e-15)
     unc_measured = unc_measured.replace(0, 1e-15)
+    unc_measured = unc_measured.replace(None, 1e-15)
     data = sp.odr.RealData(delivered,
                            measured,
                            sx=unc_delivered,
@@ -51,10 +53,28 @@ def calc_r2(delivered, measured, sensitivity, offset):
     r2 = 1 - (ss_residual / ss_total)
     return r2
 
-def calc_no2_delivered(nox_delivered, no_measured, no_sensitivity, no_offset):
-    no_delivered = (no_measured - no_offset) / no_sensitivity
-    no2_delivered = nox_delivered = no_measured
-    return no2_delivered
+def calc_no2_delivered(nox_delivered,
+                       no_measured,
+                       no_sensitivity,
+                       no_offset,
+                       unc_nox_delivered,
+                       unc_no_measured,
+                       unc_no_sensitivity,
+                       unc_no_offset):
+    
+    no_meas_sub_off = no_measured - no_offset
+    unc_no_meas_sub_off = (
+        (unc_no_measured ** 2) + (unc_no_offset ** 2)
+        ) ** 0.5
+    no2_delivered = (no_meas_sub_off / no_sensitivity).rename("NO2_ppb_Delivered")
+    unc_no2_delivered = (no2_delivered * (
+        (
+            ((unc_no_meas_sub_off / no_meas_sub_off) ** 2)
+            + ((unc_no_sensitivity / no_sensitivity) ** 2)
+        ) ** 0.5
+        # SOURCE OF THE DIVIDE BY ZERO ERROR I BELIEVE
+        )).rename("Unc_NO2_ppb_Delivered")
+    return no2_delivered, unc_no2_delivered
 
 cal_inputs = {}
 
@@ -117,7 +137,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                                                 .truediv(2)
                                                 )
                                             .alias("Mid"),
-                                            ).fill_null(np.nan).filter(
+                                            ).filter(
                                                 pl.col(stop_compare).gt(pl.min("Start"))
                                                 & pl.col(left_on).lt(pl.max("Stop"))
                                                 )
@@ -154,6 +174,27 @@ for inst, inst_cal_inputs in cal_inputs.items():
                             pl.col("NO2_ppb_Delivered").eq(0)
                             )
                     elif var == "NO2_ppb":
+                        
+                        no2_delivered, unc_no2_delivered = calc_no2_delivered(
+                            cal_data["NOx_ppb_Delivered"],
+                            cal_data["NO_ppb_Measured"],
+                            sens,
+                            off,
+                            cal_data["Unc_NOx_ppb_Delivered"],
+                            cal_data["Unc_NO_ppb_Measured"],
+                            unc_sens,
+                            unc_off
+                            )
+                        cal_data = cal_data.with_columns(
+                            pl.when(pl.col("NO2_ppb_Delivered").is_null())
+                            .then(no2_delivered)
+                            .otherwise(pl.col("NO2_ppb_Delivered"))
+                            .alias("NO2_ppb_Delivered"),
+                            pl.when(pl.col("Unc_NO2_ppb_Delivered").is_null())
+                            .then(unc_no2_delivered)
+                            .otherwise(pl.col("Unc_NO2_ppb_Delivered"))
+                            .alias("Unc_NO2_ppb_Delivered"),
+                            )
                         odr_cal_data = cal_data.filter(
                             (
                                 pl.col("NO_ppb_Delivered").eq(0)
@@ -192,3 +233,33 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     ax.set_xlabel(var + "_Delivered")
                     ax.set_ylabel(var + "_Measured")
                 cal_factors[inst] = inst_cal_factors
+
+
+cal_data["NO_ppb_Measured"]
+
+no_meas_sub_off = cal_data["NO_ppb_Measured"] - off
+unc_no_meas_sub_off = (
+    (cal_data["Unc_NO_ppb_Measured"] ** 2) + (unc_off ** 2)
+    ) ** 0.5
+no2_delivered = (no_meas_sub_off / sens).rename("NO2_ppb_Delivered")
+unc_no2_delivered = (no2_delivered * (
+    (
+        ((unc_no_meas_sub_off / no_meas_sub_off) ** 2)
+        + ((unc_sens / sens) ** 2)
+    ) ** 0.5
+    )).rename("Unc_NO2_ppb_Delivered")
+
+check = cal_data.with_columns(
+    pl.when(pl.col("NO2_ppb_Delivered").is_null())
+    .then(no2_delivered)
+    .otherwise(pl.col("NO2_ppb_Delivered"))
+    .alias("NO2_ppb_Delivered"),
+    pl.when(pl.col("Unc_NO2_ppb_Delivered").is_null())
+    .then(unc_no2_delivered)
+    .otherwise(pl.col("Unc_NO2_ppb_Delivered"))
+    .alias("Unc_NO2_ppb_Delivered")
+    )
+check.select(
+    pl.col("Unc_NO2_ppb_Delivered").is_null()
+    )
+check["Unc_NO2_ppb_Delivered"]
