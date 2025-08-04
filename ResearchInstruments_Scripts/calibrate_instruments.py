@@ -169,7 +169,6 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         .name.map(lambda c: "Unc_" + c + "_Measured")
                         )
                 for var in cal_vars:
-                    var_nounits = var.split("_")[0]
                     if var == "NO_ppb":
                         odr_cal_data = cal_data.filter(
                             pl.col("NO2_ppb_Delivered").eq(0)
@@ -179,12 +178,12 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         no2_delivered, unc_no2_delivered = calc_no2_delivered(
                             cal_data["NOx_ppb_Delivered"],
                             cal_data["NO_ppb_Measured"],
-                            date_cal_factors["NO"]["Sensitivity"],
-                            date_cal_factors["NO"]["Offset"],
+                            date_cal_factors["NO_ppb"]["Sensitivity"],
+                            date_cal_factors["NO_ppb"]["Offset"],
                             cal_data["Unc_NOx_ppb_Delivered"],
                             cal_data["Unc_NO_ppb_Measured"],
-                            date_cal_factors["NO"]["Unc_Sensitivity"],
-                            date_cal_factors["NO"]["Unc_Offset"]
+                            date_cal_factors["NO_ppb"]["Unc_Sensitivity"],
+                            date_cal_factors["NO_ppb"]["Unc_Offset"]
                             )
                         cal_data = cal_data.with_columns(
                             pl.when(pl.col("NO2_ppb_Delivered").is_null())
@@ -219,7 +218,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         sens,
                         off
                         )
-                    date_cal_factors[var_nounits] = {
+                    date_cal_factors[var] = {
                         "Sensitivity": sens,
                         "Unc_Sensitivity": unc_sens,
                         "Offset": off,
@@ -239,3 +238,18 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     ax.set_ylabel(var + "_Measured")
                 inst_cal_factors[date] = date_cal_factors
             cal_factors[inst] = inst_cal_factors
+
+cal_results = {}
+for inst, factors in cal_factors.items():
+    inst_cal_results = []
+    for date, results in factors.items():
+        date_results = []
+        for species, result in results.items():
+            date_results.append(
+                pl.DataFrame(result).select(
+                    pl.lit(date).alias("Calibration_Date"),
+                    pl.all().name.prefix(species + "_")
+                    )
+                )
+        inst_cal_results.append(pl.concat(date_results, how="align"))
+    cal_results[inst] = pl.concat(inst_cal_results, how="vertical").sort(by="Calibration_Date")
