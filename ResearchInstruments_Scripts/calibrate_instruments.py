@@ -82,7 +82,7 @@ for root, dirs, files in (os.walk(CAL_DIR)):
     for file in (files):
         inst = file.split("_CalibrationInputs.txt")[0]
         inst_cal_inputs = pl.read_csv(
-            os.path.join(root, file)
+            os.path.join(root, file), comment_prefix="#"
             ).with_columns(
                 pl.col("Start", "Stop")
                 .str.to_datetime()
@@ -91,10 +91,7 @@ for root, dirs, files in (os.walk(CAL_DIR)):
                     .dt.convert_time_zone("America/Denver")
                     .dt.strftime("%Y%m%d")
                     )
-        cal_inputs[inst] = {date[0]: df.with_columns(
-            pl.col("Start").dt.offset_by("2m"),
-            pl.col("Stop").dt.offset_by("-2m")
-            )
+        cal_inputs[inst] = {date[0]: df
             for date, df in inst_cal_inputs.partition_by(
                     "FTC_Date",
                     include_key=False,
@@ -138,10 +135,12 @@ for inst, inst_cal_inputs in cal_inputs.items():
                                                 .truediv(2)
                                                 )
                                             .alias("Mid"),
-                                            ).filter(
-                                                pl.col(stop_compare).gt(pl.min("Start"))
-                                                & pl.col(left_on).lt(pl.max("Stop"))
-                                                )
+                                            ).with_columns(
+                                                pl.col("Start").sub(pl.col("Mid")).alias("xerr")
+                                                ).filter(
+                                                    pl.col(stop_compare).gt(pl.min("Start"))
+                                                    & pl.col(left_on).lt(pl.max("Stop"))
+                                                    )
                 cal_data = cal_plot_data.filter(
                     pl.col(stop_compare).lt(pl.col("Stop"))
                     )
@@ -168,6 +167,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         cs.by_name(cal_vars).std()
                         .name.map(lambda c: "Unc_" + c + "_Measured")
                         )
+                        
                 for var in cal_vars:
                     if var == "NO_ppb":
                         odr_cal_data = cal_data.filter(
@@ -182,8 +182,8 @@ for inst, inst_cal_inputs in cal_inputs.items():
                             date_cal_factors["NO_ppb"]["Offset"],
                             cal_data["Unc_NOx_ppb_Delivered"],
                             cal_data["Unc_NO_ppb_Measured"],
-                            date_cal_factors["NO_ppb"]["Unc_Sensitivity"],
-                            date_cal_factors["NO_ppb"]["Unc_Offset"]
+                            date_cal_factors["NO_ppb"]["Sensitivity_Uncertainty"],
+                            date_cal_factors["NO_ppb"]["Offset_Uncertainty"]
                             )
                         cal_data = cal_data.with_columns(
                             pl.when(pl.col("NO2_ppb_Delivered").is_null())
@@ -206,6 +206,8 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         continue
                     else:
                         odr_cal_data = cal_data
+                    if odr_cal_data.is_empty():
+                        continue
                     sens, off, unc_sens, unc_off = perform_odr(
                         odr_cal_data[var + "_Delivered"],
                         odr_cal_data[var + "_Measured"],
@@ -220,9 +222,9 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         )
                     date_cal_factors[var] = {
                         "Sensitivity": sens,
-                        "Unc_Sensitivity": unc_sens,
                         "Offset": off,
-                        "Unc_Offset": unc_off,
+                        "Sensitivity_Uncertainty": unc_sens,
+                        "Offset_Uncertainty": unc_off,
                         "R2": r2
                         }
                     fig, ax = plt.subplots(figsize=(5, 5))
@@ -239,6 +241,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                 inst_cal_factors[date] = date_cal_factors
             cal_factors[inst] = inst_cal_factors
 
+
 cal_results = {}
 for inst, factors in cal_factors.items():
     inst_cal_results = []
@@ -247,9 +250,9 @@ for inst, factors in cal_factors.items():
         for species, result in results.items():
             date_results.append(
                 pl.DataFrame(result).select(
-                    pl.lit(date).alias("Calibration_Date"),
+                    pl.lit(date).alias("CalDate"),
                     pl.all().name.prefix(species + "_")
                     )
                 )
         inst_cal_results.append(pl.concat(date_results, how="align"))
-    cal_results[inst] = pl.concat(inst_cal_results, how="vertical").sort(by="Calibration_Date")
+    cal_results[inst] = pl.concat(inst_cal_results, how="diagonal").sort(by="CalDate")
