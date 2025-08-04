@@ -103,8 +103,9 @@ for root, dirs, files in (os.walk(CAL_DIR)):
 
 cal_factors = {}
 for inst, inst_cal_inputs in cal_inputs.items():
-    inst_cal_factors = []
+    inst_cal_factors = {}
     for date, inst_cal_input in inst_cal_inputs.items():
+        date_cal_factors = {}
         cal_vars = inst_cal_input.select(
             ~cs.contains("Unc") &
             ~cs.datetime()
@@ -146,7 +147,6 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     )
                 
                 for var in cal_vars:
-                    var_nounits = var.split("_")[0]
                     fig, ax = plt.subplots()
                     ax.scatter(cal_plot_data[left_on], cal_plot_data[var])
                     ax.errorbar(cal_data["Mid"], cal_data[var + "_Delivered"],
@@ -169,6 +169,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         .name.map(lambda c: "Unc_" + c + "_Measured")
                         )
                 for var in cal_vars:
+                    var_nounits = var.split("_")[0]
                     if var == "NO_ppb":
                         odr_cal_data = cal_data.filter(
                             pl.col("NO2_ppb_Delivered").eq(0)
@@ -178,12 +179,12 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         no2_delivered, unc_no2_delivered = calc_no2_delivered(
                             cal_data["NOx_ppb_Delivered"],
                             cal_data["NO_ppb_Measured"],
-                            sens,
-                            off,
+                            date_cal_factors["NO"]["Sensitivity"],
+                            date_cal_factors["NO"]["Offset"],
                             cal_data["Unc_NOx_ppb_Delivered"],
                             cal_data["Unc_NO_ppb_Measured"],
-                            unc_sens,
-                            unc_off
+                            date_cal_factors["NO"]["Unc_Sensitivity"],
+                            date_cal_factors["NO"]["Unc_Offset"]
                             )
                         cal_data = cal_data.with_columns(
                             pl.when(pl.col("NO2_ppb_Delivered").is_null())
@@ -218,9 +219,13 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         sens,
                         off
                         )
-                    inst_cal_factors.append(
-                        [date, var_nounits, sens, unc_sens, off, unc_off, r2])
-                    
+                    date_cal_factors[var_nounits] = {
+                        "Sensitivity": sens,
+                        "Unc_Sensitivity": unc_sens,
+                        "Offset": off,
+                        "Unc_Offset": unc_off,
+                        "R2": r2
+                        }
                     fig, ax = plt.subplots(figsize=(5, 5))
                     ax.errorbar(odr_cal_data[var + "_Delivered"],
                                 odr_cal_data[var + "_Measured"],
@@ -232,34 +237,5 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     ax.set_title(inst + " " + date)
                     ax.set_xlabel(var + "_Delivered")
                     ax.set_ylabel(var + "_Measured")
-                cal_factors[inst] = inst_cal_factors
-
-
-cal_data["NO_ppb_Measured"]
-
-no_meas_sub_off = cal_data["NO_ppb_Measured"] - off
-unc_no_meas_sub_off = (
-    (cal_data["Unc_NO_ppb_Measured"] ** 2) + (unc_off ** 2)
-    ) ** 0.5
-no2_delivered = (no_meas_sub_off / sens).rename("NO2_ppb_Delivered")
-unc_no2_delivered = (no2_delivered * (
-    (
-        ((unc_no_meas_sub_off / no_meas_sub_off) ** 2)
-        + ((unc_sens / sens) ** 2)
-    ) ** 0.5
-    )).rename("Unc_NO2_ppb_Delivered")
-
-check = cal_data.with_columns(
-    pl.when(pl.col("NO2_ppb_Delivered").is_null())
-    .then(no2_delivered)
-    .otherwise(pl.col("NO2_ppb_Delivered"))
-    .alias("NO2_ppb_Delivered"),
-    pl.when(pl.col("Unc_NO2_ppb_Delivered").is_null())
-    .then(unc_no2_delivered)
-    .otherwise(pl.col("Unc_NO2_ppb_Delivered"))
-    .alias("Unc_NO2_ppb_Delivered")
-    )
-check.select(
-    pl.col("Unc_NO2_ppb_Delivered").is_null()
-    )
-check["Unc_NO2_ppb_Delivered"]
+                inst_cal_factors[date] = date_cal_factors
+            cal_factors[inst] = inst_cal_factors
