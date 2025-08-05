@@ -1,0 +1,88 @@
+# clean_rawdata.py
+- Still need to handle data cleaning
+	- 2BTech_205_A
+		- Dates with visible outliers are 20250203, 20250211, 20250212, 20250213, 20250215, 20250217, 20250226?, 20250319?, 20250326, 20250327, 20250328, 20250406, 20250407, 20250418, 20250424?
+			- Enough that it is a bit ridiculous to manually remove those points
+	- 2BTech_205_B
+		- Dates with visible outliers are 20250120, 20250122, 20250123, 20250124, 20250125, 20250127, 20250128, 20250129, 20250130, 20250131, 20250203, 20250204, 20250205, 20250206, 20250207, 20250210?, 20250211, 20250212, 20250213, 20250214, 20250215, 20250216, 20250217, 20250218, 20250219, 20250220, 20250226, 20250227, 20250228, 20250301, 20250302, 20250303, 20250304, 20250305, 20250306?, 20250307, 20250308, 20250309, 20250312, 20250313, 20250314, 20250317?, 20250318, 20250319, 20250320, 20250329, 20250331, 20250401, 20250402, 20250403, 20250407, 20250414, 20250415, 20250416, 20250417, 20250418, 20250424, 20250501, 20250502
+			- So like most dates - definitely don't want to try to manually remove points
+	- ThermoScientific_42i-TL
+		- Dates with visible outliers are 20250212?
+			- Once filtered out warm up and low flow periods, seems fine
+	- Picarro_G2307
+		- Dates with visible outliers are 20250203, 20250204
+	- LI-COR_LI840A_A
+		- Essentially no dates with outliers
+	- LI-COR_LI840A_B
+		- Essentially no dates with outliers
+	- TempRHDoor
+		- Dates with visible outliers are 20250226
+			- Related to warmup?
+	- Potentially a point of discussion for Megan meeting today
+# interpret_doorstatus.py
+- Want to create a script that will derive the time intervals that the door to C200 was open based on door status in TempRHDoor
+- Largely copied code from interpret_solenoidvalve.py
+- ~~Exported only the intervals where the door was open to CSV file~~
+	- I actually think it would be more useful to have all intervals instead with the door status labeled
+	- Changed it to do this
+# structure_rawdata.py
+- Want to revise this script to:
+	- Define all NOx columns
+	- Structure the addition valve state data
+	- Structure the aranet sensor data
+- Copied over the addition valve raw data and aranet sensor data to the RawData folder
+- Added schemas to schema dict
+- Added datetime formats and timezone information to appropriate dicts
+- Added averaging time for Aranet4 sensors to averaging time dict
+- Added read-in functions for new sources
+	- Simple pl.read_csv functions for both
+- Now adding NOx column definition
+	- 2BTech_405nm has all NOx components defined (not sure if that would be true on the DAQ, but not my concern)
+	- ThermoScientific_42i-TL needs to have NOx components defined
+		- Logger has NO and NOx defined
+		- DAQ has NO and NO2 defined
+		- Used .insert_column function at specific index based on the source
+			- Best way to do it? Probably not, but it should work
+			- This is an in place operation which is interesting
+- After updating, ran the export again
+	- First export for the Aranet4 sensors and Addition Valve, overwriting everything else
+- Done with this script for now, returning to clean_rawdata.py
+# clean_rawdata.py
+- Added new data sources to be read in
+- I actually think it may be better to first go to a new script to interpret AdditionValves to define automated addition times
+# interpret_additionvalves.py
+- Created to interpret AdditionValves structured data
+- Copied over code to read in data from the other interpret scripts
+- After concatenation, need to use ReadPosition to determine addition start times
+	- I know there are some rows that have an error in ReadPosition, and I will be ignoring those for now - may need to consider how to handle later
+- Get the addition starts and stops from the position change and join them using join_asof with a forward join strategy
+	- Set a tolerance of 10 minutes for the ozone additions
+		- The first ozone open was matched with an ozone closed that was something like 3 hours later
+	- For CO2, the addition is multiple pulses that I want to consider as one addition
+		- I can filter by checking the time between consecutive addition starts and combining into one if it is less than 10 minutes
+			- Most are 2 minutes apart, but want to give some allowance
+		- Decided to do this filtering before I join
+- Exported to AutomatedAdditionTimes CSV file
+# clean_rawdata.py
+- Considering what I want to get done before I meet with Megan, I think it's best at this stage to consider the data "clean" even with the outliers remaining
+	- One of the points of discussion will be how to approach data cleaning
+- I do want to assign sampling locations to all data, even if the location never changes
+	- I am looking at the earliest recorded times for each of the DataFrames and setting a time slightly before that to be the start time for the location
+	- I am not going to be particularly thorough in this location assignment for the 2024 dates because it's not my main concern right now
+		- The location should just read as None in this case
+	- I am also ignoring the Teledyne instrument for the time being
+- After data is "clean", exporting it to a CleanData directory
+# calibrate_cleandata.py
+- New script used to calibrate data
+- This will undergo A LOT of changes in the future!!!!
+- For now, I am going to declare calibration factors to apply to all of the data that needs them applied
+- Then, will just cycle through the clean data and apply calibration factors, then export as calibrated data
+- At this point, I suspect I will want to move the data I care about into the appropriate research project folder
+	- Perhaps I should create a script to do this for me
+# select_projectdata.py
+- Basically going to walk through all the files between a user defined start and stop date, read them in, filter out anywhere that has a location of None, and export it to the project data folder (user defined)
+- Will also explicitly declare if I should be pulling from clean or calibrated data folders for each instrument
+- Also will export the derived data to the project folder
+	- Will first filter based on user defined start and stop date
+- At this point, moving to KeckO3 project
+	- Will require some setup
