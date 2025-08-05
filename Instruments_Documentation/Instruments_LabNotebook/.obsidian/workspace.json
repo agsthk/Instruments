@@ -11,10 +11,14 @@
             "id": "3af3f2cfd2b7f8c6",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "Instruments_CodingNotes/Instruments_CodingNotes_20250805.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "Instruments_CodingNotes_20250805"
             }
           }
         ]
@@ -74,7 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 200
+    "width": 288.5
   },
   "right": {
     "id": "5fc85d81384d1e90",

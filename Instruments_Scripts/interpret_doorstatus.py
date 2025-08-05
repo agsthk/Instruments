@@ -8,20 +8,20 @@ Created on Tue Jul 29 10:04:53 2025
 import os
 import polars as pl
 
-# Declares full path to ResearchInstruments_Data/ directory
+# Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
-# Starts in ResearchInstruments/ directory
-if "ResearchInstruments" in os.path.dirname(data_dir):
+# Starts in Instruments/ directory
+if "Instruments" in os.path.dirname(data_dir):
     data_dir = os.path.dirname(data_dir)
-data_dir = os.path.join(data_dir, "ResearchInstruments_Data")
+data_dir = os.path.join(data_dir, "Instruments_Data")
 
 # Full path to directory containing structured TempRHDoor raw data
 STRUCT_DATA_DIR = os.path.join(data_dir,
-                               "ResearchInstruments_StructuredData",
+                               "Instruments_StructuredData",
                                "TempRHDoor_StructuredData")
 # Full path to directory containing data derived from TempRHDoor
 DERIVED_DATA_DIR = os.path.join(data_dir,
-                                "ResearchInstruments_DerivedData",
+                                "Instruments_DerivedData",
                                 "TempRHDoor_DerivedData")
 if not os.path.exists(DERIVED_DATA_DIR):
     os.makedirs(DERIVED_DATA_DIR)

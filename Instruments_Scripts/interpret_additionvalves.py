@@ -8,20 +8,20 @@ Created on Tue Jul 29 11:11:11 2025
 import os
 import polars as pl
 
-# Declares full path to ResearchInstruments_Data/ directory
+# Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
-# Starts in ResearchInstruments/ directory
-if "ResearchInstruments" in os.path.dirname(data_dir):
+# Starts in Instruments/ directory
+if "Instruments" in os.path.dirname(data_dir):
     data_dir = os.path.dirname(data_dir)
-data_dir = os.path.join(data_dir, "ResearchInstruments_Data")
+data_dir = os.path.join(data_dir, "Instruments_Data")
 
 # Full path to directory containing structured Picarro G2307 raw data
 STRUCT_DATA_DIR = os.path.join(data_dir,
-                               "ResearchInstruments_StructuredData",
+                               "Instruments_StructuredData",
                                "AdditionValves_StructuredData")
 # Full path to directory containing data derived from Picarro G2307
 DERIVED_DATA_DIR = os.path.join(data_dir,
-                                "ResearchInstruments_DerivedData",
+                                "Instruments_DerivedData",
                                 "AdditionValves_DerivedData")
 if not os.path.exists(DERIVED_DATA_DIR):
     os.makedirs(DERIVED_DATA_DIR)

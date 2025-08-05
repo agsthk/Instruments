@@ -17,19 +17,19 @@ from matplotlib import ticker
 import pytz
 import shutil
 
-# Declares full path to ResearchInstruments_Data/ directory
+# Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
-# Starts in ResearchInstruments/ directory
-if "ResearchInstruments" in os.path.dirname(data_dir):
+# Starts in Instruments/ directory
+if "Instruments" in os.path.dirname(data_dir):
     data_dir = os.path.dirname(data_dir)
-data_dir = os.path.join(data_dir, "ResearchInstruments_Data")
+data_dir = os.path.join(data_dir, "Instruments_Data")
 
 # Full path to directory containing all structured data
-STRUCT_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_StructuredData")
+STRUCT_DATA_DIR = os.path.join(data_dir, "Instruments_StructuredData")
 # Full path to calibration data
 CAL_DIR = os.path.join(data_dir,
-                       "ResearchInstruments_ManualData",
-                       "ResearchInstruments_Calibrations")
+                       "Instruments_ManualData",
+                       "Instruments_Calibrations")
 
 def linear(B, x):
     return B[0] * x + B[1]

@@ -11,18 +11,18 @@ import pytz
 from datetime import datetime
 from tqdm import tqdm
 
-# Declares full path to ResearchInstruments_Data/ directory
+# Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
-# Starts in ResearchInstruments/ directory
-if "ResearchInstruments" in os.path.dirname(data_dir):
+# Starts in Instruments/ directory
+if "Instruments" in os.path.dirname(data_dir):
     data_dir = os.path.dirname(data_dir)
-data_dir = os.path.join(data_dir, "ResearchInstruments_Data")
+data_dir = os.path.join(data_dir, "Instruments_Data")
 
 # Full path to directory containing all structured raw data
-STRUCT_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_StructuredData")
+STRUCT_DATA_DIR = os.path.join(data_dir, "Instruments_StructuredData")
 # Full path to directory containing all clean raw data
-CLEAN_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_CleanData")
-# Creates ResearchInstruments_CleanData/ directory if needed
+CLEAN_DATA_DIR = os.path.join(data_dir, "Instruments_CleanData")
+# Creates Instruments_CleanData/ directory if needed
 if not os.path.exists(CLEAN_DATA_DIR):
     os.makedirs(CLEAN_DATA_DIR)
 
@@ -185,7 +185,7 @@ sampling_locs = {
 valve_states = pl.read_csv(
     os.path.join(
         data_dir,
-        "ResearchInstruments_DerivedData",
+        "Instruments_DerivedData",
         "Picarro_G2307_DerivedData",
         "Picarro_G2307_SolenoidValveStates.csv"
         )

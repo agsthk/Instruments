@@ -8,4 +8,5 @@
 - Recreated ResearchInstruments project in agsthk directory on Windows PC and now am going to assess if this will fix the path length issue
 	- Renamed "ResearchInstruments" to "Instruments" - I suspect that will do in combination with the change in location
 	- Will be trying to use git to backup documentation
-	- 
+- After a lot of kind of difficult renaming and such, got git repo up to date (I think)
+- Now, need to go into my scripts and change the paths

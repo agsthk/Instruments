@@ -10,18 +10,18 @@ import polars as pl
 import pandas as pd
 from datetime import datetime
 
-# Declares full path to ResearchInstruments_Data/ directory
+# Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
-# Starts in ResearchInstruments/ directory
-if "ResearchInstruments" in os.path.dirname(data_dir):
+# Starts in Instruments/ directory
+if "Instruments" in os.path.dirname(data_dir):
     data_dir = os.path.dirname(data_dir)
-data_dir = os.path.join(data_dir, "ResearchInstruments_Data")
+data_dir = os.path.join(data_dir, "Instruments_Data")
 
 # Full path to directory containing all raw data
-RAW_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_RawData")
+RAW_DATA_DIR = os.path.join(data_dir, "Instruments_RawData")
 # Full path to directory containing all structured data
 STRUCT_DATA_DIR = RAW_DATA_DIR.replace("Raw", "Structured")
-# Creates ResearchInstruments_StructuredData/ directory if needed
+# Creates Instruments_StructuredData/ directory if needed
 if not os.path.exists(STRUCT_DATA_DIR):
     os.makedirs(STRUCT_DATA_DIR)
 

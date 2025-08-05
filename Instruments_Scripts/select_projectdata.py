@@ -25,18 +25,18 @@ derived_sources = ["AdditionValves",
                    "TempRHDoor"]
 start_date = datetime(2025, 1, 17)
 stop_date = datetime(2025, 5, 6)
-# Declares full path to ResearchInstruments_Data/ directory
+# Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
-# Starts in ResearchInstruments/ directory
-if "ResearchInstruments" in os.path.dirname(data_dir):
+# Starts in Instruments/ directory
+if "Instruments" in os.path.dirname(data_dir):
     data_dir = os.path.dirname(data_dir)
-data_dir = os.path.join(data_dir, "ResearchInstruments_Data")
+data_dir = os.path.join(data_dir, "Instruments_Data")
 # Full path to directory containing all calibrated clean data
-CALIBRATED_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_CalibratedData")
+CALIBRATED_DATA_DIR = os.path.join(data_dir, "Instruments_CalibratedData")
 # Full path to directory containing all clean raw data
-CLEAN_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_CleanData")
+CLEAN_DATA_DIR = os.path.join(data_dir, "Instruments_CleanData")
 # Full path to directory containing all derived data
-DERIVED_DATA_DIR =  os.path.join(data_dir, "ResearchInstruments_DerivedData")
+DERIVED_DATA_DIR =  os.path.join(data_dir, "Instruments_DerivedData")
 # Full path to Graduate_ResearchProjects directory
 PROJECT_DATA_DIR = os.path.join(
     os.path.dirname(os.path.dirname(data_dir)),

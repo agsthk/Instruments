@@ -9,18 +9,18 @@ import os
 import polars as pl
 from tqdm import tqdm
 
-# Declares full path to ResearchInstruments_Data/ directory
+# Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
-# Starts in ResearchInstruments/ directory
-if "ResearchInstruments" in os.path.dirname(data_dir):
+# Starts in Instruments/ directory
+if "Instruments" in os.path.dirname(data_dir):
     data_dir = os.path.dirname(data_dir)
-data_dir = os.path.join(data_dir, "ResearchInstruments_Data")
+data_dir = os.path.join(data_dir, "Instruments_Data")
 
 # Full path to directory containing all clean raw data
-CLEAN_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_CleanData")
+CLEAN_DATA_DIR = os.path.join(data_dir, "Instruments_CleanData")
 # Full path to directory containing all calibrated clean data
-CALIBRATED_DATA_DIR = os.path.join(data_dir, "ResearchInstruments_CalibratedData")
-# Creates ResearchInstruments_CleanData/ directory if needed
+CALIBRATED_DATA_DIR = os.path.join(data_dir, "Instruments_CalibratedData")
+# Creates Instruments_CleanData/ directory if needed
 if not os.path.exists(CALIBRATED_DATA_DIR):
     os.makedirs(CALIBRATED_DATA_DIR)
 
