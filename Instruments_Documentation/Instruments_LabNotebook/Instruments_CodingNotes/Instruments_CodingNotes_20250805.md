@@ -10,3 +10,5 @@
 	- Will be trying to use git to backup documentation
 - After a lot of kind of difficult renaming and such, got git repo up to date (I think)
 - Now, need to go into my scripts and change the paths
+- After changing the paths and corresponding folder names, calibrate_instruments ran and exported the figures with no issue
+	- Changed the time series plotting for NO2 to only show errorbars for data used to fit ODR

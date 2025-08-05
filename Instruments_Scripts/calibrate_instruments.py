@@ -168,7 +168,7 @@ line_kwargs = {'linewidth': 3,
                'color': csu_colors['aggie_orange']}
 
 cal_inputs = {}
-
+os.path.exists(CAL_DIR)
 for root, dirs, files in (os.walk(CAL_DIR)):
     for file in (files):
         inst = file.split("_CalibrationInputs.txt")[0]
@@ -314,17 +314,17 @@ for inst, inst_cal_inputs in cal_inputs.items():
                                   cal_plot_data[var],
                                   label="Measured [" + var_name + "]",
                                   **scatter_kwargs)
-                    ts_ax.errorbar(cal_data["Mid"],
-                                   cal_data[var + "_Delivered"],
-                                   xerr=cal_data["DeltaT"],
-                                   yerr=cal_data["Unc_" + var + "_Delivered"],
+                    ts_ax.errorbar(odr_cal_data["Mid"],
+                                   odr_cal_data[var + "_Delivered"],
+                                   xerr=odr_cal_data["DeltaT"],
+                                   yerr=odr_cal_data["Unc_" + var + "_Delivered"],
                                    label="Delivered [" + var_name + "]",
                                    color="#D9782D",
                                    **ebar_kwargs)
-                    ts_ax.errorbar(cal_data["Mid"],
-                                   cal_data[var + "_Measured"],
-                                   xerr=cal_data["DeltaT"],
-                                   yerr=cal_data["Unc_" + var + "_Measured"],
+                    ts_ax.errorbar(odr_cal_data["Mid"],
+                                   odr_cal_data[var + "_Measured"],
+                                   xerr=odr_cal_data["DeltaT"],
+                                   yerr=odr_cal_data["Unc_" + var + "_Measured"],
                                    label="Mean Measured [" + var_name + "]",
                                    color="#1E4D2B",
                                    **ebar_kwargs)
@@ -341,6 +341,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         inst_cal_fig_dir,
                         ts_fig_name
                         ))
+                    plt.close()
                     sens, off, unc_sens, unc_off = perform_odr(
                         odr_cal_data[var + "_Delivered"],
                         odr_cal_data[var + "_Measured"],
@@ -396,6 +397,8 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         inst_cal_fig_dir,
                         inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
                         ))
+                    
+                    plt.close()
                 inst_cal_factors[date] = date_cal_factors
             cal_factors[inst] = inst_cal_factors
 
