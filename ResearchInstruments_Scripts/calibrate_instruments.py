@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib.dates as mdates
 from matplotlib import ticker
 import pytz
+import shutil
 
 # Declares full path to ResearchInstruments_Data/ directory
 data_dir = os.getcwd()
@@ -171,6 +172,8 @@ cal_inputs = {}
 for root, dirs, files in (os.walk(CAL_DIR)):
     for file in (files):
         inst = file.split("_CalibrationInputs.txt")[0]
+        if inst == file:
+            continue
         inst_cal_inputs = pl.read_csv(
             os.path.join(root, file), comment_prefix="#"
             ).with_columns(
@@ -191,6 +194,11 @@ for root, dirs, files in (os.walk(CAL_DIR)):
 cal_factors = {}
 for inst, inst_cal_inputs in cal_inputs.items():
     inst_cal_factors = {}
+    inst_cal_fig_dir = os.path.join(CAL_DIR,
+                                    inst + "_Calibrations",
+                                    inst + "_CalibrationFigures")
+    if not os.path.exists(inst_cal_fig_dir):
+        os.makedirs(inst_cal_fig_dir)
     for date, inst_cal_input in inst_cal_inputs.items():
         date_cal_factors = {}
         cal_vars = inst_cal_input.select(
@@ -250,6 +258,9 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         cs.by_name(cal_vars).std()
                         .name.map(lambda c: "Unc_" + c + "_Measured")
                         )
+                        
+
+                
                 for var in cal_vars:
                     if var == "NO_ppb":
                         odr_cal_data = cal_data.filter(
@@ -290,6 +301,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     if odr_cal_data.is_empty():
                         continue
                     var_name, var_units = var.split("_")
+                    var_nounits = var_name
                     for i, char in enumerate(var_name):
                         if char.isnumeric():
                             var_name = var_name[:i] + "$_" + char + "$" + var_name[i + 1:]
@@ -324,7 +336,11 @@ for inst, inst_cal_inputs in cal_inputs.items():
 
                     ts_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Time Series",
                                     size=15)
-                    
+                    ts_fig_name = inst + "_" + var_nounits + "_CalibrationTimeSeries_" + date + ".png"
+                    ts_fig.savefig(os.path.join(
+                        inst_cal_fig_dir,
+                        ts_fig_name
+                        ))
                     sens, off, unc_sens, unc_off = perform_odr(
                         odr_cal_data[var + "_Delivered"],
                         odr_cal_data[var + "_Measured"],
@@ -375,11 +391,16 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     fit_ax.set_title(date)
                     fit_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Fit",
                                     size=15)
+                    
+                    fit_fig.savefig(os.path.join(
+                        inst_cal_fig_dir,
+                        inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
+                        ))
                 inst_cal_factors[date] = date_cal_factors
             cal_factors[inst] = inst_cal_factors
 
 
-cal_results = {}
+
 for inst, factors in cal_factors.items():
     inst_cal_results = []
     for date, results in factors.items():
@@ -392,4 +413,9 @@ for inst, factors in cal_factors.items():
                     )
                 )
         inst_cal_results.append(pl.concat(date_results, how="align"))
-    cal_results[inst] = pl.concat(inst_cal_results, how="diagonal").sort(by="CalDate")
+    inst_cal_results = pl.concat(inst_cal_results, how="diagonal").sort(by="CalDate")
+    inst_cal_results.write_csv(os.path.join(CAL_DIR,
+                                             inst + "_Calibrations",
+                                             inst + "_CalibrationResults.txt"),
+                               float_precision=6)
+          
