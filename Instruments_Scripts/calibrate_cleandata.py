@@ -18,48 +18,40 @@ data_dir = os.path.join(data_dir, "Instruments_Data")
 
 # Full path to directory containing all clean raw data
 CLEAN_DATA_DIR = os.path.join(data_dir, "Instruments_CleanData")
+# Full path to directory containing calibration results
+CAL_RESULTS_DIR = os.path.join(data_dir, "Instruments_ManualData", "Instruments_Calibrations")
 # Full path to directory containing all calibrated clean data
 CALIBRATED_DATA_DIR = os.path.join(data_dir, "Instruments_CalibratedData")
 # Creates Instruments_CleanData/ directory if needed
 if not os.path.exists(CALIBRATED_DATA_DIR):
     os.makedirs(CALIBRATED_DATA_DIR)
 
-# Calibration factors to apply
-cal_factors = {
-    "2BTech_202": {
-        "O3_ppb": {"Sensitivity": 0.9773,
-                   "Offset": -1.76}
-        },
-    "2BTech_205_A": {
-        "O3_ppb": {"Sensitivity": 0.9795,
-                   "Offset":  -1.948}
-        },
-    "2BTech_205_B": {
-        "O3_ppb": {"Sensitivity": 1.0008,
-                   "Offset":  0.1224}
-        },
-    "2BTech_405nm": {
-        "NO_ppb": {"Sensitivity": 1.0287,
-                   "Offset":  -4.0130},
-        "NO2_ppb": {"Sensitivity": 1.0682,
-                   "Offset":  -0.2913}
-        },
-    "Picarro_G2307": {
-        "CH2O_ppm": {"Sensitivity": 0.97,
-                   "Offset":  -1.36}
-        },
-    "ThermoScientific_42i-TL": {
-        "NO_ppb": {"Sensitivity": 1.0103,
-                   "Offset":  4.8689},
-        "NO2_ppb": {"Sensitivity": 0.9964,
-                   "Offset":  0.3281}
-        }
-    }
-cal_factors = {
-    inst: pl.DataFrame(factors)
-    for inst, factors in cal_factors.items()
-    }
+# Date to use calibration factor from
+cal_dates = {"2BTech_202": "20240118",
+             "2BTech_205_A": "20250115",
+             "2BTech_205_B": "20250115",
+             "2BTech_405nm": "20241216",
+             "Picarro_G2307": "20250109",
+             "ThermoScientific_42i-TL": "20241216"}
 
+cal_factors = {}
+for root, dirs, files in os.walk(CAL_RESULTS_DIR):
+    for file in files:
+        if file.find("CalibrationResults") == -1:
+            continue
+        inst = file.rsplit("_", 1)[0]
+        path = os.path.join(root, file)
+        inst_cal_factors = pl.read_csv(path)
+        cal_factors[inst] = inst_cal_factors.filter(
+            pl.col("CalDate").cast(pl.String()).eq(cal_dates[inst])
+            ).select(
+                pl.exclude("CalDate")
+                )
+        
+
+
+for inst, factors in cal_factors.items():
+    cal_vars = {"_".join(col.split("_", 2)[:2]) for col in factors.columns}
 
 for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
     for file in tqdm(files):
@@ -76,19 +68,20 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         else:
             lf = pl.scan_csv(path)
         lf = lf.with_columns(
-            pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
-            pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
+            pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC")
             )
         inst_cal_factors = cal_factors[inst]
-        for var in inst_cal_factors.columns:
-            unnested = inst_cal_factors.unnest(var)
-            sens = unnested["Sensitivity"][0]
-            off = unnested["Offset"][0]
+        cal_vars = {"_".join(col.split("_", 2)[:2])
+                    for col in inst_cal_factors.columns}
+        for var in cal_vars:
+            sens = inst_cal_factors[var + "_Sensitivity"]
+            off = inst_cal_factors[var + "_Offset"]
             lf = lf.with_columns(
                 (pl.col(var).sub(off)).truediv(sens)
                 )
         df = lf.collect()
-        f_name = file.replace("Clean", "Calibrated")
+        f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
+        f_name = f_name[0] + "_" + cal_dates[inst] + "Calibration_" + f_name[1]
         f_dir = root.replace("Clean", "Calibrated")
         if not os.path.exists(f_dir):
             os.makedirs(f_dir)
