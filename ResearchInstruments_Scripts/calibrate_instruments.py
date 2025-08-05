@@ -12,6 +12,9 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import scipy as sp
 import numpy as np
+import matplotlib.dates as mdates
+from matplotlib import ticker
+import pytz
 
 # Declares full path to ResearchInstruments_Data/ directory
 data_dir = os.getcwd()
@@ -76,6 +79,93 @@ def calc_no2_delivered(nox_delivered,
         )).rename("Unc_NO2_ppb_Delivered")
     return no2_delivered, unc_no2_delivered
 
+# Defines functions for plotting outputs
+def set_ax_ticks(ax, ts=False, round_to=5):
+    '''
+    Locates and formats x- and y-axis tick labels and draws gridlines
+
+    Parameters
+    ----------
+    ax : matplotlib.axes._axes.Axes
+        Axes of subplot to set tick labels for
+    ts : bool, optional
+        Used to determine if the x-axis is a time series axis. The default is
+        False.
+    round_to : int, optional
+        Value used for rounding. Rounds the lower bound down to the nearest
+        value evenly divisible by round_to and the upper bound up to the
+        nearest value evenly divisible by round_to. For time series axis, this
+        is in units of minutes. The default is 5.
+
+    Returns
+    -------
+    None.
+
+    '''
+    # Gets default x and y limits
+    xlims = np.array(ax.get_xlim())
+    ylims = np.array(ax.get_ylim())
+    # Rounds x and y limits to nearest 'round_to' value (rounds down for lower
+    # limits and up for upper limits)
+    for lims in [xlims, ylims]:
+        # Rounds to nearest 'round_to' minutes for time series axis
+        if ts and (lims == xlims).all():
+            lims[0] = np.floor(lims[0] / (round_to / 1440)) * (round_to / 1440)
+            lims[1] = np.ceil(lims[1] / (round_to / 1440)) * (round_to / 1440)
+            continue
+        lims[0] = np.floor(lims[0] / round_to) * round_to
+        lims[1] = np.ceil(lims[1] / round_to) * round_to
+    # Sets tick locations (and formatting as appropriate) for x and y axes
+    for axis in [ax.xaxis, ax.yaxis]:
+        if ts and axis == ax.xaxis:
+            # axis.set_major_locator(mdates.MinuteLocator(byminute=[0, 30]))
+
+            axis.set_major_locator(mdates.AutoDateLocator(tz=pytz.timezone("America/Denver")))
+            # axis.set_minor_locator(mdates.MinuteLocator(interval=10))
+            axis.set_major_formatter(mdates.DateFormatter('%H:%M', tz=pytz.timezone("America/Denver")))
+            # Sets number of minor tick intervals for time series
+            n = 3
+        else:
+            axis.set_major_locator(ticker.AutoLocator())
+            # Does not set a fixed number of minor tick intervals for non-time
+            # series axes
+            n = None
+        axis.set_minor_locator(ticker.AutoMinorLocator(n=n))
+    # Turns on major and minor gridlines
+    ax.grid(which='major')
+    ax.grid(which='minor', linestyle=':')
+
+# Defines list of Colorado State University brand colors
+csu_colors = {'csu_green': '#1E4D2B',
+              'csu_gold': '#C8C372',
+              'aggie_orange': '#D9782D',
+              '80_black': '#59595B',
+              'white': '#FFFFFF',
+              'oval_green': '#006144',
+              'lovers_lane': '#82C503',
+              'energy_green': '#CFFC00',
+              'flower_trial_red': '#E56A54',
+              'powdered_purple': '#7E5475',
+              'horsetooth_blue': '#008FB3',
+              'stalwart_slate': '#105456',
+              'sunshine': '#FFC038',
+              'black': '#000000',
+              'gray': '#CCCCCC',
+              'tan': '#E3CDB1'}
+# Defines dictionaries for keyword arguments for plotting
+# Error bars
+ebar_kwargs = {'fmt': 'o', # Marker style
+               'linestyle': '', # Turns off lines between points
+               'linewidth': 3, # Width of error bars
+               'capsize': 3, # Length of error bar caps
+               'barsabove': True} # Error bars drawn on top of markers
+# Scatter points
+scatter_kwargs = {'s': 25, # Marker size
+                  'color': csu_colors['csu_gold']}
+# Lines
+line_kwargs = {'linewidth': 3,
+               'color': csu_colors['aggie_orange']}
+
 cal_inputs = {}
 
 for root, dirs, files in (os.walk(CAL_DIR)):
@@ -135,29 +225,22 @@ for inst, inst_cal_inputs in cal_inputs.items():
                                                 .truediv(2)
                                                 )
                                             .alias("Mid"),
-                                            ).with_columns(
-                                                pl.col("Start").sub(pl.col("Mid")).alias("xerr")
-                                                ).filter(
-                                                    pl.col(stop_compare).gt(pl.min("Start"))
-                                                    & pl.col(left_on).lt(pl.max("Stop"))
-                                                    )
-                cal_data = cal_plot_data.filter(
+                                            pl.col("Stop")
+                                            .sub(pl.col("Start"))
+                                            .truediv(2)
+                                            .alias("DeltaT")
+                                            ).filter(
+                                                pl.col(stop_compare).gt(pl.min("Start"))
+                                                & pl.col(left_on).lt(pl.max("Stop"))
+                                                )
+                cal_input_data = cal_plot_data.filter(
                     pl.col(stop_compare).lt(pl.col("Stop"))
                     )
-                
-                for var in cal_vars:
-                    fig, ax = plt.subplots()
-                    ax.scatter(cal_plot_data[left_on], cal_plot_data[var])
-                    ax.errorbar(cal_data["Mid"], cal_data[var + "_Delivered"],
-                                xerr=(cal_data["Mid"] - cal_data["Start"]),
-                                yerr=cal_data["Unc_" + var],
-                                linestyle="",
-                                color="black"
-                                )
-                    ax.set_ylabel(var)
-                    ax.set_title(inst + " " + date)
-                cal_data = cal_data.group_by(
-                    cs.ends_with("Delivered")
+                cal_input_data.columns
+                cal_data = cal_input_data.group_by(
+                    cs.ends_with("Delivered"),
+                    pl.col("Mid"),
+                    pl.col("DeltaT")
                     ).agg(
                         cs.ends_with("Delivered"),
                         cs.starts_with("Unc").mean()
@@ -167,14 +250,12 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         cs.by_name(cal_vars).std()
                         .name.map(lambda c: "Unc_" + c + "_Measured")
                         )
-                        
                 for var in cal_vars:
                     if var == "NO_ppb":
                         odr_cal_data = cal_data.filter(
                             pl.col("NO2_ppb_Delivered").eq(0)
                             )
                     elif var == "NO2_ppb":
-                        
                         no2_delivered, unc_no2_delivered = calc_no2_delivered(
                             cal_data["NOx_ppb_Delivered"],
                             cal_data["NO_ppb_Measured"],
@@ -208,6 +289,42 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         odr_cal_data = cal_data
                     if odr_cal_data.is_empty():
                         continue
+                    var_name, var_units = var.split("_")
+                    for i, char in enumerate(var_name):
+                        if char.isnumeric():
+                            var_name = var_name[:i] + "$_" + char + "$" + var_name[i + 1:]
+                        
+                    cal_plot_data = cal_plot_data.filter(
+                        pl.col(var).gt(-2000)
+                        )
+                    ts_fig, ts_ax = plt.subplots(figsize=(8, 6))
+                    ts_ax.scatter(cal_plot_data[left_on],
+                                  cal_plot_data[var],
+                                  label="Measured [" + var_name + "]",
+                                  **scatter_kwargs)
+                    ts_ax.errorbar(cal_data["Mid"],
+                                   cal_data[var + "_Delivered"],
+                                   xerr=cal_data["DeltaT"],
+                                   yerr=cal_data["Unc_" + var + "_Delivered"],
+                                   label="Delivered [" + var_name + "]",
+                                   color="#D9782D",
+                                   **ebar_kwargs)
+                    ts_ax.errorbar(cal_data["Mid"],
+                                   cal_data[var + "_Measured"],
+                                   xerr=cal_data["DeltaT"],
+                                   yerr=cal_data["Unc_" + var + "_Measured"],
+                                   label="Mean Measured [" + var_name + "]",
+                                   color="#1E4D2B",
+                                   **ebar_kwargs)
+                    
+                    set_ax_ticks(ts_ax, ts=True)
+                    ts_ax.legend(framealpha=1, edgecolor='black')
+                    ts_ax.set_title(date)
+                    ts_ax.set_ylabel('[' + var_name + '] (' + var_units + ")")
+
+                    ts_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Time Series",
+                                    size=15)
+                    
                     sens, off, unc_sens, unc_off = perform_odr(
                         odr_cal_data[var + "_Delivered"],
                         odr_cal_data[var + "_Measured"],
@@ -227,17 +344,37 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         "Offset_Uncertainty": unc_off,
                         "R2": r2
                         }
-                    fig, ax = plt.subplots(figsize=(5, 5))
-                    ax.errorbar(odr_cal_data[var + "_Delivered"],
-                                odr_cal_data[var + "_Measured"],
-                                xerr=odr_cal_data["Unc_" + var + "_Delivered"],
-                                yerr=odr_cal_data["Unc_" + var + "_Measured"],
-                                linestyle="")
-                    ax.plot(odr_cal_data[var + "_Delivered"],
-                            odr_cal_data[var + "_Delivered"] * sens + off)
-                    ax.set_title(inst + " " + date)
-                    ax.set_xlabel(var + "_Delivered")
-                    ax.set_ylabel(var + "_Measured")
+                    fit_label = ('['
+                     + var_name
+                     + ']$_{measured}$ = '
+                     + f'{sens:.3f}'
+                     + r'$\cdot$ ['
+                     + var_name
+                     + ']$_{delivered}$ ')
+                    if off > 0: # Add zero
+                        fit_label += f'+ {off:.3f}\nR' + '$^2$ = ' + f'{r2:.4f}'
+                    else: # Subtract negative zero
+                        fit_label += f'\u2212 {-off:.3f}\nR' + '$^2$ = ' + f'{r2:.4f}'
+                    fit_fig, fit_ax = plt.subplots(figsize=(6, 6))
+                    fit_ax.errorbar(
+                        odr_cal_data[var + "_Delivered"],
+                        odr_cal_data[var + "_Measured"],
+                        xerr=odr_cal_data["Unc_" + var + "_Delivered"],
+                        yerr=odr_cal_data["Unc_" + var + "_Measured"],
+                        color=csu_colors['csu_green'],
+                        **ebar_kwargs)
+                    fit_ax.plot(odr_cal_data[var + "_Delivered"], odr_cal_data[var + "_Delivered"] * sens + off,
+                                **line_kwargs)
+                    
+                    fit_ax.text(0.05, 0.95, fit_label, va='top',
+                                transform=fit_ax.transAxes, bbox={'facecolor': 'white',
+                                                                  'alpha': 1})
+                    set_ax_ticks(fit_ax)
+                    fit_ax.set_xlabel('[' + var_name + '] Delivered (' + var_units + ")")
+                    fit_ax.set_ylabel('[' + var_name + '] Measured (' + var_units + ")")
+                    fit_ax.set_title(date)
+                    fit_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Fit",
+                                    size=15)
                 inst_cal_factors[date] = date_cal_factors
             cal_factors[inst] = inst_cal_factors
 
