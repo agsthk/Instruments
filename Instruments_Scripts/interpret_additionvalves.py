@@ -22,7 +22,7 @@ STRUCT_DATA_DIR = os.path.join(data_dir,
 # Full path to directory containing data derived from Picarro G2307
 DERIVED_DATA_DIR = os.path.join(data_dir,
                                 "ResearchInstruments_DerivedData",
-                                "AdditonValves_DerivedData")
+                                "AdditionValves_DerivedData")
 if not os.path.exists(DERIVED_DATA_DIR):
     os.makedirs(DERIVED_DATA_DIR)
     

@@ -1,0 +1,15 @@
+# clean_rawdata.py
+- Going to add a column that indicates the start of the current sampling interval for each data point - using fill forward again
+	- This will allow for determination of data collected during "crossover" times - they can be removed
+- Revised determination of sampling intervals to prevent declaring multiple zero-second intervals
+	- Artifact of Picarro DateTime sometimes rounding to the nearest minute
+	- Sorted by DateTime, then also by solenoid valve state so that if the state switched at a given time, there is only one location where that change occurs
+- Instead of comparing against the next sampling interval stop, I will compare to the stop of the current interval, which will be offset by 20 seconds from when the switch occurs
+	- Should remove all data that may be influenced by the switch
+	- May elect to offset by more or less time
+	- Where there is a transition, the sampling location is None
+- Need to investigate why sampling location is None when it should be C200/B203/Exhaust
+	- I assume this is an artifact of how I define sampling locations from Picarro
+	- This is more complicated than I had anticipated
+	- Nothing I do is working!
+	- I think using cross joining of DataFrames may be able to help me here - it did
