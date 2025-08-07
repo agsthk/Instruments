@@ -212,4 +212,4 @@ Instruments_Data/
 *.DS_Store
 
 # Obsidian workspace files
-*.obsidian
+*.json
