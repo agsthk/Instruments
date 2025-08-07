@@ -413,14 +413,14 @@ for date, df in data["2BTech_205_B"].items():
                     )
     df2 = df.filter(
         (pl.col(var).sub(pl.col("med"))).abs().lt(pl.col("thresh"))
-        & (pl.col("d/dt").lt(1))
+        & (pl.col("d/dt").lt(0.25))
         )
         # pl.col("O3_ppb").is_between(pl.col("med_llim"), pl.col("med_ulim"))
         # & pl.col("O3_ppb").is_between(pl.col("mean_llim"), pl.col("mean_ulim"))
         # )
     df3 = df.filter(
         (pl.col(var).sub(pl.col("med"))).abs().ge(pl.col("thresh"))
-         & (pl.col("d/dt").lt(1))
+         & (pl.col("d/dt").lt(0.25))
         )
     fig, ax = plt.subplots()
     ax2 = ax.twinx()
