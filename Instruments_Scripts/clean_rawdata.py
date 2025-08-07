@@ -396,11 +396,15 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
 
 for date, df in data["2BTech_205_B"].items():
     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
+    if df.is_empty():
+        continue
     var = "O3_ppb"
     df = df.with_columns(
         pl.col(var).sub(pl.col(var).shift(1)).abs().alias("diff"),
+        pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(1)).dt.total_microseconds().truediv(1e6).alias("dt"),
         pl.col(var).rolling_median_by("UTC_Start", "30m").alias("med")
         ).with_columns(
+            pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
             (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff")
             ).with_columns(
                 pl.col("abs_diff").rolling_median_by("UTC_Start", "30m").mul(1.4826).alias("mad")
@@ -409,16 +413,15 @@ for date, df in data["2BTech_205_B"].items():
                     )
     df2 = df.filter(
         (pl.col(var).sub(pl.col("med"))).abs().lt(pl.col("thresh"))
-        & (pl.col("diff").lt(3))
+        & (pl.col("d/dt").lt(1))
         )
         # pl.col("O3_ppb").is_between(pl.col("med_llim"), pl.col("med_ulim"))
         # & pl.col("O3_ppb").is_between(pl.col("mean_llim"), pl.col("mean_ulim"))
         # )
     df3 = df.filter(
         (pl.col(var).sub(pl.col("med"))).abs().ge(pl.col("thresh"))
-         & (pl.col("diff").lt(3))
+         & (pl.col("d/dt").lt(1))
         )
-    if df.is_empty(): continue
     fig, ax = plt.subplots()
     ax2 = ax.twinx()
     ax.plot(df["UTC_Start"], df["O3_ppb"], color="#1E4D2B")
@@ -436,7 +439,7 @@ for date, df in data["2BTech_205_B"].items():
     ax.tick_params(axis="x", labelrotation=90)
     ax.tick_params(axis="y", color="#1E4D2B", labelcolor="#1E4D2B")
 
-    ax2.scatter(df3["UTC_Start"], df3["diff"], color="black")
+    ax2.scatter(df3["UTC_Start"], df3["d/dt"], color="black", alpha=0.5)
     # ax.plot(df["UTC_Start"], df["llim"], color="#D9782D")
     # ax.fill_between(df["UTC_Start"], df["ulim"], df["llim"], color="#D9782D", alpha=0.5)
     # ax.plot(df["UTC_Start"], df["ulim"], color="#D9782D")
