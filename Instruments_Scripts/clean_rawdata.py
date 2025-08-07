@@ -400,8 +400,8 @@ for date, df in data["2BTech_205_B"].items():
         continue
     var = "O3_ppb"
     df = df.with_columns(
-        pl.col(var).sub(pl.col(var).shift(1)).abs().alias("diff"),
-        pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(1)).dt.total_microseconds().truediv(1e6).alias("dt"),
+        pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
+        pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
         pl.col(var).rolling_median_by("UTC_Start", "30m").alias("med")
         ).with_columns(
             pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
