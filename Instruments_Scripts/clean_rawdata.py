@@ -394,24 +394,11 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         #                     f_name)
         # df.write_csv(path)
 
-for date, df in data["2BTech_205_A"].items():
-    df = df.filter(pl.col("SamplingLocation").eq("C200"))
-    # df = df.with_columns(
-    #     pl.col("O3_ppb").rolling_mean_by("UTC_Start", window_size="10m").alias("mean"),
-    #     pl.col("O3_ppb").rolling_std_by("UTC_Start", window_size="10m").alias("std"),
-    #     pl.col("O3_ppb").rolling_median_by("UTC_Start", window_size="10m").alias("med"),
-    #     pl.col("O3_ppb").rolling_quantile_by("UTC_Start", window_size="10m", quantile=0.25).alias("lq"),
-    #     pl.col("O3_ppb").rolling_quantile_by("UTC_Start", window_size="10m", quantile=0.75).alias("uq")
-    #     ).with_columns(
-    #         pl.col("uq").sub(pl.col("lq")).alias("iqr")
-    #         ).with_columns(
-    #             pl.col("mean").add(pl.col("std").mul(4)).alias("mean_ulim"),
-    #             pl.col("mean").sub(pl.col("std").mul(4)).alias("mean_llim"),
-    #             pl.col("med").add(pl.col("iqr").mul(4)).alias("med_ulim"),
-    #             pl.col("med").sub(pl.col("iqr").mul(4)).alias("med_llim")
-    #             )
+for date, df in data["2BTech_205_B"].items():
+    df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
     var = "O3_ppb"
     df = df.with_columns(
+        pl.col(var).sub(pl.col(var).shift(1)).abs().alias("diff"),
         pl.col(var).rolling_median_by("UTC_Start", "30m").alias("med")
         ).with_columns(
             (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff")
@@ -422,13 +409,18 @@ for date, df in data["2BTech_205_A"].items():
                     )
     df2 = df.filter(
         (pl.col(var).sub(pl.col("med"))).abs().lt(pl.col("thresh"))
+        & (pl.col("diff").lt(3))
         )
         # pl.col("O3_ppb").is_between(pl.col("med_llim"), pl.col("med_ulim"))
         # & pl.col("O3_ppb").is_between(pl.col("mean_llim"), pl.col("mean_ulim"))
         # )
+    df3 = df.filter(
+        (pl.col(var).sub(pl.col("med"))).abs().ge(pl.col("thresh"))
+         & (pl.col("diff").lt(3))
+        )
     if df.is_empty(): continue
     fig, ax = plt.subplots()
-    # ax2 = ax.twinx()
+    ax2 = ax.twinx()
     ax.plot(df["UTC_Start"], df["O3_ppb"], color="#1E4D2B")
     
     ax.plot(df2["UTC_Start"], df2["O3_ppb"], color="#D9782D")
@@ -444,12 +436,12 @@ for date, df in data["2BTech_205_A"].items():
     ax.tick_params(axis="x", labelrotation=90)
     ax.tick_params(axis="y", color="#1E4D2B", labelcolor="#1E4D2B")
 
-    # ax.plot(df["UTC_Start"], df["med"], color="#D9782D")
+    ax2.scatter(df3["UTC_Start"], df3["diff"], color="black")
     # ax.plot(df["UTC_Start"], df["llim"], color="#D9782D")
     # ax.fill_between(df["UTC_Start"], df["ulim"], df["llim"], color="#D9782D", alpha=0.5)
     # ax.plot(df["UTC_Start"], df["ulim"], color="#D9782D")
     # ax.set_ylabel("med", color="#D9782D")
-    ax.spines["right"].set_color("#D9782D")
+    ax2.spines["right"].set_color("black")
     ax.spines["left"].set_color("#1E4D2B")
     ax.tick_params(axis="y", colors="#D9782D")
     ax.set_title(date)
