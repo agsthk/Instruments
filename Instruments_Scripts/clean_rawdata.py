@@ -402,25 +402,28 @@ for date, df in data["2BTech_205_B"].items():
     df = df.with_columns(
         pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
         pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
-        pl.col(var).rolling_median_by("UTC_Start", "30m").alias("med")
+        pl.col(var).rolling_median_by("UTC_Start", "10m").alias("med")
         ).with_columns(
+            pl.col("diff").truediv(pl.col(var)).truediv(pl.col("dt")).abs().alias("rel d/dt"),
             pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
             (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff")
             ).with_columns(
-                pl.col("abs_diff").rolling_median_by("UTC_Start", "30m").mul(1.4826).alias("mad")
+                pl.col("abs_diff").rolling_median_by("UTC_Start", "10m").mul(1.4826).alias("mad")
                 ).with_columns(
-                    pl.col("mad").mul(5).alias("thresh")
+                    pl.col("mad").mul(6).alias("thresh")
                     )
     df2 = df.filter(
         (pl.col(var).sub(pl.col("med"))).abs().lt(pl.col("thresh"))
-        & (pl.col("d/dt").lt(0.25))
+        & ((pl.col("d/dt").lt(0.5))
+        | (pl.col("rel d/dt").lt(0.01)))
         )
         # pl.col("O3_ppb").is_between(pl.col("med_llim"), pl.col("med_ulim"))
         # & pl.col("O3_ppb").is_between(pl.col("mean_llim"), pl.col("mean_ulim"))
         # )
     df3 = df.filter(
         (pl.col(var).sub(pl.col("med"))).abs().ge(pl.col("thresh"))
-         & (pl.col("d/dt").lt(0.25))
+         & (pl.col("d/dt").lt(0.5))
+         & (pl.col("rel d/dt").lt(0.01))
         )
     fig, ax = plt.subplots()
     ax2 = ax.twinx()
@@ -439,7 +442,7 @@ for date, df in data["2BTech_205_B"].items():
     ax.tick_params(axis="x", labelrotation=90)
     ax.tick_params(axis="y", color="#1E4D2B", labelcolor="#1E4D2B")
 
-    ax2.scatter(df3["UTC_Start"], df3["d/dt"], color="black", alpha=0.5)
+    # ax2.scatter(df3["UTC_Start"], df3["rel d/dt"], color="black", alpha=0.5)
     # ax.plot(df["UTC_Start"], df["llim"], color="#D9782D")
     # ax.fill_between(df["UTC_Start"], df["ulim"], df["llim"], color="#D9782D", alpha=0.5)
     # ax.plot(df["UTC_Start"], df["ulim"], color="#D9782D")
