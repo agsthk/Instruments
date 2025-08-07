@@ -10,6 +10,8 @@ import polars as pl
 import pytz
 from datetime import datetime
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
@@ -377,15 +379,80 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 pl.col("SampleFlow_LPM").gt(0.5)
                 )
         df = lf.collect()
+        
         if df.is_empty():
             continue
-        _, source = file[:-17].split("_Structured")
-        f_name = inst + "_Clean" + source + "Data_" + path[-12:-4] + ".csv"
-        f_dir = os.path.join(CLEAN_DATA_DIR,
-                             inst + "_CleanData",
-                             inst + "_Clean" + source + "Data")
-        if not os.path.exists(f_dir):
-            os.makedirs(f_dir)
-        path = os.path.join(f_dir,
-                            f_name)
-        df.write_csv(path)
+        data[inst][file.rsplit("_", 1)[-1][:-4]] = df
+        # _, source = file[:-17].split("_Structured")
+        # f_name = inst + "_Clean" + source + "Data_" + path[-12:-4] + ".csv"
+        # f_dir = os.path.join(CLEAN_DATA_DIR,
+        #                      inst + "_CleanData",
+        #                      inst + "_Clean" + source + "Data")
+        # if not os.path.exists(f_dir):
+        #     os.makedirs(f_dir)
+        # path = os.path.join(f_dir,
+        #                     f_name)
+        # df.write_csv(path)
+
+for date, df in data["2BTech_205_A"].items():
+    df = df.filter(pl.col("SamplingLocation").eq("C200"))
+    # df = df.with_columns(
+    #     pl.col("O3_ppb").rolling_mean_by("UTC_Start", window_size="10m").alias("mean"),
+    #     pl.col("O3_ppb").rolling_std_by("UTC_Start", window_size="10m").alias("std"),
+    #     pl.col("O3_ppb").rolling_median_by("UTC_Start", window_size="10m").alias("med"),
+    #     pl.col("O3_ppb").rolling_quantile_by("UTC_Start", window_size="10m", quantile=0.25).alias("lq"),
+    #     pl.col("O3_ppb").rolling_quantile_by("UTC_Start", window_size="10m", quantile=0.75).alias("uq")
+    #     ).with_columns(
+    #         pl.col("uq").sub(pl.col("lq")).alias("iqr")
+    #         ).with_columns(
+    #             pl.col("mean").add(pl.col("std").mul(4)).alias("mean_ulim"),
+    #             pl.col("mean").sub(pl.col("std").mul(4)).alias("mean_llim"),
+    #             pl.col("med").add(pl.col("iqr").mul(4)).alias("med_ulim"),
+    #             pl.col("med").sub(pl.col("iqr").mul(4)).alias("med_llim")
+    #             )
+    var = "O3_ppb"
+    df = df.with_columns(
+        pl.col(var).rolling_median_by("UTC_Start", "30m").alias("med")
+        ).with_columns(
+            (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff")
+            ).with_columns(
+                pl.col("abs_diff").rolling_median_by("UTC_Start", "30m").mul(1.4826).alias("mad")
+                ).with_columns(
+                    pl.col("mad").mul(5).alias("thresh")
+                    )
+    df2 = df.filter(
+        (pl.col(var).sub(pl.col("med"))).abs().lt(pl.col("thresh"))
+        )
+        # pl.col("O3_ppb").is_between(pl.col("med_llim"), pl.col("med_ulim"))
+        # & pl.col("O3_ppb").is_between(pl.col("mean_llim"), pl.col("mean_ulim"))
+        # )
+    if df.is_empty(): continue
+    fig, ax = plt.subplots()
+    # ax2 = ax.twinx()
+    ax.plot(df["UTC_Start"], df["O3_ppb"], color="#1E4D2B")
+    
+    ax.plot(df2["UTC_Start"], df2["O3_ppb"], color="#D9782D")
+    ax.set_ylabel("O3_ppb", color="#1E4D2B")
+    ax.spines["left"].set_color("#1E4D2B")
+    ax.xaxis.set_major_locator(
+        mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
+        # mdates.HourLocator(byhour=[h * 3 for h in range(8)], tz=pytz.timezone("America/Denver"))
+        )
+    ax.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax.tick_params(axis="x", labelrotation=90)
+    ax.tick_params(axis="y", color="#1E4D2B", labelcolor="#1E4D2B")
+
+    # ax.plot(df["UTC_Start"], df["med"], color="#D9782D")
+    # ax.plot(df["UTC_Start"], df["llim"], color="#D9782D")
+    # ax.fill_between(df["UTC_Start"], df["ulim"], df["llim"], color="#D9782D", alpha=0.5)
+    # ax.plot(df["UTC_Start"], df["ulim"], color="#D9782D")
+    # ax.set_ylabel("med", color="#D9782D")
+    ax.spines["right"].set_color("#D9782D")
+    ax.spines["left"].set_color("#1E4D2B")
+    ax.tick_params(axis="y", colors="#D9782D")
+    ax.set_title(date)
+    ax.grid(axis="x")
+    
+
