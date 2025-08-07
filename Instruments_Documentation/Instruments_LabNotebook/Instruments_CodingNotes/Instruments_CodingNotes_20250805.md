@@ -25,3 +25,8 @@
 		- Unsure of the source of this issue, going to manually change the units in the affected files
 - After resolving the units, the calibration script worked fine
 - Revised file naming to include the calibration date
+- When going from Clean -> Calibrated, it seems that the actual data was removed from the files - why?
+	- No it wasn't lol I changed the script without realizing (in Keck O3) and was plotting the actual data instead of the zeros - my bad!
+# select_projectdata.py
+- Because I have moved this project, I need to move the KeckO3 project to my PC folder
+- After doing so, the script runs with no issue (I think)
