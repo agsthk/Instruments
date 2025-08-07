@@ -398,6 +398,41 @@ for date, df in data["2BTech_205_B"].items():
     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
     if df.is_empty():
         continue
+    og = df.height
+    var = "O3_ppb"
+    pts_removed = []
+    windows = [i + 1 for i in range(60)]
+    sigmas = [(i + 1) / 10 for i in range(50)]
+    for m in windows:
+        m_rmvd = []
+        for s in sigmas:
+            df2 = df.with_columns(
+                pl.col(var).rolling_median_by("UTC_Start", str(m) + "m").alias("med")
+                ).with_columns(
+                    (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff")
+                    ).with_columns(
+                        pl.col("abs_diff").rolling_median_by("UTC_Start", str(m) + "m").mul(1.4826).alias("mad")
+                        ).with_columns(
+                            pl.col("mad").mul(s).alias("thresh")
+                            ).filter(
+                                pl.col(var).sub(pl.col("med")).abs().lt(pl.col("thresh"))
+                                )
+                                
+            m_rmvd.append((og - df2.height) / og)
+        pts_removed.append(m_rmvd)
+    cmap = plt.colormaps['GnBu']
+    fig, ax = plt.subplots(figsize=(8, 4))
+    cs = ax.pcolormesh(sigmas, windows, pts_removed, cmap=cmap, shading="auto")
+    ax.set_xlabel("sigmas")
+    ax.set_ylabel("window size (minutes)")
+    cbar = fig.colorbar(cs)
+    cbar.ax.set_ylabel("% of data removed by hampel filter")
+    ax.set_title(date)
+
+for date, df in data["2BTech_205_B"].items():
+    df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
+    if df.is_empty():
+        continue
     var = "O3_ppb"
     df = df.with_columns(
         pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
