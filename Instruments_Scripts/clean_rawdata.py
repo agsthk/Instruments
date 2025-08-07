@@ -394,15 +394,15 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         #                     f_name)
         # df.write_csv(path)
 
-for date, df in data["2BTech_205_B"].items():
+for date, df in tqdm(data["2BTech_205_B"].items()):
     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
     if df.is_empty():
         continue
     og = df.height
     var = "O3_ppb"
     pts_removed = []
-    windows = [i + 1 for i in range(60)]
-    sigmas = [(i + 1) / 10 for i in range(50)]
+    windows = [10 * (i + 1) for i in range(6)]
+    sigmas = [2 + (i / 2) for i in range(5)]
     for m in windows:
         m_rmvd = []
         for s in sigmas:
