@@ -1,0 +1,31 @@
+# clean_rawdata.py
+- Want to handle messy ozone data
+- First, want to plot room ozone and diagnostic data to see if that can explain some of the noise
+	- Nothing obvious when checking ozone against cell temperature
+	- Limited correlation when checking ozone against cell pressure
+		- 20250424, 20250312, 20250217?, 20250213?, 20250203
+		- Not all pressure spikes lead to ozone and not all ozone spikes have a corresponding pressure spike
+	- Very limited correlation with sample flow
+		- 20250212, 20250203
+- Checking vent ozone
+	- Temperature - maybe 3/17?
+- The diagnostics don't explain the noise very well, so I will likely need to do a point-to-point variation
+# inst_venv
+- Trying to install hampel package using conda-forge
+	- Don't want to use pip because I worry it will break my environment (has happened several times)
+	- Did not work
+	- Will not be installing this package
+# clean_rawdata.py
+- Wrote my own hampel filter - was relatively straightforward
+- Checking what threshold works to remove outliers while limiting valid data removed
+- A threshold of 10 with a window of 30 minutes kind of works
+	- Will need to manually ignore ozone additions as to prevent removing data during additions
+	- Actually looks really good on most of the room ozone data! The vent data is a little messier
+		- A threshold of 8 is even better
+- I wonder if I can somehow combine the hampel filter with a point-to-point difference
+	- Identify possible outliers, but only consider them outliers if the point to point difference is greater than some value
+	- Plotting the point to point difference on top of the original and filtered data to see what value I may wish to set as a limit
+		- A point-to-point difference of 3 works well when combined with hampel filter for room ozone data
+- Hampel combined with point-to-point seems to work fairly well for the vent ozone as well
+- The next step would be to optimize the parameters as to minimize the number of both false positives and false negatives
+	- Also may want to consider using d/dt rather than point-to-point difference - think about what might be best
