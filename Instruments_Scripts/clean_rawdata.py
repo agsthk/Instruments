@@ -398,36 +398,58 @@ for date, df in tqdm(data["2BTech_205_B"].items()):
     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
     if df.is_empty():
         continue
+    fig, (ax1, ax2) = plt.subplots(2, 1,figsize=(8, 8))
+    ax1.plot(df["UTC_Start"], df["O3_ppb"], color="#1E4D2B")
+    ax1.set_ylabel("O3_ppb", color="#1E4D2B")
+    ax1.spines["left"].set_color("#1E4D2B")
+    ax1.xaxis.set_major_locator(
+        mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
+        # mdates.HourLocator(byhour=[h * 3 for h in range(8)], tz=pytz.timezone("America/Denver"))
+        )
+    ax1.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax1.tick_params(axis="x", labelrotation=90)
+    ax1.tick_params(axis="y", color="#1E4D2B", labelcolor="#1E4D2B")
+    ax1.set_title(date)
+    ax1.grid(axis="x")
     og = df.height
     var = "O3_ppb"
     pts_removed = []
-    windows = [10 * (i + 1) for i in range(6)]
-    sigmas = [2 + (i / 2) for i in range(5)]
+    windows = [5 * (i + 1) for i in range(6)]
+    sigmas = [2 + (i / 4) for i in range(5)][::-1]
     for m in windows:
         m_rmvd = []
         for s in sigmas:
             df2 = df.with_columns(
+                pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
+                pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
                 pl.col(var).rolling_median_by("UTC_Start", str(m) + "m").alias("med")
                 ).with_columns(
+                    pl.col("diff").truediv(pl.col(var)).truediv(pl.col("dt")).abs().alias("rel d/dt"),
+                    pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
                     (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff")
                     ).with_columns(
                         pl.col("abs_diff").rolling_median_by("UTC_Start", str(m) + "m").mul(1.4826).alias("mad")
                         ).with_columns(
                             pl.col("mad").mul(s).alias("thresh")
                             ).filter(
-                                pl.col(var).sub(pl.col("med")).abs().lt(pl.col("thresh"))
+                                (pl.col(var).sub(pl.col("med")).abs().lt(pl.col("thresh"))
+                                | (pl.col("d/dt").lt(0.25) & pl.col("rel d/dt").lt(0.005)))
+                                & (pl.col("d/dt").lt(1) & pl.col("rel d/dt").lt(0.02))
                                 )
                                 
-            m_rmvd.append((og - df2.height) / og)
+            m_rmvd.append((og - df2.height))
         pts_removed.append(m_rmvd)
+    ax1.plot(df2["UTC_Start"], df2["O3_ppb"], color="#D9782D")
     cmap = plt.colormaps['GnBu']
-    fig, ax = plt.subplots(figsize=(8, 4))
-    cs = ax.pcolormesh(sigmas, windows, pts_removed, cmap=cmap, shading="auto")
-    ax.set_xlabel("sigmas")
-    ax.set_ylabel("window size (minutes)")
+    # fig, ax = plt.subplots(figsize=(8, 4))
+    cs = ax2.pcolormesh(sigmas, windows, pts_removed, cmap=cmap, shading="auto")
+    ax2.set_xlabel("sigmas")
+    ax2.set_ylabel("window size (minutes)")
     cbar = fig.colorbar(cs)
-    cbar.ax.set_ylabel("% of data removed by hampel filter")
-    ax.set_title(date)
+    cbar.ax.set_ylabel("# of data points removed by hampel filter")
+    # ax.set_title(date)
 
 for date, df in data["2BTech_205_B"].items():
     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
