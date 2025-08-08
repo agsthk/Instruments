@@ -394,6 +394,43 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         #                     f_name)
         # df.write_csv(path)
 
+for date, df in tqdm(data["2BTech_205_B"].items()):
+    df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
+    if df.is_empty():
+        continue
+    fig, (ax1, ax2) = plt.subplots(2, 1,figsize=(8, 8))
+    ax1.plot(df["UTC_Start"], df["O3_ppb"], color="#1E4D2B")
+    ax1.set_ylabel("O3_ppb", color="#1E4D2B")
+    ax1.spines["left"].set_color("#1E4D2B")
+    ax1.xaxis.set_major_locator(
+        mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
+        )
+    ax1.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax1.tick_params(axis="x", labelrotation=90)
+    ax1.tick_params(axis="y", color="#1E4D2B", labelcolor="#1E4D2B")
+    ax1.set_title(date)
+    ax1.grid(axis="x")
+    og = df.height
+    var = "O3_ppb"
+    pts_removed = []
+    absolute = [0.1 + (i / 100) for i in range(20)][::-1]
+    for a in absolute:
+        df2 = df.with_columns(
+            pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
+            pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
+            ).with_columns(
+                pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
+                ).filter(
+                    pl.col("d/dt").abs().lt(a)
+                    )
+        pts_removed.append((og - df2.height) / og)
+    ax1.plot(df2["UTC_Start"], df2["O3_ppb"], color="#D9782D")
+    ax2.plot(absolute, pts_removed, color="#D9782D")
+    ax2.set_xlabel("Absolute d/dt Cutoff")
+    ax2.set_ylabel("Fraction of data removed")
+
 
 for date, df in tqdm(data["2BTech_205_B"].items()):
     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
@@ -416,8 +453,8 @@ for date, df in tqdm(data["2BTech_205_B"].items()):
     og = df.height
     var = "O3_ppb"
     pts_removed = []
-    absolute = [0.1 + (i / 10) for i in range(10)][::-1]
-    relative = [0.01 + (i / 100) for i in range(20)][::-1]
+    absolute = [0.1 + (i / 10) for i in range(5)][::-1]
+    relative = [0.01 + (i / 100) for i in range(10)][::-1]
     for a in absolute:
         a_rmvd = []
         for r in relative:
