@@ -538,6 +538,99 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
 #     cbar.ax.set_ylabel("# of data points removed by hampel filter")
 #     # ax.set_title(date)
 
+# Hampel + IQR visualization
+for date, df in tqdm(data["2BTech_205_B"].items()):
+    df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
+    if df.is_empty():
+        continue
+    var = "O3_ppb"
+    i = 0
+    fig, axs = plt.subplots(4, 4, figsize=(9, 6), sharex=True, sharey=True)
+    for window in ["10m", "20m", "30m", "40m"]:
+        j = 0
+        df2 = df.with_columns(
+            pl.col(var).rolling_median_by("UTC_Start", window).alias("median"),
+            pl.col(var).rolling_quantile_by(by="UTC_Start", quantile=0.25, interpolation="linear", window_size=window).alias("lq"),
+            pl.col(var).rolling_quantile_by(by="UTC_Start", quantile=0.75, interpolation="linear", window_size=window).alias("uq")
+            ).with_columns(
+                pl.col("uq").sub(pl.col("lq")).alias("iqr")
+                ).with_columns(
+                    (pl.col(var).sub(pl.col("median"))).abs().alias("abs_diff")
+                    ).with_columns(
+                        pl.col("abs_diff").rolling_median_by("UTC_Start", window).mul(1.4826).alias("mad")
+                        )
+        for iqrs in [5, 6, 7, 8]:
+            df3 = df2.filter(
+                pl.col(var).sub(pl.col("median")).abs().gt(pl.col("iqr").mul(iqrs))
+                & pl.col(var).sub(pl.col("median")).abs().gt(pl.col("mad").mul(iqrs)))
+            axs[i][j].scatter(df["UTC_Start"], df[var], color="#D9782D", s=10)
+            axs[i][j].scatter(df3["UTC_Start"], df3[var], color="#1E4D2B", s=10)
+            axs[i][j].grid(axis="x")
+            axs[i][j].text(1.1, 1, str(df3.height), horizontalalignment='right',
+                           verticalalignment='top', transform=axs[i][j].transAxes, fontsize="medium")
+            if i == 0:
+                axs[i][j].set_title(str(iqrs) + " IQRs/sigmas", fontsize="medium")
+            if j == 0:
+                axs[i][j].set_ylabel(window + " window", fontsize="medium")
+            j += 1
+        i += 1
+    for ax in axs[-1]:
+        ax.xaxis.set_major_locator(
+            mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"))
+            )
+        ax.xaxis.set_major_formatter(
+            mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+            )
+        ax.tick_params(axis="x", labelrotation=90, labelsize="medium")
+    fig.suptitle(date, size="xx-large")
+    fig.supylabel(var, size="large")
+
+# Hampel visualization
+for date, df in tqdm(data["2BTech_205_B"].items()):
+    df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
+    if df.is_empty():
+        continue
+    var = "O3_ppb"
+    i = 0
+    fig, axs = plt.subplots(4, 4, figsize=(9, 6), sharex=True, sharey=True)
+    for window in ["10m", "20m", "30m", "40m"]:
+        j = 0
+        df2 = df.with_columns(
+            pl.col(var).rolling_median_by("UTC_Start", window).alias("med")
+            ).with_columns(
+                (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff")
+                ).with_columns(
+                    pl.col("abs_diff").rolling_median_by("UTC_Start", window).mul(1.4826).alias("mad")
+                    ).with_columns(
+                        pl.col("mad").mul(6).alias("thresh")
+                        )
+        for sigma in [6, 7, 8, 9]:
+            df3 = df2.filter(
+                pl.col(var).sub(pl.col("med")).abs().gt(pl.col("mad").mul(sigma))
+                )
+            axs[i][j].scatter(df["UTC_Start"], df[var], color="#D9782D", s=10)
+            axs[i][j].scatter(df3["UTC_Start"], df3[var], color="#1E4D2B", s=10)
+            axs[i][j].grid(axis="x")
+            axs[i][j].text(1.1, 1, str(df3.height), horizontalalignment='right',
+                           verticalalignment='top', transform=axs[i][j].transAxes, fontsize="medium")
+            if i == 0:
+                axs[i][j].set_title(str(sigma) + " sigmas", fontsize="medium")
+            if j == 0:
+                axs[i][j].set_ylabel(window + " window", fontsize="medium")
+            j += 1
+        i += 1
+    for ax in axs[-1]:
+        ax.xaxis.set_major_locator(
+            mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"))
+            )
+        ax.xaxis.set_major_formatter(
+            mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+            )
+        ax.tick_params(axis="x", labelrotation=90, labelsize="medium")
+    fig.suptitle(date, size="xx-large")
+    fig.supylabel(var, size="large")
+
+# Hampel + d/dt filter number of points removed
 for date, df in tqdm(data["2BTech_205_B"].items()):
     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
     if df.is_empty():
@@ -607,7 +700,8 @@ for date, df in tqdm(data["2BTech_205_B"].items()):
     cbar.ax.yaxis.set_label_position("left")
     cax2.set_ylabel("fraction of data removed")
     cax2.yaxis.set_label_position("right")
-    
+
+# Hampel + d/dt visualization
 for date, df in data["2BTech_205_B"].items():
     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
     if df.is_empty():
