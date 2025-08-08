@@ -394,92 +394,149 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         #                     f_name)
         # df.write_csv(path)
 
-for date, df in tqdm(data["2BTech_205_B"].items()):
-    df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
-    if df.is_empty():
-        continue
-    fig, (ax1, ax2) = plt.subplots(2, 1,figsize=(8, 8))
-    ax1.plot(df["UTC_Start"], df["O3_ppb"], color="#1E4D2B")
-    ax1.set_ylabel("O3_ppb", color="#1E4D2B")
-    ax1.spines["left"].set_color("#1E4D2B")
-    ax1.xaxis.set_major_locator(
-        mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
-        )
-    ax1.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax1.tick_params(axis="x", labelrotation=90)
-    ax1.tick_params(axis="y", color="#1E4D2B", labelcolor="#1E4D2B")
-    ax1.set_title(date)
-    ax1.grid(axis="x")
-    og = df.height
-    var = "O3_ppb"
-    pts_removed = []
-    absolute = [0.1 + (i / 100) for i in range(20)][::-1]
-    for a in absolute:
-        df2 = df.with_columns(
-            pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
-            pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
-            ).with_columns(
-                pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
-                ).filter(
-                    pl.col("d/dt").abs().lt(a)
-                    )
-        pts_removed.append((og - df2.height) / og)
-    ax1.plot(df2["UTC_Start"], df2["O3_ppb"], color="#D9782D")
-    ax2.plot(absolute, pts_removed, color="#D9782D")
-    ax2.set_xlabel("Absolute d/dt Cutoff")
-    ax2.set_ylabel("Fraction of data removed")
+# for date, df in tqdm(data["2BTech_205_B"].items()):
+#     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
+#     if df.is_empty():
+#         continue
+#     fig, (ax1, ax2) = plt.subplots(2, 1,figsize=(8, 8))
+#     ax1.plot(df["UTC_Start"], df["O3_ppb"], color="#1E4D2B")
+#     ax1.set_ylabel("O3_ppb", color="#1E4D2B")
+#     ax1.spines["left"].set_color("#1E4D2B")
+#     ax1.xaxis.set_major_locator(
+#         mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
+#         )
+#     ax1.xaxis.set_major_formatter(
+#         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+#         )
+#     ax1.tick_params(axis="x", labelrotation=90)
+#     ax1.tick_params(axis="y", color="#1E4D2B", labelcolor="#1E4D2B")
+#     ax1.set_title(date)
+#     ax1.grid(axis="x")
+#     og = df.height
+#     var = "O3_ppb"
+#     pts_removed = []
+#     absolute = [0.1 + (i / 100) for i in range(20)][::-1]
+#     for a in absolute:
+#         df2 = df.with_columns(
+#             pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
+#             pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
+#             ).with_columns(
+#                 pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
+#                 ).filter(
+#                     pl.col("d/dt").abs().lt(a)
+#                     )
+#         pts_removed.append((og - df2.height) / og)
+#     ax1.plot(df2["UTC_Start"], df2["O3_ppb"], color="#D9782D")
+#     ax2.plot(absolute, pts_removed, color="#D9782D")
+#     ax2.set_xlabel("Absolute d/dt Cutoff")
+#     ax2.set_ylabel("Fraction of data removed")
 
 
-for date, df in tqdm(data["2BTech_205_B"].items()):
-    df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
-    if df.is_empty():
-        continue
-    fig, (ax1, ax2) = plt.subplots(2, 1,figsize=(8, 8))
-    ax1.plot(df["UTC_Start"], df["O3_ppb"], color="#1E4D2B")
-    ax1.set_ylabel("O3_ppb", color="#1E4D2B")
-    ax1.spines["left"].set_color("#1E4D2B")
-    ax1.xaxis.set_major_locator(
-        mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
-        )
-    ax1.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax1.tick_params(axis="x", labelrotation=90)
-    ax1.tick_params(axis="y", color="#1E4D2B", labelcolor="#1E4D2B")
-    ax1.set_title(date)
-    ax1.grid(axis="x")
-    og = df.height
-    var = "O3_ppb"
-    pts_removed = []
-    absolute = [0.1 + (i / 10) for i in range(5)][::-1]
-    relative = [0.01 + (i / 100) for i in range(10)][::-1]
-    for a in absolute:
-        a_rmvd = []
-        for r in relative:
-            df2 = df.with_columns(
-                pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
-                pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
-                ).with_columns(
-                    pl.col("diff").truediv(pl.col(var)).truediv(pl.col("dt")).abs().alias("rel d/dt"),
-                    pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
-                    ).filter(
-                        pl.col("d/dt").lt(a) & pl.col("rel d/dt").lt(r)
-                        )
-            a_rmvd.append((og - df2.height))
-        pts_removed.append(a_rmvd)
-    ax1.plot(df2["UTC_Start"], df2["O3_ppb"], color="#D9782D")
-    # ax3 = ax1.twinx()
-    # ax3.plot(df2["UTC_Start"], df2["rel d/dt"])
-    cmap = plt.colormaps['GnBu']
-    # fig, ax = plt.subplots(figsize=(8, 4))
-    cs = ax2.pcolormesh(relative, absolute, pts_removed, cmap=cmap, shading="auto")
-    ax2.set_xlabel("Relative d/dt Cutoff")
-    ax2.set_ylabel("Absolute d/dt Cutoff")
-    cbar = fig.colorbar(cs)
-    cbar.ax.set_ylabel("# of outliers")
-    # ax.set_title(date)
+# for date, df in tqdm(data["2BTech_205_B"].items()):
+#     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
+#     if df.is_empty():
+#         continue
+#     fig, (ax1, ax2) = plt.subplots(2, 1,figsize=(8, 8))
+#     ax1.plot(df["UTC_Start"], df["O3_ppb"], color="#1E4D2B")
+#     ax1.set_ylabel("O3_ppb", color="#1E4D2B")
+#     ax1.spines["left"].set_color("#1E4D2B")
+#     ax1.xaxis.set_major_locator(
+#         mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
+#         )
+#     ax1.xaxis.set_major_formatter(
+#         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+#         )
+#     ax1.tick_params(axis="x", labelrotation=90)
+#     ax1.tick_params(axis="y", color="#1E4D2B", labelcolor="#1E4D2B")
+#     ax1.set_title(date)
+#     ax1.grid(axis="x")
+#     og = df.height
+#     var = "O3_ppb"
+#     pts_removed = []
+#     absolute = [0.1 + (i / 10) for i in range(5)][::-1]
+#     relative = [0.01 + (i / 100) for i in range(10)][::-1]
+#     for a in absolute:
+#         a_rmvd = []
+#         for r in relative:
+#             df2 = df.with_columns(
+#                 pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
+#                 pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
+#                 ).with_columns(
+#                     pl.col("diff").truediv(pl.col(var)).truediv(pl.col("dt")).abs().alias("rel d/dt"),
+#                     pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
+#                     ).filter(
+#                         pl.col("d/dt").lt(a) & pl.col("rel d/dt").lt(r)
+#                         )
+#             a_rmvd.append((og - df2.height))
+#         pts_removed.append(a_rmvd)
+#     ax1.plot(df2["UTC_Start"], df2["O3_ppb"], color="#D9782D")
+#     # ax3 = ax1.twinx()
+#     # ax3.plot(df2["UTC_Start"], df2["rel d/dt"])
+#     cmap = plt.colormaps['GnBu']
+#     # fig, ax = plt.subplots(figsize=(8, 4))
+#     cs = ax2.pcolormesh(relative, absolute, pts_removed, cmap=cmap, shading="auto")
+#     ax2.set_xlabel("Relative d/dt Cutoff")
+#     ax2.set_ylabel("Absolute d/dt Cutoff")
+#     cbar = fig.colorbar(cs)
+#     cbar.ax.set_ylabel("# of outliers")
+#     # ax.set_title(date)
+
+# for date, df in tqdm(data["2BTech_205_B"].items()):
+#     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
+#     if df.is_empty():
+#         continue
+#     fig, (ax1, ax2) = plt.subplots(2, 1,figsize=(8, 8))
+#     ax1.plot(df["UTC_Start"], df["O3_ppb"], color="#1E4D2B")
+#     ax1.set_ylabel("O3_ppb", color="#1E4D2B")
+#     ax1.spines["left"].set_color("#1E4D2B")
+#     ax1.xaxis.set_major_locator(
+#         mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
+#         # mdates.HourLocator(byhour=[h * 3 for h in range(8)], tz=pytz.timezone("America/Denver"))
+#         )
+#     ax1.xaxis.set_major_formatter(
+#         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+#         )
+#     ax1.tick_params(axis="x", labelrotation=90)
+#     ax1.tick_params(axis="y", color="#1E4D2B", labelcolor="#1E4D2B")
+#     ax1.set_title(date)
+#     ax1.grid(axis="x")
+#     og = df.height
+#     var = "O3_ppb"
+#     pts_removed = []
+#     windows = [5 * (i + 1) for i in range(6)]
+#     sigmas = [2 + (i / 4) for i in range(5)][::-1]
+#     for m in windows:
+#         m_rmvd = []
+#         for s in sigmas:
+#             df2 = df.with_columns(
+#                 pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
+#                 pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
+#                 pl.col(var).rolling_median_by("UTC_Start", str(m) + "m").alias("med")
+#                 ).with_columns(
+#                     pl.col("diff").truediv(pl.col(var)).truediv(pl.col("dt")).abs().alias("rel d/dt"),
+#                     pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
+#                     (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff")
+#                     ).with_columns(
+#                         pl.col("abs_diff").rolling_median_by("UTC_Start", str(m) + "m").mul(1.4826).alias("mad")
+#                         ).with_columns(
+#                             pl.col("mad").mul(s).alias("thresh")
+#                             ).filter(
+#                                 (pl.col(var).sub(pl.col("med")).abs().lt(pl.col("thresh"))
+#                                 | (pl.col("d/dt").lt(0.25) & pl.col("rel d/dt").lt(0.005)))
+#                                 & (pl.col("d/dt").lt(1) & pl.col("rel d/dt").lt(0.02))
+#                                 )
+                                
+#             m_rmvd.append((og - df2.height))
+#         pts_removed.append(m_rmvd)
+#     ax1.plot(df2["UTC_Start"], df2["O3_ppb"], color="#D9782D")
+#     cmap = plt.colormaps['GnBu']
+#     # fig, ax = plt.subplots(figsize=(8, 4))
+#     cs = ax2.pcolormesh(sigmas, windows, pts_removed, cmap=cmap, shading="auto")
+#     ax2.set_xlabel("sigmas")
+#     ax2.set_ylabel("window size (minutes)")
+#     cbar = fig.colorbar(cs)
+#     cbar.ax.set_ylabel("# of data points removed by hampel filter")
+#     # ax.set_title(date)
 
 for date, df in tqdm(data["2BTech_205_B"].items()):
     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
@@ -503,41 +560,54 @@ for date, df in tqdm(data["2BTech_205_B"].items()):
     og = df.height
     var = "O3_ppb"
     pts_removed = []
-    windows = [5 * (i + 1) for i in range(6)]
-    sigmas = [2 + (i / 4) for i in range(5)][::-1]
-    for m in windows:
-        m_rmvd = []
+    perc_removed = []
+    absolute = [0.025 + (i / 40) for i in range(5)][::-1]
+    sigmas = [3 + (i / 8) for i in range(16)][::-1]
+    for a in absolute:
+        a_rmvd = []
+        a_perc_rmvd = []
         for s in sigmas:
             df2 = df.with_columns(
                 pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
                 pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
-                pl.col(var).rolling_median_by("UTC_Start", str(m) + "m").alias("med")
+                pl.col(var).rolling_median_by("UTC_Start", "30m").alias("med")
                 ).with_columns(
-                    pl.col("diff").truediv(pl.col(var)).truediv(pl.col("dt")).abs().alias("rel d/dt"),
                     pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
                     (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff")
                     ).with_columns(
-                        pl.col("abs_diff").rolling_median_by("UTC_Start", str(m) + "m").mul(1.4826).alias("mad")
+                        pl.col("abs_diff").rolling_median_by("UTC_Start", "30m").mul(1.4826).alias("mad")
                         ).with_columns(
                             pl.col("mad").mul(s).alias("thresh")
                             ).filter(
-                                (pl.col(var).sub(pl.col("med")).abs().lt(pl.col("thresh"))
-                                | (pl.col("d/dt").lt(0.25) & pl.col("rel d/dt").lt(0.005)))
-                                & (pl.col("d/dt").lt(1) & pl.col("rel d/dt").lt(0.02))
+                                pl.col(var).sub(pl.col("med")).abs().lt(pl.col("thresh"))
+                                | pl.col("d/dt").abs().lt(a)
                                 )
                                 
-            m_rmvd.append((og - df2.height))
-        pts_removed.append(m_rmvd)
+            a_rmvd.append((og - df2.height))
+            a_perc_rmvd.append((og - df2.height) / og)
+        pts_removed.append(a_rmvd)
+        perc_removed.append(a_perc_rmvd)
+    vmin = 0#min(min(x) for x in pts_removed)
+    vmax = 0.03 * og#max(max(x) for x in pts_removed)
+    vmin2 = 0#min(min(x) for x in perc_removed)
+    vmax2 = 0.03#max(max(x) for x in perc_removed)
     ax1.plot(df2["UTC_Start"], df2["O3_ppb"], color="#D9782D")
     cmap = plt.colormaps['GnBu']
-    # fig, ax = plt.subplots(figsize=(8, 4))
-    cs = ax2.pcolormesh(sigmas, windows, pts_removed, cmap=cmap, shading="auto")
+    cs = ax2.pcolormesh(sigmas, absolute, pts_removed, cmap=cmap, shading="auto", vmin=vmin, vmax=vmax)
     ax2.set_xlabel("sigmas")
-    ax2.set_ylabel("window size (minutes)")
+    ax2.set_ylabel("absolute derivative cutoff")
     cbar = fig.colorbar(cs)
-    cbar.ax.set_ylabel("# of data points removed by hampel filter")
-    # ax.set_title(date)
-
+    pos = cbar.ax.get_position()
+    cax2 = cbar.ax.twinx()
+    cax2.set_ylim([vmin2, vmax2])
+    pos.x0 += 0.05
+    cbar.ax.set_position(pos)
+    cax2.set_position(pos)
+    cbar.ax.set_ylabel("# of data points removed")
+    cbar.ax.yaxis.set_label_position("left")
+    cax2.set_ylabel("fraction of data removed")
+    cax2.yaxis.set_label_position("right")
+    
 for date, df in data["2BTech_205_B"].items():
     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
     if df.is_empty():
