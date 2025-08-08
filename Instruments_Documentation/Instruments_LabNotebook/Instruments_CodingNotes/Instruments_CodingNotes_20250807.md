@@ -1,0 +1,21 @@
+# Git repository
+- In remote and local repositories, removed obsidian workspace files from being tracked
+	- I think this was successful?
+# clean_rawdata.py
+- Picking up where I left off with the hampel and point-to-point filter
+- Calculated d/dt and am assessing feasibility of using that rather than point-to-point
+	- Using a d/dt limit of 0.25 ppb/s - somewhat arbitrary
+- Additionally, I would like to consider using a relative d/dt in combination with the absolute
+	- This is getting complex quite quickly
+- I need a way to systematically assess the impact of changing inputs
+	- In general, I only want clear outliers removed
+		- Doing so will likely change the mean and standard deviation, but should have limited impact on the median and interquartile range (I think)
+	- The first thing to assess is just the number of points removed
+		- Hampel filter only to begin with, as a function of number of sigmas and window size
+		- Figured out how to plot the percentage of data removed with different filter inputs (window size and sigmas)
+	- Considering doing this systematic analysis just using a point-to-point or derivative filter - that may be easier to understand
+	- Examined the number of points removed based only on an absolute d/dt cutoff
+		- Relative d/dt doesn't seem particularly useful, as it's only high when ozone is low
+		- I think combining this with the hampel filter is still the best option, as it doesn't catch all obvious outliers and while simultaneously removing plenty of valid data
+- Tomorrow, I want to pick up on optimizing this filter using the hampel filter in combination with absolute d/dt
+	- Set a single window, then optimize based on sigmas and d/dt cutoff
