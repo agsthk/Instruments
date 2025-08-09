@@ -641,7 +641,7 @@ for date, df in tqdm(data["2BTech_205_B"].items()):
     var = "O3_ppb"
     i = 0
     fig, axs = plt.subplots(4, 4, figsize=(9, 6), sharex=True, sharey=True)
-    for window in ["10m", "20m", "30m", "40m"]:
+    for window in ["5m", "10m", "60m", "120m"]:
         j = 0
         df2 = df.with_columns(
             pl.col(var).rolling_median_by("UTC_Start", window).alias("med")
