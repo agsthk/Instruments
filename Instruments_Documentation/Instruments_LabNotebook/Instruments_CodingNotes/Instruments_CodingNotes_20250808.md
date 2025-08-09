@@ -1,0 +1,30 @@
+# clean_rawdata.py
+- Picking up with the intention to use a hampel filter in combination with absolute d/dt
+	- Examination follows the same structure/code as previously used
+	- Added a secondary fraction of data removed to colorbar label to get a better idea of the amount of data removed
+	- Set the minimum amount of data removed to 0 and the maximum amount to the original number of points/1 to facilitate intercomparison
+		- A maximum of 1 may be too high, making it difficult to see differences given that the number of points removed doesn't get that high in general
+		- The maximum is ~3%, so setting a maximum of 0.05
+- I am not sure that just looking at the number of points is giving me the information that I want
+	- This is difficult
+- Visualizing what a filter based on median/interquartile range would look like
+	- I like the hampel filter better - I think this is removing too much real data when the ozone rapidly changes
+- Instead of just examining the number of data points, plotting what each filter looks like on the same figure (with subplots)
+	- Hampel filter first
+	- Also testing with interquartile range
+	- Attempting to combine Hampel and IQR filters
+- I wonder if I could use the rolling standard deviation of d/dt, take the rolling mean and standard deviation of that, and use that to filter?
+	- This does not work well on its own
+	- Could I combine this with another filter?
+- Perhaps consider in steps
+	- First, filter global outliers
+		- e.g. -50
+	- Then consider how to handle local outliers
+	- Also need to confirm that I actually understand the Hampel filtering
+- I will be using Hampel filtering
+	- I need to decide if it will be in combination with another filter, or if it is sufficient on its own - this is where I will pick up next time
+	- Also consider looping - apply the filter twice and see what that does
+	- Quickly examining what a very large time window will do
+	- What if I combine a Hampel filter with a short window with one with a long window?
+	- I think I have determined the source of some of the issues for long times!
+		- The rolling mean is calculated in the forward direction only
