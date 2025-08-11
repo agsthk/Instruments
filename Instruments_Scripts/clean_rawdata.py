@@ -538,6 +538,33 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
 #     cbar.ax.set_ylabel("# of data points removed by hampel filter")
 #     # ax.set_title(date)
 
+# Global outliers
+for date, df in tqdm(data["2BTech_205_B"].items()):
+    df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
+    if df.is_empty():
+        continue
+    var = "O3_ppb"
+    median = df[var].median()
+    iqr = df[var].quantile(0.75) - df[var].quantile(0.25)
+    df2 = df.filter(
+        pl.col(var).sub(median).abs().lt(9 * iqr)
+        )
+    if df.height == df2.height:
+        continue    
+    fig, ax = plt.subplots(figsize=(9, 6))
+    ax.scatter(df["UTC_Start"], df[var], color="#D9782D", s=10)
+    ax.scatter(df2["UTC_Start"], df2[var], color="#1E4D2B", s=10)
+    ax.grid(axis="x")
+    ax.set_title(date, size="xx-large")
+    ax.set_ylabel(var, size="large")
+    ax.xaxis.set_major_locator(
+        mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"))
+        )
+    ax.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax.tick_params(axis="x", labelrotation=90, labelsize="medium")
+
 # IQR of STD of d/dt
 for date, df in tqdm(data["2BTech_205_B"].items()):
     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
