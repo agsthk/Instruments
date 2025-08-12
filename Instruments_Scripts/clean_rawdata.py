@@ -406,10 +406,33 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
 rmvd = []
 
 # iterative Hampel visualization
-for date, df in tqdm(data["2BTech_205_B"].items()):
-    df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
+for date, df in tqdm(data["2BTech_205_A"].items()):
+    df = df.filter(pl.col("SamplingLocation").eq("C200"))
     if df.is_empty():
         continue
+    df_start = df["UTC_Start"].min()
+    df_stop = df["UTC_Stop"].max()
+    adds = add_times["O3"].filter(
+        pl.col("UTC_Start").is_between(df_start, df_stop)
+        | pl.col("UTC_Stop").is_between(df_start, df_stop)
+        )
+    ignore = adds.with_columns(
+        pl.col("UTC_Stop").dt.offset_by("20m")
+        )
+    df = df.join_asof(
+        ignore,
+        on="UTC_Start",
+        coalesce=False,
+        strategy="backward",
+        suffix="_Add"
+        ).with_columns(
+            pl.when(pl.col("UTC_Start").le(pl.col("UTC_Stop_Add")))
+            .then(pl.lit(True))
+            .otherwise(pl.lit(False))
+            .alias("Valid")
+            ).select(
+                ~pl.selectors.contains("_Add")
+                )
     var = "O3_ppb"
     df2 = df.clone()
     fig, ax = plt.subplots(figsize=(6, 3))
@@ -454,12 +477,16 @@ for date, df in tqdm(data["2BTech_205_B"].items()):
         
         df3 = df2.filter(
             (pl.col(var).sub(pl.col("med")).abs().gt(pl.col("mad").mul(3))
-            & (pl.col("d/dt").ge(0.2) | pl.col("d/dt2").ge(0.2)))
+            & (pl.col("d/dt").ge(0.2) | pl.col("d/dt2").ge(0.2))
+            & ~pl.col("Valid")
+            )
             | pl.col(var).le(-8)
             )
         df2 = df2.filter(
             (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(3))
-            | (pl.col("d/dt").lt(0.2) & pl.col("d/dt2").lt(0.2)))
+            | (pl.col("d/dt").lt(0.2) & pl.col("d/dt2").lt(0.2))
+            | pl.col("Valid")
+            )
             & pl.col(var).gt(-8)
             # | (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(4)) & (pl.col("len").ge(12)) & (pl.col("d/dt").lt(0.3) & pl.col("d/dt2").lt(0.3)))
             # | (pl.col(var).sub(pl.col("longmed")).abs().le(pl.col("iqr").mul(1.5)))
@@ -481,11 +508,15 @@ rmvd = rmvd.with_columns(
 
 fig, ax = plt.subplots(figsize=(6, 3))
 ax.scatter(rmvd["Date"], rmvd["%rm"] * 100, color="#D9782D", s=25)
-ax.set_title("Data removed by filter - Vent ozone")
+ax.set_title("Data removed by filter - Room ozone")
 ax.grid()
+ax.grid(which="minor", axis="x", linestyle=":")
 ax.set_ylabel("% data removed")
 ax.xaxis.set_major_locator(
     mdates.AutoDateLocator()
+    )
+ax.xaxis.set_minor_locator(
+    mdates.DayLocator(interval=1)
     )
 ax.xaxis.set_major_formatter(
     mdates.DateFormatter("%m/%d")
