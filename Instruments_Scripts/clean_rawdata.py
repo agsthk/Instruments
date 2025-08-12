@@ -394,7 +394,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         #                     f_name)
         # df.write_csv(path)
 
-
+rmvd = []
 
 # iterative Hampel visualization
 for date, df in tqdm(data["2BTech_205_B"].items()):
@@ -403,7 +403,21 @@ for date, df in tqdm(data["2BTech_205_B"].items()):
         continue
     var = "O3_ppb"
     df2 = df.clone()
-    
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.scatter(df["UTC_Start"], df[var], color="#D9782D", s=10)
+    ax.set_title(date)
+    ax.grid(axis="x")
+    ax.set_xlim(
+        df["UTC_Start"].min(), df["UTC_Start"].max()
+        )
+    ax.set_ylabel(var)
+    ax.xaxis.set_major_locator(
+        mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
+        )
+    ax.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax.tick_params(axis="x", labelrotation=90)
     for i in range(50):
         last_h = df2.height
         df2 = df2.select(
@@ -428,30 +442,43 @@ for date, df in tqdm(data["2BTech_205_B"].items()):
                         )
         inc_dec_count = df2.group_by("inc_dec_id").len()
         df2 = df2.join(inc_dec_count, on="inc_dec_id", how="full", coalesce=True, maintain_order="left")
+        
+        df3 = df2.filter(
+            (pl.col(var).sub(pl.col("med")).abs().gt(pl.col("mad").mul(3))
+            & (pl.col("d/dt").ge(0.2) | pl.col("d/dt2").ge(0.2)))
+            | pl.col(var).le(-8)
+            )
         df2 = df2.filter(
-            pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(3))
-            | (pl.col("d/dt").lt(0.2) & pl.col("d/dt2").lt(0.2))
+            (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(3))
+            | (pl.col("d/dt").lt(0.2) & pl.col("d/dt2").lt(0.2)))
+            & pl.col(var).gt(-8)
             # | (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(4)) & (pl.col("len").ge(12)) & (pl.col("d/dt").lt(0.3) & pl.col("d/dt2").lt(0.3)))
             # | (pl.col(var).sub(pl.col("longmed")).abs().le(pl.col("iqr").mul(1.5)))
             )
+        ax.scatter(df3["UTC_Start"], df3[var], color="#1E4D2B", s=10)
         if last_h == df2.height:
             break
     if df2.height == df.height:
         continue
-    fig, ax = plt.subplots(figsize=(6, 3))
-    ax.scatter(df["UTC_Start"], df[var], color="#D9782D", s=10)
-    ax.set_title(date)
-    ax.grid(axis="x")
-    ax.set_xlim(
-        df["UTC_Start"].min(), df["UTC_Start"].max()
-        )
-    ax.set_ylabel(var)
-    ax.xaxis.set_major_locator(
-        mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
-        )
-    ax.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax.tick_params(axis="x", labelrotation=90)
-    ax.scatter(df2["UTC_Start"], df2[var], color="#1E4D2B", s=10)
+    pts_rm = df.height - df2.height
+    perc_rm = pts_rm / df.height
+    rmvd.append([date, perc_rm])
     ax.set_title(date + " - " + str(df.height - df2.height) + " points removed, " + str(i) + " iterations")
+    
+rmvd = pl.DataFrame(rmvd, orient="row", schema={"Date": pl.String(), "%rm": pl.Float64()})
+rmvd = rmvd.with_columns(
+    pl.col("Date").str.to_date("%Y%m%d")
+    )
+
+fig, ax = plt.subplots(figsize=(6, 3))
+ax.scatter(rmvd["Date"], rmvd["%rm"] * 100, color="#D9782D", s=25)
+ax.set_title("Data removed by filter - Vent ozone")
+ax.grid()
+ax.set_ylabel("% data removed")
+ax.xaxis.set_major_locator(
+    mdates.AutoDateLocator()
+    )
+ax.xaxis.set_major_formatter(
+    mdates.DateFormatter("%m/%d")
+    )
+ax.tick_params(axis="x", labelrotation=90)
