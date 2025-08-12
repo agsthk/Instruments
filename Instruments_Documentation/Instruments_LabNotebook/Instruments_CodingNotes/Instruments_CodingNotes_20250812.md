@@ -1,0 +1,27 @@
+# clean_rawdata.py
+- I want to check the room ozone data for filtering efficacy with additions not filtered
+- Added lines to read in the automated addition times
+- Identified ozone addition times and visualized them to ensure nothing is missing
+	- Successfully identifies all ozone additions, though false elevation during citrus peeling events is obviously not identified
+- Will identify periods from addition start to 20 minutes after addition stop as points to not filter out
+	- Plotting to ensure that this has appropriately identified the points I'm interested in
+		- It does, although on 3/27 the negative outlier points are considered to be valid by this method - may need to add an extra filter after the Hampel filter
+		- The greater than -8 filter covers this just fine
+	- Works well for room ozone
+- Not sure if formaldehyde needs to be filtered - checking
+	- There is still one file that has formaldehyde units as ppm - not sure why
+	- Formaldehyde definitely needs a more generous cutoff
+		- A sigma cutoff of 5 with an absolute cutoff of 2 seems to work okay
+	- Considering source of spikes
+		- 20250203 - may correspond to NOx turning back on? Need to check
+		- 20250204 - definitely because of the NOx
+		- 20250304 - smoke addition (out of room)
+		- 20250305 - smoke addition (out of room)
+		- 20250312 not showing spike because smoke addition happened while instrument offline (why?)
+		- 20250313 - smoke addition (in room)
+		- 20250314 - smoke addition (in room)
+	- Formaldehyde does not need to be filtered - removing spikes due to Thermo/line changes is sufficient
+- Given the realization that the formaldehyde spikes are due to instrument line changes, I am returning to the ozone instruments to double check their diagnostic variables
+	- Some of the outliers do correspond to a diagnostic variable change, but not all of them do
+		- Essentially none of them do for vent ozone
+- Next time I work on this, I need to make it so that the clean data is exported - currently just have it visualized
