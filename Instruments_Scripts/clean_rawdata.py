@@ -27,6 +27,15 @@ CLEAN_DATA_DIR = os.path.join(data_dir, "Instruments_CleanData")
 # Creates Instruments_CleanData/ directory if needed
 if not os.path.exists(CLEAN_DATA_DIR):
     os.makedirs(CLEAN_DATA_DIR)
+# Full path to automated addition times
+ADD_TIMES_PATH = os.path.join(data_dir, "Instruments_DerivedData", "AdditionValves_DerivedData", "AdditionValves_AutomatedAdditionTimes.csv")
+add_times = pl.read_csv(ADD_TIMES_PATH).with_columns(
+    pl.selectors.contains("UTC").str.to_datetime()
+    )
+add_times = {key[0]: df for key, df in 
+             add_times.partition_by(
+                 "Species", as_dict=True, include_key=False
+                 ).items()}
 
 insts = ["2BTech_202",
          "2BTech_205_A",
