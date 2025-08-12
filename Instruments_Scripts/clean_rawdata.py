@@ -406,33 +406,33 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
 rmvd = []
 
 # iterative Hampel visualization
-for date, df in tqdm(data["2BTech_205_A"].items()):
-    df = df.filter(pl.col("SamplingLocation").eq("C200"))
+for date, df in tqdm(data["2BTech_205_B"].items()):
+    df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
     if df.is_empty():
         continue
     df_start = df["UTC_Start"].min()
     df_stop = df["UTC_Stop"].max()
-    adds = add_times["O3"].filter(
-        pl.col("UTC_Start").is_between(df_start, df_stop)
-        | pl.col("UTC_Stop").is_between(df_start, df_stop)
-        )
-    ignore = adds.with_columns(
-        pl.col("UTC_Stop").dt.offset_by("20m")
-        )
-    df = df.join_asof(
-        ignore,
-        on="UTC_Start",
-        coalesce=False,
-        strategy="backward",
-        suffix="_Add"
-        ).with_columns(
-            pl.when(pl.col("UTC_Start").le(pl.col("UTC_Stop_Add")))
-            .then(pl.lit(True))
-            .otherwise(pl.lit(False))
-            .alias("Valid")
-            ).select(
-                ~pl.selectors.contains("_Add")
-                )
+    # adds = add_times["O3"].filter(
+    #     pl.col("UTC_Start").is_between(df_start, df_stop)
+    #     | pl.col("UTC_Stop").is_between(df_start, df_stop)
+    #     )
+    # ignore = adds.with_columns(
+    #     pl.col("UTC_Stop").dt.offset_by("20m")
+    #     )
+    # df = df.join_asof(
+    #     ignore,
+    #     on="UTC_Start",
+    #     coalesce=False,
+    #     strategy="backward",
+    #     suffix="_Add"
+    #     ).with_columns(
+    #         pl.when(pl.col("UTC_Start").le(pl.col("UTC_Stop_Add")))
+    #         .then(pl.lit(True))
+    #         .otherwise(pl.lit(False))
+    #         .alias("Valid")
+    #         ).select(
+    #             ~pl.selectors.contains("_Add")
+    #             )
     var = "O3_ppb"
     df2 = df.clone()
     fig, ax = plt.subplots(figsize=(6, 3))
@@ -478,14 +478,14 @@ for date, df in tqdm(data["2BTech_205_A"].items()):
         df3 = df2.filter(
             (pl.col(var).sub(pl.col("med")).abs().gt(pl.col("mad").mul(3))
             & (pl.col("d/dt").ge(0.2) | pl.col("d/dt2").ge(0.2))
-            & ~pl.col("Valid")
+            # & ~pl.col("Valid")
             )
             | pl.col(var).le(-8)
             )
         df2 = df2.filter(
             (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(3))
             | (pl.col("d/dt").lt(0.2) & pl.col("d/dt2").lt(0.2))
-            | pl.col("Valid")
+            # | pl.col("Valid")
             )
             & pl.col(var).gt(-8)
             # | (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(4)) & (pl.col("len").ge(12)) & (pl.col("d/dt").lt(0.3) & pl.col("d/dt2").lt(0.3)))
@@ -494,8 +494,8 @@ for date, df in tqdm(data["2BTech_205_A"].items()):
         ax.scatter(df3["UTC_Start"], df3[var], color="#1E4D2B", s=10)
         if last_h == df2.height:
             break
-    if df2.height == df.height:
-        continue
+    # if df2.height == df.height:
+    #     continue
     pts_rm = df.height - df2.height
     perc_rm = pts_rm / df.height
     rmvd.append([date, perc_rm])
@@ -508,7 +508,133 @@ rmvd = rmvd.with_columns(
 
 fig, ax = plt.subplots(figsize=(6, 3))
 ax.scatter(rmvd["Date"], rmvd["%rm"] * 100, color="#D9782D", s=25)
-ax.set_title("Data removed by filter - Room ozone")
+ax.set_title("Data removed by filter - Vent ozone")
+ax.grid()
+ax.grid(which="minor", axis="x", linestyle=":")
+ax.set_ylabel("% data removed")
+ax.xaxis.set_major_locator(
+    mdates.AutoDateLocator()
+    )
+ax.xaxis.set_minor_locator(
+    mdates.DayLocator(interval=1)
+    )
+ax.xaxis.set_major_formatter(
+    mdates.DateFormatter("%m/%d")
+    )
+ax.tick_params(axis="x", labelrotation=90)
+
+# Formaldehyde filtering
+rmvd = []
+
+# iterative Hampel visualization
+for date, df in tqdm(data["Picarro_G2307"].items()):
+    df = df.filter(pl.col("SamplingLocation").eq("C200"))
+    if df.is_empty():
+        continue
+    df_start = df["UTC_DateTime"].min()
+    df_stop = df["UTC_DateTime"].max()
+    # adds = add_times["O3"].filter(
+    #     pl.col("UTC_DateTime").is_between(df_start, df_stop)
+    #     | pl.col("UTC_DateTime").is_between(df_start, df_stop)
+    #     )
+    # ignore = adds.with_columns(
+    #     pl.col("UTC_DateTime").dt.offset_by("20m")
+    #     )
+    # df = df.join_asof(
+    #     ignore,
+    #     on="UTC_DateTime",
+    #     coalesce=False,
+    #     strategy="backward",
+    #     suffix="_Add"
+    #     ).with_columns(
+    #         pl.when(pl.col("UTC_DateTime").le(pl.col("UTC_DateTime_Add")))
+    #         .then(pl.lit(True))
+    #         .otherwise(pl.lit(False))
+    #         .alias("Valid")
+    #         ).select(
+    #             ~pl.selectors.contains("_Add")
+    #             )
+    var = "CH2O_ppb"
+    df2 = df.clone()
+    fig, ax = plt.subplots(figsize=(6, 3))
+    try:
+        ax.scatter(df["UTC_DateTime"], df[var], color="#D9782D", s=10)
+    except:
+        var = "CH2O_ppm"
+        ax.scatter(df["UTC_DateTime"], df[var], color="#D9782D", s=10)
+    ax.set_title(date)
+    ax.grid(axis="x")
+    ax.set_xlim(
+        df["UTC_DateTime"].min(), df["UTC_DateTime"].max()
+        )
+    ax.set_ylabel(var)
+    ax.xaxis.set_major_locator(
+        mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
+        )
+    ax.xaxis.set_major_formatter(
+        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
+        )
+    ax.tick_params(axis="x", labelrotation=90)
+    for i in range(50):
+        last_h = df2.height
+        df2 = df2.select(
+            pl.exclude("len")
+            ).with_columns(
+                pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
+                pl.col("UTC_DateTime").shift(-1).sub(pl.col("UTC_DateTime")).dt.total_microseconds().truediv(1e6).alias("dt"),
+                pl.col(var).sub(pl.col(var).shift(1)).abs().alias("diff2"),
+                pl.col("UTC_DateTime").sub(pl.col("UTC_DateTime").shift(1)).dt.total_microseconds().truediv(1e6).alias("dt2"),
+                pl.col(var).rolling_median_by("UTC_DateTime", "10m").alias("med"),
+                pl.col(var).rolling_median_by("UTC_DateTime", "30m").alias("longmed"),
+                pl.col(var).rolling_quantile_by(by="UTC_DateTime", window_size="30m", quantile=0.25).alias("lq"),
+                pl.col(var).rolling_quantile_by(by="UTC_DateTime", window_size="30m", quantile=0.75).alias("uq"),
+                ).with_columns(
+                    (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff"),
+                    pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
+                    pl.col("diff2").truediv(pl.col("dt2")).alias("d/dt2"),
+                    pl.col("uq").sub(pl.col("lq")).alias("iqr")
+                    ).with_columns(
+                        pl.col("abs_diff").rolling_median_by("UTC_DateTime", "10m").mul(1.4826).alias("mad"),
+                        pl.col(var).le(pl.col(var).shift(1)).rle_id().alias("inc_dec_id")
+                        )
+        inc_dec_count = df2.group_by("inc_dec_id").len()
+        df2 = df2.join(inc_dec_count, on="inc_dec_id", how="full", coalesce=True, maintain_order="left")
+        
+        df3 = df2.filter(
+            (pl.col(var).sub(pl.col("med")).abs().gt(pl.col("mad").mul(5))
+            & (pl.col("d/dt").ge(2) | pl.col("d/dt2").ge(2))
+            # & ~pl.col("Valid")
+            )
+            | pl.col(var).le(-8)
+            )
+        df2 = df2.filter(
+            (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(5))
+            | (pl.col("d/dt").lt(2) & pl.col("d/dt2").lt(2))
+            # | pl.col("Valid")
+            )
+            & pl.col(var).gt(-8)
+            # | (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(4)) & (pl.col("len").ge(12)) & (pl.col("d/dt").lt(0.3) & pl.col("d/dt2").lt(0.3)))
+            # | (pl.col(var).sub(pl.col("longmed")).abs().le(pl.col("iqr").mul(1.5)))
+            )
+        ax.scatter(df3["UTC_DateTime"], df3[var], color="#1E4D2B", s=10)
+        if last_h == df2.height:
+            break
+    # if df2.height == df.height:
+    #     continue
+    pts_rm = df.height - df2.height
+    perc_rm = pts_rm / df.height
+    rmvd.append([date, perc_rm])
+    ax.set_title(date + " - " + str(df.height - df2.height) + " points removed, " + str(i) + " iterations")
+    # break
+df3["d/dt"]
+rmvd = pl.DataFrame(rmvd, orient="row", schema={"Date": pl.String(), "%rm": pl.Float64()})
+rmvd = rmvd.with_columns(
+    pl.col("Date").str.to_date("%Y%m%d")
+    )
+
+fig, ax = plt.subplots(figsize=(6, 3))
+ax.scatter(rmvd["Date"], rmvd["%rm"] * 100, color="#D9782D", s=25)
+ax.set_title("Data removed by filter - Formaldehyde")
 ax.grid()
 ax.grid(which="minor", axis="x", linestyle=":")
 ax.set_ylabel("% data removed")
