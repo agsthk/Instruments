@@ -1,0 +1,40 @@
+# clean_rawdata.py
+- Picking up with Hampel filter, trying to assess parameters to use
+- Prior to Hampel filter, I think it may be useful to remove global outliers
+	- The minimum number of IQRs from the median that doesn't cut off any real data is 9
+	- What if I assume Gaussian?
+		- Not much of an improvement
+		- Not sure a global filter is great
+	- Global Hampel filter?
+		- A little confused here, the median absolute deviation is 0
+			- Does that make sense? I think so - this filter is not useful here
+	- This doesn't seem particularly helpful
+- This is hard
+- I wonder if I can somehow combine an exponentially weighted mean with a Hampel filter
+	- Rather than looking at the difference between the rolling median and values, use the exponentially weighted mean
+		- Questionable statistics but will try
+		- Not any better than the Hampel filter
+- Visualizing just d/dt again
+	- Considering how I may be able to iteratively filter
+		- First filter out the ones with a very large d/dt, then recalculate d/dt without those points, then filter again, and so on
+		- First, cut out d/dt >= 1
+- Iterative Hampel filter and d/dt filter in combination works quite well! This is what I will be going with
+	- Do still wish to optimize parameters, which I anticipate will be challenging given the large number of parameters
+	- First, testing 10 iterations of the most generous reasonable parameters
+		- 0.5 for d/dt limit, 5 sigmas
+	- Then, the most restrictive reasonable parameters
+		- 0.2 for d/dt limit, 3 sigmas
+		- This actually does okay, may want to pair restrictive sigmas with more generous d/dt limit
+	- Perhaps do inverse of level of restriction - start with large sigma and go down, and start with small d/dt limit and go up
+	- Would be much more straightforward (and easier to justify) if I set a constant limit and sigma
+		- Checking how it looks if I combine with IQR
+			- Data is kept if it is within 1.5 IQR of rolling median with 10 minute window size
+	- Trying to keep the data that monotonically increases - otherwise loosing real rapid changes
+		- Proving to be challenging
+	- Need to move on from this - choosing to filter by 3 sigmas and 0.2 limit and nothing else
+		- Will discuss with Megan potential issues I see arising from this decision
+		- 15 iterations max needed
+	- Quickly checking room ozone data
+		- Perhaps cuts off a bit more data than ideal, but overall not bad
+		- Added an absolute value cutoff of -8
+- Plotting the percent of data filtered out over campaign
