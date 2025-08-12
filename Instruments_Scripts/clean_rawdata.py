@@ -394,6 +394,8 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         #                     f_name)
         # df.write_csv(path)
 
+
+
 # iterative Hampel visualization
 for date, df in tqdm(data["2BTech_205_B"].items()):
     df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
@@ -401,8 +403,43 @@ for date, df in tqdm(data["2BTech_205_B"].items()):
         continue
     var = "O3_ppb"
     df2 = df.clone()
+    
+    for i in range(50):
+        last_h = df2.height
+        df2 = df2.select(
+            pl.exclude("len")
+            ).with_columns(
+                pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
+                pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
+                pl.col(var).sub(pl.col(var).shift(1)).abs().alias("diff2"),
+                pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(1)).dt.total_microseconds().truediv(1e6).alias("dt2"),
+                pl.col(var).rolling_median_by("UTC_Start", "10m").alias("med"),
+                pl.col(var).rolling_median_by("UTC_Start", "30m").alias("longmed"),
+                pl.col(var).rolling_quantile_by(by="UTC_Start", window_size="30m", quantile=0.25).alias("lq"),
+                pl.col(var).rolling_quantile_by(by="UTC_Start", window_size="30m", quantile=0.75).alias("uq"),
+                ).with_columns(
+                    (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff"),
+                    pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
+                    pl.col("diff2").truediv(pl.col("dt2")).alias("d/dt2"),
+                    pl.col("uq").sub(pl.col("lq")).alias("iqr")
+                    ).with_columns(
+                        pl.col("abs_diff").rolling_median_by("UTC_Start", "10m").mul(1.4826).alias("mad"),
+                        pl.col(var).le(pl.col(var).shift(1)).rle_id().alias("inc_dec_id")
+                        )
+        inc_dec_count = df2.group_by("inc_dec_id").len()
+        df2 = df2.join(inc_dec_count, on="inc_dec_id", how="full", coalesce=True, maintain_order="left")
+        df2 = df2.filter(
+            pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(3))
+            | (pl.col("d/dt").lt(0.2) & pl.col("d/dt2").lt(0.2))
+            # | (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(4)) & (pl.col("len").ge(12)) & (pl.col("d/dt").lt(0.3) & pl.col("d/dt2").lt(0.3)))
+            # | (pl.col(var).sub(pl.col("longmed")).abs().le(pl.col("iqr").mul(1.5)))
+            )
+        if last_h == df2.height:
+            break
+    if df2.height == df.height:
+        continue
     fig, ax = plt.subplots(figsize=(6, 3))
-    ax.scatter(df2["UTC_Start"], df2[var], color="#1E4D2B", s=10)
+    ax.scatter(df["UTC_Start"], df[var], color="#D9782D", s=10)
     ax.set_title(date)
     ax.grid(axis="x")
     ax.set_xlim(
@@ -416,32 +453,5 @@ for date, df in tqdm(data["2BTech_205_B"].items()):
         mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
         )
     ax.tick_params(axis="x", labelrotation=90)
-    for j in range(2):
-        for i, color, s, lim in zip(range(6), ["#D9782D", "#008FB3", "#E56A54", "#CFFC00", "#FFC038", "#7E5475"], [5, 5, 4, 4, 3, 3], [0.25, 0.25, 0.3, 0.3, 0.35, 0.35]):
-            df2 = df2.with_columns(
-                pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
-                pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
-                pl.col(var).sub(pl.col(var).shift(1)).abs().alias("diff2"),
-                pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(1)).dt.total_microseconds().truediv(1e6).alias("dt2"),
-                pl.col(var).rolling_median_by("UTC_Start", "10m").alias("med")
-                ).with_columns(
-                    (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff"),
-                    pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
-                    pl.col("diff2").truediv(pl.col("dt2")).alias("d/dt2")
-                    ).with_columns(
-                        pl.col("abs_diff").rolling_median_by("UTC_Start", "10m").mul(1.4826).alias("mad")
-                        )
-            df3 = df2.filter(
-                pl.col(var).sub(pl.col("med")).abs().gt(pl.col("mad").mul(s))
-                & (pl.col("d/dt").gt(lim) | pl.col("d/dt2").gt(lim))
-                )
-                        
-            df2 = df2.filter(
-                pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(s))
-                | (pl.col("d/dt").lt(lim) & pl.col("d/dt2").lt(lim))
-                )
-            if df3.height == 0:
-                continue
-            ax.scatter(df3["UTC_Start"], df3[var], color=color, s=10)
-    ax.set_title(date + " - " + str(df.height - df2.height) + " points removed")
-    break
+    ax.scatter(df2["UTC_Start"], df2[var], color="#1E4D2B", s=10)
+    ax.set_title(date + " - " + str(df.height - df2.height) + " points removed, " + str(i) + " iterations")
