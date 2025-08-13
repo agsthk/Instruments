@@ -1,0 +1,63 @@
+- Reconsidering my work flow - what order are these scripts applied in and what changes need to be made to work properly?
+	- structure_rawdata.py
+		- Need to move schemas (and hard-coded paths) to an external input
+		- Consider flagging log starts for non-DAQ data (Thermo NOx especially)
+	- interpret_additionvalves.py
+		- Good as is, needs to happen before cleaning to have automated addition times
+		- Need to create a manual addition external input to handle the non-automated additions
+	- interpret_solenoidvalve.py
+		- Needs to happen before cleaning to have UZA locations
+		- Consider changing name
+		- Consider what might happen if there are overlapping DAQ and Logger files
+	- interpret_doorstatus.py
+		- Need to take this further to have a room occupied/unoccupied file to be used for some cleaning (citrus peeling)
+	- clean_rawdata.py
+		- Consider adjusting removal of warm up data, especially if log starts are flagged in non-DAQ data
+		- Adjust outlier removal
+			- For 2BTech_205_A only, others either don't need or are variable enough that outliers are hard to identify
+				- Check on Temp/RH, CO2/H2O, Aranet sensors to ensure no outliers
+		- Adjust sampling location assignment to use an external input file
+			- And complete with information from Phase I as well - review lab notes
+	- calibrate_instruments.py
+		- Need to revise to avoid running already complete calibrations
+		- Need to revise output to add to existing file if it exists
+		- Need to include determination of S/N and LOD from calibrations as possible
+	- calibrate_cleandata.py
+		- Need to revise to calibrate DAQ and other source files and store them in separate files as in other data folders
+	- correct_zerodrift.py
+		- Need to pull from KeckO3 to this project since it is data processing
+		- Script can also handle time-dependent limit of detection
+			- Change to backfill with median
+	- ~~Need a script to determine S/N and constant LOD based on calibrations~~
+		- ~~Perhaps combine with calibrate_instruments.py? I think that would be best~~
+- Running structure_rawdata.py with no changes because I believe there was a concern with one of the Picarro files not being read in properly
+	- Formaldehyde units were off
+	- 2025-02-15
+		- That is because originally, I was splitting by UTC date, but when I switched to split by Fort Collins date, there is no data on 2/15, so that file was never overwritten
+		- Deleting file
+- Need to create a manual additions file similar to the automated additions file
+	- In Instruments_ManualData folder
+		- Instruments_ManualExperiments
+			- In this folder, will have manual additions, maybe room occupied/unoccupied?
+			- ManualAdditionTimes.csv
+				- UTC_Start, UTC_Stop, and Species
+				- Automated additions start 6/7/24, anything prior needs to be in manual additions
+				- Have manual additions written down through 2024-07-15 (I think)
+				- Going to reformat into UTC (use a quick script to do probably) to have at least manual O3 and CO2 additions
+					- Other additions aren't important to me at the moment, will return to at another time
+					- Missing ozone additions from 3/11/24 and 5/9/24
+					- Missing CO2 additions prior to 3/7, 3/14?, 3/19?, 3/20?
+						- Need to get an idea of occupied times to check the smaller spikes - from occupied room?
+						- Checking quickly against door open/door closed
+							- Some but not all correspond to door opening/closing
+							- Can likely use this information for precise times of dry ice/CO2 cartridge injections
+					- When looking more closely at ozone additions, it is clear that ozone starts increasing before the generator is turned on and stops increasing after it's turned off, even with automated additions
+						- May be a time offset - is this true even with the DAQ data?
+						- It is almost certainly something to do with the time offset - with the DAQ data, the increase starts after the generator is turned on, although it continues to increase after the generator turns off (mixing considerations)
+						- I wonder if I could use the automated additions to define a time offset as to synchronize the instruments
+							- It would probably be better to use the zeros - those are more regularly applied
+					- I can see myself getting very caught up on this unnecessarily - moving on for the time being, will come back to it later
+# clean_rawdata.py
+- Since I am not planning to filter any of the vent ozone data, I want to adjust the Hampel filter parameters to be ideal for room ozone
+	- Changing the filter to not be iterative
+	- Computer is doing something weird so I'm going to shut everything down and restart it
