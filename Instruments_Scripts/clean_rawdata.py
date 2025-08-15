@@ -334,7 +334,7 @@ for inst, df in sampling_locs.items():
         pl.col("UTC_Start").dt.offset_by("60s"),
         pl.col("UTC_Stop").dt.offset_by("-60s")
         )
-rmd = {}
+
 data = {inst: {} for inst in insts}
 
 for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
@@ -447,7 +447,9 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 ).sort(
                     by="UTC_Start"
                     )
-            rmd[path[-12:-4]] = (h0 - hf / h0)
+        if inst == "2BTech_205_B":
+            lf = lf.filter(
+                pl.col("O3_ppb").is_between(-5, 200))
         df = lf.collect()
         
         if df.is_empty():
