@@ -450,18 +450,21 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         if inst == "2BTech_205_B":
             lf = lf.filter(
                 pl.col("O3_ppb").is_between(-5, 200))
+        lf = lf.select(
+            pl.exclude("Sampling_Stop")
+            )
         df = lf.collect()
         
         if df.is_empty():
             continue
         data[inst][file.rsplit("_", 1)[-1][:-4]] = df
-        # _, source = file[:-17].split("_Structured")
-        # f_name = inst + "_Clean" + source + "Data_" + path[-12:-4] + ".csv"
-        # f_dir = os.path.join(CLEAN_DATA_DIR,
-        #                      inst + "_CleanData",
-        #                      inst + "_Clean" + source + "Data")
-        # if not os.path.exists(f_dir):
-        #     os.makedirs(f_dir)
-        # path = os.path.join(f_dir,
-        #                     f_name)
-        # df.write_csv(path)
+        _, source = file[:-17].split("_Structured")
+        f_name = inst + "_Clean" + source + "Data_" + path[-12:-4] + ".csv"
+        f_dir = os.path.join(CLEAN_DATA_DIR,
+                             inst + "_CleanData",
+                             inst + "_Clean" + source + "Data")
+        if not os.path.exists(f_dir):
+            os.makedirs(f_dir)
+        path = os.path.join(f_dir,
+                            f_name)
+        df.write_csv(path)
