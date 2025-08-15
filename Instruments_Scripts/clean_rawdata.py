@@ -412,31 +412,31 @@ for date, df in tqdm(data["2BTech_205_A"].items()):
         continue
     df_start = df["UTC_Start"].min()
     df_stop = df["UTC_Stop"].max()
-    # adds = add_times["O3"].filter(
-    #     pl.col("UTC_Start").is_between(df_start, df_stop)
-    #     | pl.col("UTC_Stop").is_between(df_start, df_stop)
-    #     )
-    # ignore = adds.with_columns(
-    #     pl.col("UTC_Stop").dt.offset_by("20m")
-    #     )
-    # df = df.join_asof(
-    #     ignore,
-    #     on="UTC_Start",
-    #     coalesce=False,
-    #     strategy="backward",
-    #     suffix="_Add"
-    #     ).with_columns(
-    #         pl.when(pl.col("UTC_Start").le(pl.col("UTC_Stop_Add")))
-    #         .then(pl.lit(True))
-    #         .otherwise(pl.lit(False))
-    #         .alias("Valid")
-    #         ).select(
-    #             ~pl.selectors.contains("_Add")
-    #             )
+    adds = add_times["O3"].filter(
+        pl.col("UTC_Start").is_between(df_start, df_stop)
+        | pl.col("UTC_Stop").is_between(df_start, df_stop)
+        )
+    ignore = adds.with_columns(
+        pl.col("UTC_Stop").dt.offset_by("20m")
+        )
+    df = df.join_asof(
+        ignore,
+        on="UTC_Start",
+        coalesce=False,
+        strategy="backward",
+        suffix="_Add"
+        ).with_columns(
+            pl.when(pl.col("UTC_Start").le(pl.col("UTC_Stop_Add")))
+            .then(pl.lit(True))
+            .otherwise(pl.lit(False))
+            .alias("Valid")
+            ).select(
+                ~pl.selectors.contains("_Add")
+                )
     var = "O3_ppb"
     df2 = df.clone()
     fig, ax = plt.subplots(figsize=(6, 3))
-    ax.scatter(df["UTC_Start"], df[var], color="#D9782D", s=10)
+    # ax.scatter(df["UTC_Start"], df[var], color="#D9782D", s=10)
     ax.set_title(date)
     ax.grid(axis="x")
     ax.set_xlim(
@@ -475,21 +475,29 @@ for date, df in tqdm(data["2BTech_205_A"].items()):
     
     df3 = df2.filter(
         (pl.col(var).sub(pl.col("med")).abs().gt(pl.col("mad").mul(3))
-        & (pl.col("d/dt").ge(0.2) | pl.col("d/dt2").ge(0.2))
-        # & ~pl.col("Valid")
+        # & (pl.col("d/dt").ge(0.2) | pl.col("d/dt2").ge(0.2))
+        & (pl.col("d/dt").add(pl.col("d/dt2"))).truediv(2).ge(0.25)
+        & ~pl.col("Valid")
         )
         | pl.col(var).le(-8)
         )
     df2 = df2.filter(
         (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(3))
-        | (pl.col("d/dt").lt(0.2) & pl.col("d/dt2").lt(0.2))
-        # | pl.col("Valid")
+        # | (pl.col("d/dt").lt(0.2) & pl.col("d/dt2").lt(0.2))
+        | (pl.col("d/dt").add(pl.col("d/dt2"))).truediv(2).lt(0.25)
+        | pl.col("Valid")
         )
         & pl.col(var).gt(-8)
         # | (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(4)) & (pl.col("len").ge(12)) & (pl.col("d/dt").lt(0.3) & pl.col("d/dt2").lt(0.3)))
         # | (pl.col(var).sub(pl.col("longmed")).abs().le(pl.col("iqr").mul(1.5)))
         )
     ax.scatter(df3["UTC_Start"], df3[var], color="#1E4D2B", s=10)
+    ax.scatter(df2["UTC_Start"], df2[var], color="#D9782D", s=10)
+    ax2 = ax.twinx()
+    ax2.scatter(df3["UTC_Start"], df3["d/dt"], color="gray", s=5)
+    ax2.scatter(df3["UTC_Start"], df3["d/dt2"], color="gray", s=5)
+    
+    ax2.scatter(df3["UTC_Start"], (df3["d/dt"] + df3["d/dt2"]) / 2, color="blue", s=5)
     # if df2.height == df.height:
     #     continue
     pts_rm = df.height - df2.height
