@@ -334,7 +334,7 @@ for inst, df in sampling_locs.items():
         pl.col("UTC_Start").dt.offset_by("60s"),
         pl.col("UTC_Stop").dt.offset_by("-60s")
         )
-
+rmd = {}
 data = {inst: {} for inst in insts}
 
 for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
@@ -387,6 +387,67 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             lf = lf.filter(
                 pl.col("SampleFlow_LPM").gt(0.5)
                 )
+        if inst == "2BTech_205_A":
+            lf_room = lf.filter(
+                pl.col("SamplingLocation").str.contains("C200")
+                )
+            h0 = lf_room.collect().height
+            lf_start = lf_room.select("UTC_Start").min().collect().item()
+            lf_stop = lf_room.select("UTC_Stop").max().collect().item()
+            lf_adds = add_times["O3"].filter(
+                pl.col("UTC_Start").is_between(lf_start, lf_stop)
+                | pl.col("UTC_Stop").is_between(lf_start, lf_stop)
+                )
+            lf_adds = lf_adds.with_columns(
+                pl.col("UTC_Stop").dt.offset_by("20m")
+                ).lazy()
+            lf_room = lf_room.join_asof(
+                lf_adds,
+                on="UTC_Start",
+                coalesce=False,
+                strategy="backward",
+                suffix="_Add"
+                ).with_columns(
+                    pl.when(pl.col("UTC_Start").le(pl.col("UTC_Stop_Add")))
+                    .then(pl.lit(True))
+                    .otherwise(pl.lit(False))
+                    .alias("KeepDefault")
+                    ).select(
+                        ~pl.selectors.contains("_Add")
+                        )
+            lf_room = lf_room.with_columns(
+                pl.col("O3_ppb").sub(pl.col("O3_ppb").shift(-1)).abs().alias("f_diff"),
+                pl.col("O3_ppb").sub(pl.col("O3_ppb").shift(1)).abs().alias("r_diff"),
+                pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(-1)).dt.total_microseconds().truediv(1e6).abs().alias("f_dt"),
+                pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(1)).dt.total_microseconds().truediv(1e6).abs().alias("r_dt"),
+                pl.col("O3_ppb").rolling_median_by(by="UTC_Start", window_size="10m").alias("median")
+                ).with_columns(
+                    pl.col("f_diff").truediv(pl.col("f_dt")).alias("f_d/dt"),
+                    pl.col("r_diff").truediv(pl.col("r_dt")).alias("r_d/dt"),
+                    pl.col("O3_ppb").sub(pl.col("median")).abs().alias("abs_diff")
+                    ).with_columns(
+                        pl.mean_horizontal("f_d/dt", "r_d/dt").alias("d/dt"),
+                        pl.col("abs_diff").rolling_median_by(by="UTC_Start", window_size="10m").mul(1.4826).alias("MAD")
+                        )
+            lf_room = lf_room.filter(
+                (pl.col("O3_ppb").sub(pl.col("median")).abs().le(pl.col("MAD").mul(3))
+                | pl.col("d/dt").lt(0.25)
+                | pl.col("KeepDefault"))
+                & pl.col("O3_ppb").gt(-8)
+                )
+            hf = lf_room.collect().height
+            keep_cols = lf.collect_schema().names()
+            lf = pl.concat(
+                [lf_room.select(
+                    pl.col(keep_cols)
+                    ),
+                 lf.filter(
+                     ~pl.col("SamplingLocation").str.contains("C200")
+                     )]
+                ).sort(
+                    by="UTC_Start"
+                    )
+            rmd[path[-12:-4]] = (h0 - hf / h0)
         df = lf.collect()
         
         if df.is_empty():
@@ -402,169 +463,3 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         # path = os.path.join(f_dir,
         #                     f_name)
         # df.write_csv(path)
-
-rmvd = []
-
-# iterative Hampel visualization
-for date, df in tqdm(data["2BTech_205_A"].items()):
-    df = df.filter(pl.col("SamplingLocation").eq("C200"))
-    if df.is_empty():
-        continue
-    df_start = df["UTC_Start"].min()
-    df_stop = df["UTC_Stop"].max()
-    adds = add_times["O3"].filter(
-        pl.col("UTC_Start").is_between(df_start, df_stop)
-        | pl.col("UTC_Stop").is_between(df_start, df_stop)
-        )
-    ignore = adds.with_columns(
-        pl.col("UTC_Stop").dt.offset_by("20m")
-        )
-    df = df.join_asof(
-        ignore,
-        on="UTC_Start",
-        coalesce=False,
-        strategy="backward",
-        suffix="_Add"
-        ).with_columns(
-            pl.when(pl.col("UTC_Start").le(pl.col("UTC_Stop_Add")))
-            .then(pl.lit(True))
-            .otherwise(pl.lit(False))
-            .alias("Valid")
-            ).select(
-                ~pl.selectors.contains("_Add")
-                )
-    var = "O3_ppb"
-    df2 = df.clone()
-    fig, ax = plt.subplots(figsize=(6, 3))
-    # ax.scatter(df["UTC_Start"], df[var], color="#D9782D", s=10)
-    ax.set_title(date)
-    ax.grid(axis="x")
-    ax.set_xlim(
-        df["UTC_Start"].min(), df["UTC_Start"].max()
-        )
-    ax.set_ylabel(var)
-    ax.xaxis.set_major_locator(
-        mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
-        )
-    ax.xaxis.set_major_formatter(
-        mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-        )
-    ax.tick_params(axis="x", labelrotation=90)
-    df2 = df2.select(
-        pl.exclude("len")
-        ).with_columns(
-            pl.col(var).shift(-1).sub(pl.col(var)).abs().alias("diff"),
-            pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Start")).dt.total_microseconds().truediv(1e6).alias("dt"),
-            pl.col(var).sub(pl.col(var).shift(1)).abs().alias("diff2"),
-            pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(1)).dt.total_microseconds().truediv(1e6).alias("dt2"),
-            pl.col(var).rolling_median_by("UTC_Start", "10m").alias("med"),
-            pl.col(var).rolling_median_by("UTC_Start", "30m").alias("longmed"),
-            pl.col(var).rolling_quantile_by(by="UTC_Start", window_size="30m", quantile=0.25).alias("lq"),
-            pl.col(var).rolling_quantile_by(by="UTC_Start", window_size="30m", quantile=0.75).alias("uq"),
-            ).with_columns(
-                (pl.col(var).sub(pl.col("med"))).abs().alias("abs_diff"),
-                pl.col("diff").truediv(pl.col("dt")).alias("d/dt"),
-                pl.col("diff2").truediv(pl.col("dt2")).alias("d/dt2"),
-                pl.col("uq").sub(pl.col("lq")).alias("iqr")
-                ).with_columns(
-                    pl.col("abs_diff").rolling_median_by("UTC_Start", "10m").mul(1.4826).alias("mad"),
-                    pl.col(var).le(pl.col(var).shift(1)).rle_id().alias("inc_dec_id")
-                    )
-    inc_dec_count = df2.group_by("inc_dec_id").len()
-    df2 = df2.join(inc_dec_count, on="inc_dec_id", how="full", coalesce=True, maintain_order="left")
-    
-    df3 = df2.filter(
-        (pl.col(var).sub(pl.col("med")).abs().gt(pl.col("mad").mul(3))
-        # & (pl.col("d/dt").ge(0.2) | pl.col("d/dt2").ge(0.2))
-        & (pl.col("d/dt").add(pl.col("d/dt2"))).truediv(2).ge(0.25)
-        & ~pl.col("Valid")
-        )
-        | pl.col(var).le(-8)
-        )
-    df2 = df2.filter(
-        (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(3))
-        # | (pl.col("d/dt").lt(0.2) & pl.col("d/dt2").lt(0.2))
-        | (pl.col("d/dt").add(pl.col("d/dt2"))).truediv(2).lt(0.25)
-        | pl.col("Valid")
-        )
-        & pl.col(var).gt(-8)
-        # | (pl.col(var).sub(pl.col("med")).abs().le(pl.col("mad").mul(4)) & (pl.col("len").ge(12)) & (pl.col("d/dt").lt(0.3) & pl.col("d/dt2").lt(0.3)))
-        # | (pl.col(var).sub(pl.col("longmed")).abs().le(pl.col("iqr").mul(1.5)))
-        )
-    ax.scatter(df3["UTC_Start"], df3[var], color="#1E4D2B", s=10)
-    ax.scatter(df2["UTC_Start"], df2[var], color="#D9782D", s=10)
-    ax2 = ax.twinx()
-    ax2.scatter(df3["UTC_Start"], df3["d/dt"], color="gray", s=5)
-    ax2.scatter(df3["UTC_Start"], df3["d/dt2"], color="gray", s=5)
-    
-    ax2.scatter(df3["UTC_Start"], (df3["d/dt"] + df3["d/dt2"]) / 2, color="blue", s=5)
-    # if df2.height == df.height:
-    #     continue
-    pts_rm = df.height - df2.height
-    perc_rm = pts_rm / df.height
-    rmvd.append([date, perc_rm])
-    ax.set_title(date + " - " + str(df.height - df2.height) + " points removed")
-    
-rmvd = pl.DataFrame(rmvd, orient="row", schema={"Date": pl.String(), "%rm": pl.Float64()})
-rmvd = rmvd.with_columns(
-    pl.col("Date").str.to_date("%Y%m%d")
-    )
-
-fig, ax = plt.subplots(figsize=(6, 3))
-ax.scatter(rmvd["Date"], rmvd["%rm"] * 100, color="#D9782D", s=25)
-ax.set_title("Data removed by filter - Vent ozone")
-ax.grid()
-ax.grid(which="minor", axis="x", linestyle=":")
-ax.set_ylabel("% data removed")
-ax.xaxis.set_major_locator(
-    mdates.AutoDateLocator()
-    )
-ax.xaxis.set_minor_locator(
-    mdates.DayLocator(interval=1)
-    )
-ax.xaxis.set_major_formatter(
-    mdates.DateFormatter("%m/%d")
-    )
-ax.tick_params(axis="x", labelrotation=90)
-# var_vals = {var2: {"mins": [], "maxs": []} for var2 in ["CellTemp_C", "CellPressure_mbar", "SampleFlow_ccm"]}
-# Spike checking
-for date, df in tqdm(data["2BTech_205_B"].items()):
-    df = df.filter(pl.col("SamplingLocation").eq("C200_Vent"))
-    if df.is_empty():
-        continue
-    df_start = df["UTC_Start"].min()
-    df_stop = df["UTC_Start"].max()
-    var = "O3_ppb"
-    
-    # for var2 in ["CellTemp_C", "CellPressure_mbar", "SampleFlow_ccm"]:
-    #     mi = df[var2].min()
-    #     ma = df[var2].max()
-    #     print(df[var2].min(), df[var2].max())
-    for var2, lims in zip(
-            ["CellTemp_C", "CellPressure_mbar", "SampleFlow_ccm"],
-            [[28, 61], [790, 830], [1996, 2305]]
-            ):
-        # var_vals[var2]["mins"].append(df[var2].min())
-        # var_vals[var2]["maxs"].append(df[var2].max())
-        fig, ax = plt.subplots(figsize=(6, 3))
-        ax.scatter(df["UTC_Start"], df[var], color="#D9782D", s=10, zorder=10)
-        ax.set_title("Vent O3 " + date + " - " + var + " + " + var2)
-        ax.grid(axis="x")
-        ax.set_xlim(
-            df["UTC_Start"].min(), df["UTC_Start"].max()
-            )
-        ax.set_ylabel(var, color="#D9782D")
-        ax.xaxis.set_major_locator(
-            mdates.AutoDateLocator(tz=pytz.timezone("America/Denver"),)
-            )
-        ax.xaxis.set_major_formatter(
-            mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver"))
-            )
-        ax.tick_params(axis="x", labelrotation=90)
-        ax2 = ax.twinx()
-        ax2.scatter(df["UTC_Start"], df[var2], s=10, color="#1E4D2B", zorder=1)
-        ax2.set_ylabel(var2, color="#1E4D2B")
-        ax2.set_ylim(*lims)
-        ax.set_zorder(2)
-        ax2.set_zorder(1)
-        ax.patch.set_visible(False)
