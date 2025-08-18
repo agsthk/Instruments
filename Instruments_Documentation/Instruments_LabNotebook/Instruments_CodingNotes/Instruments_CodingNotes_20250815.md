@@ -1,0 +1,15 @@
+# clean_rawdata.py
+- Picking up where I left off Wednesday - "Since I am not planning to filter any of the vent ozone data, I want to adjust the Hampel filter parameters to be ideal for room ozone"
+	- Settled on 10 minute window, 3 sigmas, and an absolute average of derivatives before and after less than 0.25 ppb/s
+	- Ran on vent ozone just to see and these parameters actually work fine - may bring up again with Megan and discuss how some of the more egregious outliers may be removed
+		- Could also do an absolute value filter just to get rid of the worst offenders (less than 500?)
+			- This mostly seems to work just fine, although may want lower bound to be stricter
+				- Need to see what the minimum ozone values are for each date to get an idea of the appropriate value - address later
+	- Want to check the UZA sampling for outliers to see if the Hampel filter works for that as well
+		- The zeros don't need to be filtered; the only points being cut are those that are < -8, so filtering is mostly pointless
+		- Feb 11 does have a zeroing interval with a much larger standard deviation than expected which is odd - address later
+- Now that the parameters for the filter are set, it is time to incorporate it into the actual data cleaning portion of the script
+	- Worked well, need to go back into the sampling locations and remove the times that: the instrument was sampling NOx exhaust (1/20/2025), citrus peeling was happening
+- Running the script with the cleaning filters in place to export the newly cleaned data
+	- This is not in its final form! More work needs to be done to truly clean the data, but it is better than it was and leaves me at a good stopping place
+- When I return, want to pick up on calibrate_cleandata.py and incorporating the zeroing/variable LOD into this script
