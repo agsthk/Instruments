@@ -7,6 +7,7 @@ Created on Tue Jul 29 12:28:09 2025
 
 import os
 import polars as pl
+import polars.selectors as cs
 from tqdm import tqdm
 
 # Declares full path to Instruments_Data/ directory
@@ -25,6 +26,8 @@ CALIBRATED_DATA_DIR = os.path.join(data_dir, "Instruments_CalibratedData")
 # Creates Instruments_CleanData/ directory if needed
 if not os.path.exists(CALIBRATED_DATA_DIR):
     os.makedirs(CALIBRATED_DATA_DIR)
+# Full path to directory containing zero results
+ZERO_RESULTS_DIR = os.path.join(data_dir, "Instruments_DerivedData")
 
 # Date to use calibration factor from
 cal_dates = {"2BTech_202": "20240118",
@@ -48,7 +51,17 @@ for root, dirs, files in os.walk(CAL_RESULTS_DIR):
                 pl.exclude("CalDate")
                 )
         
-
+zeros = {}
+for root, dirs, files in os.walk(ZERO_RESULTS_DIR):
+    for file in files:
+        if file.find("UZAStatistics") == -1:
+            continue
+        inst = file.rsplit("_", 1)[0]
+        path = os.path.join(root, file)
+        inst_zeros = pl.read_csv(path)
+        zeros[inst] = inst_zeros.with_columns(
+            cs.contains("UTC").str.to_datetime()
+            )
 
 for inst, factors in cal_factors.items():
     cal_vars = {"_".join(col.split("_", 2)[:2]) for col in factors.columns}
