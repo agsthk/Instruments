@@ -9,7 +9,7 @@ import os
 import polars as pl
 import polars.selectors as cs
 from tqdm import tqdm
-
+import matplotlib.pyplot as plt
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
 # Starts in Instruments/ directory
@@ -76,7 +76,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 break
         if path.find(inst) == -1:
             continue
-        if inst != "2BTech_205_A": continue
+        # if inst != "2BTech_205_A": continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -85,6 +85,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC")
             )
         inst_cal_factors = cal_factors[inst]
+        if inst in zeros.keys():
+            inst_uza_stats = zeros[inst]
         cal_vars = {"_".join(col.split("_", 2)[:2])
                     for col in inst_cal_factors.columns}
         for var in cal_vars:
@@ -92,6 +94,50 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             off = inst_cal_factors[var + "_Offset"]
             lf = lf.with_columns(
                 (pl.col(var).sub(off)).truediv(sens)
+                )
+            if inst in zeros.keys():
+                # Applies calibration factors to UZA stats
+                inst_uza_stats = inst_uza_stats.with_columns(
+                    (pl.col(var + "_Mean").sub(off)).truediv(sens),
+                    (pl.col(var + "_STD").truediv(sens))
+                    )
+        if "UTC_DateTime" in lf.collect_schema().names():
+            left_on = "UTC_DateTime"
+        else:
+            left_on = "UTC_Start"
+            
+        if inst in zeros.keys():
+            stats_cols = inst_uza_stats.select(
+                cs.contains("Mean", "STD")
+                ).columns
+            z_starts = inst_uza_stats.select(
+                pl.exclude("UTC_Stop")
+                ).rename({"UTC_Start": left_on})
+            z_stops = inst_uza_stats.select(
+                pl.exclude("UTC_Start")
+                ).rename({"UTC_Stop": left_on})
+            
+            lf = pl.concat(
+                [lf, z_starts.lazy(), z_stops.lazy()],
+                how="diagonal_relaxed"
+                ).sort(
+                    by=left_on
+                    ).with_columns(
+                        pl.col(stats_cols)
+                        .interpolate_by(left_on)
+                        )
+            for col in stats_cols:
+                lf = lf.with_columns(
+                    pl.col(col).fill_null(inst_uza_stats[col].median())
+                    )
+            lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])
+            for var in cal_vars:
+                lf = lf.with_columns(
+                    pl.col(var).sub(pl.col(var + "_Mean")),
+                    pl.col(var + "_STD").mul(3).alias(var + "_LOD")
+                    )
+            lf = lf.select(
+                ~cs.contains("Mean", "STD")
                 )
         df = lf.collect()
         f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
@@ -102,4 +148,4 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         path = os.path.join(f_dir,
                             f_name)
         df.write_csv(path)
-
+        
