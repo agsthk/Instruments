@@ -34,6 +34,9 @@ CAL_DIR = os.path.join(data_dir,
 def linear(B, x):
     return B[0] * x + B[1]
 
+def linear_zero(B, x):
+    return B[0] * x
+
 
 def perform_odr(delivered, measured, unc_delivered, unc_measured):
     model = sp.odr.Model(linear)
@@ -337,10 +340,10 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     ts_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Time Series",
                                     size=15)
                     ts_fig_name = inst + "_" + var_nounits + "_CalibrationTimeSeries_" + date + ".png"
-                    ts_fig.savefig(os.path.join(
-                        inst_cal_fig_dir,
-                        ts_fig_name
-                        ))
+                    # ts_fig.savefig(os.path.join(
+                    #     inst_cal_fig_dir,
+                    #     ts_fig_name
+                    #     ))
                     plt.close()
                     sens, off, unc_sens, unc_off = perform_odr(
                         odr_cal_data[var + "_Delivered"],
@@ -393,16 +396,64 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     fit_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Fit",
                                     size=15)
                     
-                    fit_fig.savefig(os.path.join(
+                    # fit_fig.savefig(os.path.join(
+                    #     inst_cal_fig_dir,
+                    #     inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
+                    #     ))
+                    
+                    plt.close()
+
+                    model = sp.odr.Model(linear)
+                    data = sp.odr.RealData(
+                        odr_cal_data[var + "_Measured"],
+                        odr_cal_data["Unc_" + var + "_Measured"]
+                        )
+                    output = sp.odr.ODR(data, model, beta0=[0.005, 0]).run()
+                    ns_slope, ns_off = output.beta
+                    
+                    ns_r2 = calc_r2(
+                        odr_cal_data[var + "_Measured"],
+                        odr_cal_data["Unc_" + var + "_Measured"],
+                        ns_slope,
+                        ns_off
+                        )
+                    
+                    fit_label = (var_name
+                                 + " Noise = "
+                                 + f'{ns_slope:.5f}'
+                                 + r' $\cdot$ ('
+                                 + var_name
+                                 + " Signal)"
+                                 )
+                    if ns_off > 0: # Add zero
+                        fit_label += f'+ {ns_off:.3f}\nR' + '$^2$ = ' + f'{ns_r2:.4f}'
+                    else: # Subtract negative zero
+                        fit_label += f'\u2212 {-ns_off:.3f}\nR' + '$^2$ = ' + f'{ns_r2:.4f}'
+                    ns_fig, ns_ax = plt.subplots(figsize=(6, 6))
+                    ns_ax.errorbar(
+                        odr_cal_data[var + "_Measured"],
+                        odr_cal_data["Unc_" + var + "_Measured"],
+                        color=csu_colors['csu_green'],
+                        **ebar_kwargs)
+                    ns_ax.plot(odr_cal_data[var + "_Measured"], odr_cal_data[var + "_Measured"] * ns_slope + ns_off,
+                                **line_kwargs)
+                    ns_ax.text(0.01, 1.06, fit_label, va='top', ha="left",
+                                transform=ns_ax.transAxes, bbox={'facecolor': 'white',
+                                                                  'alpha': 1})
+                    set_ax_ticks(ns_ax)
+                    ns_ax.set_xlabel(var_name + ' Signal (' + var_units + ")")
+                    ns_ax.set_ylabel(var_name + ' Noise (' + var_units + ")")
+                    ns_ax.set_title(date, loc="right")
+                    ns_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Signal to Noise Fit",
+                                    size=15)
+                    
+                    ns_fig.savefig(os.path.join(
                         inst_cal_fig_dir,
-                        inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
+                        inst + "_" + var_nounits + "_CalibrationSNR_" + date + ".png"
                         ))
                     
                     plt.close()
                 inst_cal_factors[date] = date_cal_factors
-            cal_factors[inst] = inst_cal_factors
-
-
 
 for inst, factors in cal_factors.items():
     inst_cal_results = []
