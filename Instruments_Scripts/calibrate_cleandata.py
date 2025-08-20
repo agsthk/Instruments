@@ -139,6 +139,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             lf = lf.select(
                 ~cs.contains("Mean", "STD")
                 )
+            lf = lf.filter(
+                pl.col("SamplingLocation").ne("UZA"))
         df = lf.collect()
         f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
         f_name = f_name[0] + "_" + cal_dates[inst] + "Calibration_" + f_name[1]
