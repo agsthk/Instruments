@@ -1,0 +1,32 @@
+# calibrate_cleandata.py
+- Working on joining the zeroing and data DataFrames
+	- I think I may want to use concatenation rather than joining - otherwise not sure how I will interpolate at the start and end of the DataFrame
+		- I suppose I could identify the times before and after the DataFrame starts/ends
+		- Trying to use concatenation first, will return to joining if I am unsuccessful
+- Successfully concatenated the zeroing and data DataFrames
+	- Interpolated between zeros and filled with median values for measurements before or after zeroing occurs
+	- May want to revise to change which data is considered when determining the median values
+- Running the script to export data so that I can check in the KeckO3 project if the script did what I wanted it to
+	- It did! Zero histograms are centered at zero and scatterplots don't show any noticeable drift
+	- Average offset is <0.01, with standard deviation of <1 for all - looks good!
+- Now, dropping UZA measurements since zeros are corrected for
+- Some revisions I need to consider
+	- When is applying zero offset not desired? think calibration data
+	- Is a median of all offsets truly appropriate?
+		- Should I use a time constraint to only use data within a certain range, and if there is none do no time offset?
+	- How do I handle limit of detection when not zeroing?
+# calibrate_instruments.py
+- Need to define an uncertainty using the signal to noise ratio during calibration - combining with calibration script, will likely revise result outputs to include the uncertainty
+- Beginning with visualization
+	- Only one of these shows a clear linear relationship, so I'm a bit confused on what I should be doing here
+- Checking the noise on the zero calibration
+- Still not sure what I'm doing here, but I have figures to run by Megan and ask her about at the very least
+	- Saving plots to appropriate folder
+# Next steps
+- Revise the sampling location assignment, ensure non-logged zeros are included, check data filtering
+- Record all events over both campaigns to use with filtering
+	- For now, can focus on ozone, CO2, and citrus peeling
+- Prepare Phase II ICARTT files
+	- Do not upload - will need to change a couple of things first
+- Compare pre- and post-fixing leak measurements to establish a systematic relative error
+	- Phase II files
