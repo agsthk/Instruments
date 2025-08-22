@@ -8,7 +8,7 @@ Created on Tue Jul  8 10:14:54 2025
 import os
 import polars as pl
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
@@ -555,7 +555,7 @@ for inst in data.keys():
 
 for inst in data.keys():
     for source in data[inst].keys():
-        concat_df = pl.concat(data[inst][source]).sort("UTC_DateTime")
+        concat_df = pl.concat(data[inst][source]).unique().sort("UTC_DateTime")
         if inst in avg_times.keys():
             for start, avg_time in avg_times[inst].items():
                 if "UTC_Start" not in concat_df.columns:
@@ -592,6 +592,47 @@ for inst in data.keys():
                 pl.col("FTC_DateTime").alias("FTC_Stop"),
                 pl.exclude("UTC_Start", "UTC_DateTime", "FTC_DateTime")
                 )
+        if source != "DAQ" and inst in ["2BTech_202", "2BTech_205_A",
+                                        "2BTech_205_B", "2BTech_405nm",
+                                        "LI-COR_LI-840A", "LI-COR_LI-840B",
+                                        "Picarro_G2307",
+                                        "ThermoScientific_42i-TL"]:
+            if "UTC_Start" not in concat_df.columns:
+                concat_df = concat_df.with_columns(
+                    pl.col("UTC_DateTime").sub(pl.col("UTC_DateTime").shift(1)).alias("Gap"),
+                    pl.lit(timedelta(seconds=60)).alias("AvgT")
+                    )
+                left_on = "UTC_DateTime"
+            else:
+                concat_df = concat_df.with_columns(
+                    pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(1)).alias("Gap"),
+                    pl.col("UTC_Stop").sub(pl.col("UTC_Start")).alias("AvgT")
+                    )
+                left_on = "UTC_Stop"
+            logstart = concat_df.filter(
+                (pl.col("Gap").gt(pl.col("AvgT").add(timedelta(seconds=10)))
+                | pl.col("Gap").gt((pl.col("AvgT").add(timedelta(seconds=10))).shift(1))
+                | pl.col("Gap").is_null())
+                ).select(
+                    pl.col(left_on).alias("LogStart")
+                    )
+            concat_df = concat_df.join_asof(
+                logstart,
+                left_on=left_on,
+                right_on="LogStart",
+                strategy="backward"
+                ).select(
+                    pl.exclude("Gap", "AvgT", "LogStart"),
+                    pl.col(left_on).sub(pl.col("LogStart"))
+                    .dt.total_microseconds().truediv(1e6).mul(-1).add(600)
+                    .alias("WarmUp")
+                    ).with_columns(
+                        pl.when(pl.col("WarmUp").gt(0))
+                        .then(pl.col("WarmUp").cast(pl.Int64))
+                        .otherwise(pl.lit(0))
+                        )
+            
+            
         if inst == "LI-COR_LI-840A_B":
             concat_df = concat_df.with_columns(
                 pl.selectors.contains("UTC", "FTC").dt.offset_by("-12m15s")
