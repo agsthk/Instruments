@@ -1,0 +1,155 @@
+# Sampling Locations
+- Using delete.py to visualize so as to check against notes
+	- This is inevitably going to be very involved
+- Checking the non-DAQ data first
+- Notes on Picarro
+	- 20250108 - 20250110, solenoid valve values change but do not correspond to zeroing!
+		- Solenoid valve was not connected, instrument wasn't on trace gas line
+		- During this time, instrument sampling either B211 or calibration source
+	- In general, see some non-real spikes when zero switching occurs, but not much outside of that
+		- Review 20240715 at 14:30 ish
+		- Review 20240708 at 14:30 ish
+		- 20240625 at 08:45 ish - think this is real, but double check methane
+		- 20240624 something is weird starting around 15:00 - think it's a zeroing thing but double check
+			- Also check around 09:00
+		- 20240617 17:00 ish - 20240623, solenoid valve states do not correspond to zeroing
+			- If I recall correctly, UZA was empty, so they are just real values
+		- 20240614 there are a number of spikes that don't correspond to zeroing
+		- 20240613 weird zeroing around 09:00
+		- 20240607 times are weird - I think remember this, for whatever reason it only has the times by minute, so zeroing looks strange for sure
+			- Double check this, it does look like gaps are much longer than a minute - jk data only covers like 1 hour
+		- 20240606 around 11:00 there is some missing data
+		- 20240605 around 13:00 there is odd spike in both methane and formaldehyde not corresponding to zero
+		- 20240502 I think Picarro not installed, sampling where?
+		- 20240422, sampling where? Odd spikes
+		- 20240327, sampling where? Very odd data
+		- 20240213 one odd spike
+		- 20231209 methane looks odd during shut down (?)
+- Notes on 2BTech_405nm
+	- 20241217 - dramatic spikes that I think correspond to instrument startup
+	- 20241216 - calibration
+	- 20240702 - odd spikes why?
+	- 20240627 - one odd pint at ~12:30
+	- 20240625 - calibration, odd spikes that I think correspond to instrument startup
+	- Challenging to discern what is happening due to high noise - review against zeros and see if that gives any information
+	- Instrument startup definitely gives non-real spikes
+	- Evaluate later - not so important right now
+	- 20240228 seems reasonable, I think it was in a lab?
+	- Simply not doing this at the moment
+- Notes on 2BTech_205B
+	- This data will not be filtered because it's too difficult to discern which spikes are real and which are not
+	- Instrument is either in a lab or on the vent line, maybe also B203 while hooking up?
+	- Not on a line where other instruments will have an influence except for when the other CO2 monitor was briefly installed
+	- Not sure of the source of the 2031 data, since it's not mine, I may just delete
+	- 20250115 - calibration
+	- 20241112, 20241111, 20241011, 20241002, 20240930, 20240927, 20231121, 20231120, 20231110, 20231109, 20231103, 20231102, 20231004, 20231003 confuse me - was Tucker using it at this time? Would make more sense given very high readings, I know it wasn't installed on vent at the time
+		- May delete these as well
+		- 20231120 and 20231121 are identical - weird!
+			- As are 20231003 and 20231004
+	- 20240720 - 20240721 HVAC went down, saw additions in the vent ozone
+	- 20240610 I think the instrument was being installed?
+	- 20240605 has plot but no data so not sure what that is
+	- 20240604 very high ozone initially, maybe related to startup
+	- 20230511 - 20230614 I wasn't even at CSU so I don't think that's relevant to me
+- Notes on 2BTech_205_A
+	- 20250115 - calibration
+	- 20240812 - 20240816 I believe ozone monitor still installed, though clearly not zeroing - Picarro removed?
+	- Occasional odd spikes to check out
+		- 20240814 (vent change? no I think this was much earlier)
+		- 20240813 (no clue)
+		- 20240812 there's a little baby spike around 10:00
+		- 20240808 check the addition around 15:00, I think decay was cutoff by zeroing
+		- 20240807 - is this when ventilation changed?
+		- 20240805 - some odd spikes
+		- 20240802 - odd spike around 17:00
+		- 20240801 - a couple odd spikes
+		- 20240731 - a couple odd spikes
+		- 20240730 - a couple odd spikes
+		- 20240729 is a little weird - spikes but not corresponding to additions - what happened?
+		- 20240726 - a couple odd spikes
+		- 20240725 - a couple odd spikes
+		- 20240723 - one odd spike
+		- 20240722 - a couple odd spikes DURING ZEROS!!
+		- 20240719 - a couple odd spikes, including one at start of zero
+		- 20240717 - one odd spike
+		- 20240716 - a couple odd spikes
+		- 20240715 - VERY odd around 07:00, kind of odd around 14:00
+		- 20240713 - one odd spike
+		- 20240712 - a couple odd spikes
+		- 20240711 - a couple odd spikes, pretty odd around 18:00
+		- 20240710 - a couple odd spikes
+		- Okay I'm tired of listing every day where there are spikes, not listing if I suspect Hampel filter will take care of it
+		- 20240625 is a little funky
+		- 20240624 is weird, corresponds to changing UZA tank I believe
+		- 20240617 - 20240623 zeroing not working, no zeros
+		- 20240617 big spike, unsure why
+		- 20240613 weird measurements
+		- 20240612 something very strange going on
+		- 20240611 averaging time switched
+		- 20240610 VERY high ozone registered
+		- 20240606 VERY high ozone registered
+		- 20240605 some odd readings - maybe installing stuff on trace gas line
+		- 20240624 VERY high ozone registered
+		- 20240514 high ozone registered - addition?
+		- 20240509 mixing issues
+		- 20240417 spikey
+		- 20240416 high ozone registered
+		- 20240320 - see what might have caused little spikes
+		- 20240315 - see if any clear explanation for increase
+		- 20240312 - see if any clear explanation for increase
+		- 20240311 - VERY high ozone registered
+		- 20240307 - high at first, I think a product of instrument startup
+		- 20240119 - calibration
+		- 20220930 is not mine and I can probably delete
+- Notes on 2BTech_202
+	- Calibration 20240118
+	- I believe sampling ambient air in Farmer lab 20240119
+- Notes on Thermo
+	- 20240119 is weird - was this the first calibration attempt?
+	- 20240201 was definitely calibration
+	- 20240206 also calibration
+	- 20240228 had a startup spike
+	- 20240305 had startup spike I think
+	- 20240328 odd spike
+	- 20240415 definitely a startup spike
+	- 20240416 startup spike but also a dramatic NO2 spike - source?
+	- 20240417 several startup spikes
+	- 20240502 startup spike
+	- 20240514 startup spike
+	- 20240605 startup spike
+	- 20240612 startup spike
+	- 20240613 a little funky but I believe related to zeroing
+	- 20240617 zeroing stopped, off until 20240624
+	- 20240624 multiple startup spikes
+	- 20240625 looks weird
+	- 20240626 one NO spike, but only by like 1 ppb
+	- 20240703 multiple spikes, at least one is startup
+	- 20240708 is calibration
+	- 20240717 spike
+	- 20240724 multiple spikes, at least one startup
+	- There are definitely some days with a little funky data but I suspect it might be real - need to check what was happening those days
+	- 20241216 calibration
+	- 20241217 ? I think I was trying to do SDC calibration but never did
+	- 20250115 - startup, not sure why on? Maybe it was the DAQ connection testing
+	- 20250310 pulled to compare to DAQ because I was confused by 1 Hz transmission (still am!)
+- I suspect that it would be useful to create a WarmUp column for the non-DAQ data - particularly for the Thermo NOx
+	- That would allow for easier filtering
+	- Would this change be acceptable to do when structuring, or would that count as processing that would make the data not raw?
+		- Given that I'm not changing anything, I think it will be okay
+		- Not all that different to applying averaging times to determine start/stop points
+# structure_rawdata.py
+- Going to revise to determine when new logs were started for non-DAQ data
+- Compared the gap between consecutive logs against the time between start and stop points (or 60 seconds where averaging time is 1) to determine log starts
+- At log start, set WarmUp to 600, then counted down for subsequent logs until reaching zero
+	- Essentially replicates the WarmUp column in the DAQ data
+- In doing this, I discovered some repeat rows in Thermo NOx
+	- Makes sense given that different log pulls may contain the same data - my bad, fixing
+- Setting the comparison cutoff is a little challenging given that for shorter averaging times sometimes they aren't quite exact
+	- Originally tried multiplying averaging time by 2, but that didn't work super well
+	- Trying an allowance of 10 seconds
+		- May revise to 5 seconds depending on results
+- Get things that look a little repetitive with Picarro because of the weird same time logging issue, but I don't know how to distinguish between them so I will keep it the way it is
+	- Assigning the warmup did not work for these points
+- This was a great idea in general! Though it didn't work for some of the Picarro data where the times are a little messed up, so I will need to go back and fix that
+# Sampling Locations
+- There is still a ton of work to do here - need to really focus on getting this done before Monday
