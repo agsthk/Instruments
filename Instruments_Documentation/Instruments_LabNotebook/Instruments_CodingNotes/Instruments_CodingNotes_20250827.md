@@ -1,0 +1,20 @@
+# Sampling Location
+- Didn't actually do anything yesterday oops
+- Once again, focusing on the trace gas line as a whole
+	- Picarro seems pretty sensitive to line changes, so I think it will be a useful reference
+		- 20240502 and prior, any time it's on it's in lab
+			- Not sure why on prior to 20240502 - see if I can figure out why? Perhaps flow measurements or something?
+		- Installed on TG line 20240605 - 11:42 MDT, first few seconds AlarmStatus is not zero
+			- From notes, turned on at 11:27, then did flow measurements (for 30 minutes?), started valve sequence 12:50 (I think)
+		- Some issues 6/7
+		- 20240613 08:48-09:32 measuring flows
+		- 20240614 spikes why?
+		- 20240617 UZA ran out
+		- 20240624 Something with flows? NOx off 14:52 UTC, on 15:27 UTC, off 16:21 UTC, on 16:51 UTC
+		- 20240708 NOx off 20:27 UTC, on 20240709 01:23 UTC
+		- 20240710?
+		- 20240715 TG line disconnected 14:21 - 14:28
+		- 20240729??
+		- Removed 20240812
+	- Checking diagnostic variables for all instruments - probably more useful than the measurements
+		- Truly ridiculous number of figures

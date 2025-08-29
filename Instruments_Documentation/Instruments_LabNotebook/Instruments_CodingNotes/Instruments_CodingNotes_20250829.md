@@ -1,0 +1,75 @@
+# Sampling Locations
+- Trying to determine the time offsets prior to DAQ implementation
+- Examining Picarro since I know that time is synchronized
+	- 20240610: 12:44:57 last time solenoid valve closed, first UZA measurement after 12:45:04
+		- (based on instrument time! But I know that's wrong)
+		- Residence time of 7 seconds
+	- Valve closes 17:54:55, non UZA measurement 17:55:05
+		- Residence time of 10 seconds
+	- For Picarro, seems like switch between UZA and complete within 10 seconds of solenoid valve state change
+		- Takes longer to switch from UZA than to switch to UZA
+			- Makes sense considering pressure differences
+	- Given this, I should be able to estimate the time offset of the other instruments by examining the time between solenoid valve state switch and registering zero
+- Thermo
+	- 20240613 is first time Thermo is on TG line with Picarro
+		- 12:44:59 solenoid valve opens
+		- 12:54:59 solenoid valve closes
+		- By Picarro time, UZA should be measured from ~12:45:06 - 12:55:09
+			- Given 1 minute averaging time of Thermo, all UZA from 12:47:00 - 12:55:00
+			- Response time of 90 seconds? gives same result
+		- Measuring UZA at 12:45:00 or 12:46:00 (unclear)
+		- Stops measuring UZA 12:54:00
+		- Appears that Thermo is ~1 minute before Picarro
+	- 20240811 is last time Thermo on TG line with Picarro
+		- 03:44:30 solenoid valve opens
+		- 03:54:30 solenoid valve closes
+		- Theoretically UZA from 03:46:00 - 03:54:00
+		- Actually UZA from 03:45:00 - 03:53:00
+		- Confirms 1 minute before Picarro
+- 2BTech_205_A
+	- This one will be a bit more challenging because I resynched the time a few times, plus averaging time kind of changes, but will get some idea
+	- 20240611 is the first time I'm really gonna be able to look at this
+		- 00:44:53 - 00:54:54 valve open (by Picarro)
+		- 00:44:10 - 00:54:10 measuring UZA at 2s avg time
+			- Should be ~00:45:00 - 00:55:04 by Picarro time
+			- 50 sec ahead of Picarro
+		- 11:44:50 - 11:54:49 valve open (by Picarro)
+		- 11:44:39 - 11:52:39 measuring UZA at 1 minute avg time
+			- Should be 11:46:39 - 11:54:39 by Picarro time
+			- 2 min ahead of Picarro?
+	- 20240802
+		- 07:44:53 - 07:54:53 valve open by Picarro
+			- 07:45:00 - 07:55:03 UZA delivered
+		- 07:45:10 - 07:53:10 measuring UZA at 1 min avg time
+			- Should be 07:46:10 - 07:54:10
+			- 1 min ahead
+	- When did I sync times?
+		- 20250523 09:45, previously ~1 minute ahead
+		- 20240625 12:33:30 and 13:34:19, previously 15 seconds ahead
+			- 13:44:54 - 13:54:55 UZA open
+			- 13:45:18 - 13:52:18 measuring UZA
+				- Some UZA 13:43:18 and 13:53:18
+				- So in reality, UZA opened sometime between 13:42:18 - 13:43:18 and closed 13:52:18 - 13:53:18
+				- Picarro is between 102 - 162 seconds ahead of real time
+		- 20240611
+			- 07:44:52 - 07:54:53 UZA open
+			- Measuring UZA 07:44:09 - 07:54:01
+			- Transition 07:44:05 - 07:44:09, 07:54:01 - 07:54:12
+			- Given offset of 7-10 seconds
+				- Valve opened between 07:43:55 - 07:44:02 and closed between 07:53:51 - 07:54:05 by 2B instrument time
+				- Offset of 50 - 57 seconds or 48 - 62 seconds from 2B time, which was theoretically within 15 seconds of real time?
+- I can see myself spending a really long time on this - is there a way to automate it? Or semi-automate it?
+	- Working on automatically detecting where the instrument starts measuring UZA and pairing that with already known solenoid valves to get a rough idea of the offset
+	- Beginning with Picarro, will just look to see what the residence time is (roughly)
+		- Generally sits between 4 and 10 seconds
+			- Faster to start zero than to stop, which makes sense, shifting max 15 seconds makes sense to me
+			- Zero/not zero should register between 4 and 15 seconds after valve state changes
+				- If it does, say that it's synched to Picarro
+				- Otherwise, out of synch with Picarro
+	- Trying with 2B 205 A instrument now
+		- Some revisions to the limit calculations because I get confused easily
+		- Kernel keeps dying :/
+		- I'm so confused - the reported upper limit is the actual lower limit
+			- Starting from the beginning
+			- Okay! I have figures! Are they good? Debateable
+			- It's already late, so I am done for the day, but I feel like I'm in a good spot to actually determine the offset from these figures when I return

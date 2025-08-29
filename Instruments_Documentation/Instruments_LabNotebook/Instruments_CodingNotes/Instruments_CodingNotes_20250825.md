@@ -1,0 +1,356 @@
+# Sampling Locations
+- Going to review my notes and the figures to help create these files
+- 2BTech_205_A
+	- 20240215
+		- 13:57 on in C200
+		- Logging began 14:00 with 1 minute avg
+		- Cycled power 15:13 and started new log
+	- 20240219
+		- 08:37 turned off to move to B203
+		- 09:08 back on, sampling C200
+	- 20240415
+		- Moved to trace gas rack and changed inlet setup
+	- 20240417
+		- Turned off 08:13
+		- Turned on ~08:20
+	- 20240514
+		- Turned off 08:28
+		- Turned on 13:06
+	- 20250523
+		- Resynched clocks 09:45, previously ~1 minute ahead
+	- 20240604
+		- Monitor removed from B203
+		- Line open 09:32 - 09:34
+		- Monitor in Willis lab ~10:00, then connected to O3 monitor
+		- Averaging time changed to 2 seconds
+		- 10:28, ozone cal sequence starts (30, 60, 90, 120, 150 ppb for 20 min each), 12:08 set zero, stopped 12:49
+		- Reinstalled O3 monitor in B203 with 1 minute averaging time
+	- 20240605
+		- Changed averaging time to 2 s
+	- 20240611
+		- Changed averaging time to 1 minute
+	- 20240625
+		- O3 monitor was 15 seconds ahead of phone time
+		- Reset time at 12:33:30 and again 12:34:19
+			- Within 2 seconds
+- 2BTech_205_B
+	- 20240604
+		- Calibration, zero started 12:53
+		- Reset to MST and 2 savg time
+		- 13:28, cal sequence starts
+- 2BTech_405nm
+	- 20240415
+		- Moved to trace gas rack and changed inlet setup
+	- 20240416
+		- Adjusted flows ~07:58
+		- Adjusted flows 08:40
+	- 20240417
+		- Turned off 08:13
+		- Turned on ~08:20
+	- 20240508
+		- 08:30, noticed power cord had been unplugged and reconnected and restarted
+	- 20240514
+		- Turned off 08:28
+		- Turned on 13:06
+		- Adjusted flows
+	- 20250523
+		- Resynched clocks 09:45, previously ~1 minute ahead
+	- 20240605
+		- Changed averaging time to 5 s
+	- 20240611
+		- Changed averaging time to 1 minute
+	- 20240613
+		- Adjusting 2B NOx flows 08:15 - 08:20
+		- Adjusting flows 09:47
+	- 20240625
+		- Removed from B203
+		- Connected to calibration source
+		- Changed averaging time to 5 seconds
+		- Began calibration at 12:51 
+			- Output 100, 75, 50, 25 ppb for 12 minutes each, ZA for 20 minutes, then 25, 50, 75, 100 ppb NO2 for 12 minutes each
+		- Done by 14:55, ended logging 14:56
+		- Disconnected from calibration source, restarted logging, let run on room air
+	- 20240702
+		- Re-synced datetime at 09:40:30 MDT and changed averaging time to 5 seconds
+		- 09:48, started calibration sequence
+			- 100 ppb NO -> 75 ppb NO -> 50 ppb NO -> 25 ppb NO -> ZA (30 min) -> 25 ppb NO2 -> 50 ppb NO2 -> 75 ppb NO2 - > 100 ppb NO2 all for 20 min except zero is 30 minutes
+		- Changed averaging time back to 1 minute
+- Picarro_G2307
+	- 20240502
+		- 09:20, instrument on in lab to check hose fit
+		- Instrument off 13:30
+	- 20240605
+		- Instrument moved into B203 at 08:45
+		- ~09:14 - 11:10 modifying lines, connecting monitor
+		- On 11:27
+		- Flow measurements for ~30 minutes?
+		- Valve sequence started 12:50
+	- 20240610
+		- Data collection stopped 6/7, shutdown failed, zero maybe not running
+		- Shut down 08:13
+		- Restarted 08:19
+		- Valve sequence automatically started on startup
+		- Shut off valves and scheduled for 8:45
+	- 20240612
+		- No measurements 01:15 - 01:23
+		- Restarted measurements and valve sequence at 01:23
+		- Changed valve to start 10:45
+- Teledyne_N300
+	- 20240514
+		- Installed on TG line
+		- Turned on 13:06
+	- 20240529
+		- Reset times
+	- 20240606
+		- Cycled instrument power ~12:10
+	- 20240624
+		- 08:53 turned off and disconnected
+- ThermoScientific_42i-TL
+	- Turned on 2024-01-19 17:38:00 UTC
+	- Turned off 2024-01-22 18:42:00 UTC
+	- Turned on 2024-02-01 17:50:00 UTC
+	- Calibration
+	- Turned off 2024-02-01 20:36:00 UTC
+	- Turned on 2024-02-01 20:45:00 UTC
+	- Calibration
+	- Turned off 2024-02-01 22:25:00 UTC
+	- Turned on 2024-02-01 22:56:00 UTC
+	- Calibration
+	- Turned off 2024-02-06 21:23:00 UTC
+	- Turned on 2024-02-28 17:00:00 UTC
+	- Turned off 2024-02-28 23:28:00 UTC
+	- Turned on 2024-02-29 00:48:00 UTC
+	- Turned off 2024-03-01 15:36:00 UTC
+	- Turned on 2024-03-01 15:44:00 UTC
+	- Turned off 2024-03-05 19:53:00 UTC
+	- Turned on 2024-03-05 20:08:00 UTC
+	- Turned off 2024-03-05 20:21:00 UTC
+	- Turned on 2024-03-13 16:32:00 UTC
+	- Turned off 2024-03-28 16:39:00 UTC
+	- Turned on 2024-03-28 16:42:00 UTC
+	- Turned off 2024-04-15 14:21:00 UTC
+	- Moved onto TG line
+	- Turned on 2024-04-15 23:13:00 UTC
+	- Flow measurements
+	- Turned off 2024-04-16 20:22:00 UTC
+	- Turned on 2024-04-16 21:16:00 UTC
+	- Turned off 2024-04-17 13:31:00 UTC
+	- Turned on 2024-04-17 15:33:00 UTC
+	- Turned off 2024-04-17 17:00:00 UTC
+	- Pump adjustments?
+	- Turned on 2024-04-17 17:22:00 UTC
+	- Turned off 2024-04-17 18:55:00 UTC
+	- Pump adjustments
+	- Turned on 2024-04-17 19:05:00 UTC
+	- Turned off 2024-04-17 19:09:00 UTC
+	- Pump adjustments
+	- Turned on 2024-04-17 19:13:00 UTC
+	- Turned off 2024-04-27 17:22:00 UTC
+	- Changed Drierite
+	- Turned on 2024-05-02 13:34:00 UTC
+	- High pressure/low flow
+	- Turned off 2024-05-09 13:52:00 UTC
+	- Turned on 2024-05-14 19:06:00 UTC
+	- On TG Line
+	- Turned off 2024-05-14 21:09:00 UTC
+	- Turned on 2024-06-05 17:13:00 UTC
+	- On B203 air
+	- Turned off 2024-06-05 17:26:00 UTC
+	- Turned on 2024-06-12 22:22:00 UTC
+	- On B203 air
+	- On TG Line
+	- Turned off 2024-06-24 14:52:00 UTC
+	- Moved pump
+	- Turned on 2024-06-24 15:27:00 UTC
+	- Turned off 2024-06-24 16:21:00 UTC
+	- Turned on 2024-06-24 16:51:00 UTC
+	- Turned off 2024-07-03 20:18:00 UTC
+	- Turned on 2024-07-03 20:33:00 UTC
+	- Turned off 2024-07-08 20:27:00 UTC
+	- Turned on 2024-07-08 20:55:00 UTC
+	- Calibration
+	- Turned off 2024-07-09 00:46:00 UTC
+	- Turned on 2024-07-09 01:23:00 UTC
+	- Turned off 2024-07-24 14:45:00 UTC
+	- Replaced Drierite
+	- Turned on 2024-07-24 14:56:00 UTC
+	- Turned off 2024-07-29 14:45:00 UTC
+	- Turned on 2024-07-29 20:25:00 UTC
+	- Turned off 2024-08-12 16:20:00 UTC
+	- Turned on 2024-12-16 18:13:00 UTC
+	- Calibration
+	- Turned off 2024-12-16 22:30:00 UTC
+	- Turned on 2024-12-17 16:33:00 UTC
+	- Turned off 2024-12-17 17:13:00 UTC
+	- Turned on 2024-12-17 17:29:00 UTC
+	- Turned off 2024-12-17 18:30:00 UTC
+	- Turned on 2025-01-15 16:33:00 UTC
+	- Maybe Willis lab?
+	- Turned off 2025-01-15 17:59:00 UTC
+	- 
+	- 20240415
+		- Moved to trace gas rack and changed inlet setup
+	- 20240417
+		- Turned off 08:13
+		- Turned on ~08:20
+		- Was messing with pumps,, 11:20 back on
+		- 12:50 disconnected sample line, messed with pumps, then turned back on
+	- 20240501
+		- Regenerated drierite
+	- 20240502
+		- Reconnected drierite at 07:30, turned instrument back on
+	- 20240509
+		- Tuned off Thermo NOx due to low flow/high pressure
+	- 20240514
+		- Turned on 13:06 on TG line
+		- Turned off ~2 hours later
+	- 20240605
+		- 11:12 on to sample room air
+		- 11:20 off
+	- 20240612
+		- Changed diaphragm pump
+		- Turned on room air 16:20
+	- 20240613
+		- Connected to TG line 08:20 - 08:30
+	- 20240624
+		- Turned off to move pump 08:53
+		- 09:26 monitor back on
+	- 20240708
+		- 14:59 started NOx calibration with 20 minute zero at start
+	- 20240724
+		- 08:47, turned off and replaced Drierite
+		- 08:57, reinstalled Drierite and restarted monitor
+- Bypass pump
+	- 20240416
+		- Measured flow from C200 07:55
+		- Installed filter
+		- Changed pump critical orifice 08:10
+		- Changed filter membranes 08:24 and 08:32
+	- 20240514
+		- On at 13:06
+	- 20240528
+		- Off at 13:31
+	- 20240613
+		- 08:48 TG line disconnected to measure flows
+		- 09:32 TG line reconnected
+	- 20240624
+		- Doing something with flows
+	- 20240715
+		- TG line disconnected 14:21, reconnected 14:28
+		- definitely leaking at this stage
+
+# Events
+- Reviewing notes and figures to determine events
+	- ACR experiment 1
+		- 20231215_CO2ACR_0003.txt
+		- Measured  ~50g dry ice and placed into room temperature water bath (NEED TIME FOR THIS)
+		- RG oscillated box fan during sublimation with door closed
+		- Once sublimation complete, RG turned off fan, left room and closed door (NEED TIME FOR THIS)
+		- Allowed CO2 to decay in room for ~2.5 hours
+	- ACR experiment 2
+		- 20231215_CO2ACR_0004.txt
+		- Measured ~50g dry ice and placed into beaker at 14:35
+		- RG used heat gun to encourage sublimation, JC oscillated box fan during sublimation with door closed
+		- Heat gun caused beaker to crack, use was stopped at ~14:37 and remaining sublimation was allowed to happen on its own
+			- Likely not a quick enough injection :(
+		- Sublimation completed at 14:44; JC turned off fan, left room, and closed door
+		- Allowed CO2 to decay in room for ~40 minutes
+	- ACR experiment 3
+		- 20231215_CO2ACR_0005.txt
+		- Not present for experiment, unsure of parameters
+	- 2023-12-19
+		- Experiment 1
+			- Once again, could not find dry ice so used three people (AS, JC, LG) as CO2 source
+			- Fully covered both supply and return vents with ziploc bags/duct tape
+			- Entered room at ~9:20
+			- Turned fan on for mixing, did not oscillate fan
+			- At 9:31, left room when CO2 concentration was ~1200 ppm
+			- Fan remained on
+			- Returned to room at ~10:49
+			- Supply vent cover had lifted at some point, may need to rerun this experiment
+		- Experiment 2
+			- Fully covered return air vent only
+			- Measured ~50g dry ice
+			- Broke up into small pieces
+			- AS used hairdryer to sublimate dry ice, JC oscillated fan to mix dry ice
+			- Dry ice fully sublimated at 11:09, AS and JC left room
+			- Fan left on on chair (above ground level)
+			- CO2 concentration ~1350 ppm
+			- Returned to room at ~11:55
+		- Experiment 3
+			- Fully covered supply air vent only
+			- Measured ~50 g dry ice and broke into solid pieces
+			- AS used hairdryer to sublimate dry ice, JC oscillated fan to mix air
+			- Dry ice fully sublimated at 12:07, AS and JC left room
+			- Fan left on on chair (above ground level)
+			- CO2 concentration ~2250 ppm
+			- Returned to room at ~13:03
+			- Cover lifted off vent AGAIN 
+		- Experiment 4
+			- Fully covered supply air vent only
+			- Measured ~50 g dry ice and broke into small pieces at 13:09
+			- AS used hairdryer to sublimate dry ice, JC oscillated fan to mix air
+			- Dry ice fully sublimated at 13:18, AS and JC left room
+			- Fan left on on chair (above ground level)
+			- CO2 concentration ~2800 ppm
+			- Returned to room at 14:17
+			- Vent cover stayed! 
+		- Experiment 5
+			- Fully covered both supply and return air vents
+			- Measured ~50 g dry ice and broke into small pieces at 14:22
+			- AS used hairdryer to sublimate dry ice, JC oscillated fan to mix air
+			- Dry ice fully sublimated at 14:29 AS and JC left room
+			- Fan left on on chair (above ground level)
+			- CO2 concentration ~2700 ppm
+			- Returned to room at 
+	- 2024-01-05
+		- Experiment 1
+			- 20240105_CO2ACR_0001.txt
+			- Taped over supply and return vents
+			- JC oscillated fan while AS used hairdryer to encourage sublimation of dry ice (~50g in small pieces)
+			- Left room at 9:48 once dry ice was fully sublimated
+			- [CO2] ~
+			- Accidentally stopped log, started new log at 10:29
+			- Returned to room at ~10:50
+		- Experiment 2
+			- 20240105_CO2ACR_0003.txt
+			- Taped over supply and return vents
+			- JC oscillated fan while AS used hairdryer to encourage sublimation of dry ice (~50g in small pieces)
+			- Left rom at 11:04 once dry ice was fully sublimated
+			- [CO2] ~
+			- Upon leaving, placed towel outside of doorway underneath door
+			- Returned to room at 13:05
+		- Experiment 3
+			- 20240105_CO2ACR_0004.txt
+			- Fully covered supply and return vents
+			- Taped radiator closed
+			- JC oscillated fan while AS used hairdryer to encourage sublimation of dry ice (~50g in small pieces)
+			- Left rom at 13:22 once dry ice was fully sublimated
+			- [CO2] ~ 3600 ppm
+			- Returned to room at 14:40
+		- Experiment 4
+			- 20240105_CO2ACR_0005.txt
+			- Fully covered supply and return vents, taped radiator closed
+			- JC oscillated fan while AS used hairdryer to encourage sublimation of dry ice (~50g in small pieces)
+			- Left rom at 14:58 once dry ice was fully sublimated
+			- [CO2] ~ 2200 ppm
+			- Upon leaving, placed towel outside of doorway underneath door
+			- Returned to room at 15:00
+	- 2024-01-09
+		- Experiment 1:
+			- Taped supply and return vent closed, taped top of radiator
+			- AS Sublimated dry ice using hair dryer while JC oscillated fan
+			- Left room at 11:30 when dry ice sublimated, CO2 concentration ~ 3100 ppm
+			- Upon leaving room, placed towel under door and taped door closed
+			- Finished taping at 11:32
+			- Returned to room at 13:40
+			- Stopped log beforehand
+		- Experiment 2:
+			- Taped supply and return vent closed, taped top of radiator, upon leaving room, taped entire door shut
+			- AS Sublimated dry ice using hair dryer while JC oscillated fan
+			- Left room at 13:57 when dry ice sublimated, CO2 concentration ~ 3300 ppm
+			- Finished taping at 14:00
+	- 2024-06-17
+		- Entered C200 ~11:30
+	- 20240624
+		- In C200 ~08:10 - 08:15
