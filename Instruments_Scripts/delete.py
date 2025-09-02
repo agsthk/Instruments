@@ -85,7 +85,7 @@ insts = ["2BTech_202",
 
 data = {inst: {} for inst in insts}
 
-for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
+for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
     for file in tqdm(files):
         if file.startswith("."):
             continue
@@ -129,8 +129,8 @@ for inst in insts:
 
 #%%
 for inst, dfs in tqdm(data.items()):
-    # if inst != "2BTech_205_A": continue
-    if inst != "Picarro_G2307": continue
+    if inst != "2BTech_205_A": continue
+    # if inst != "Picarro_G2307": continue
     for date, df in tqdm(dfs.items()):
         if "UTC_DateTime" in df.columns:
             tcol1 = tcol2 = "FTC_DateTime"
@@ -144,11 +144,11 @@ for inst, dfs in tqdm(data.items()):
             join_tcol2 = "FTC_Stop_right"
             strat = "backward"
 
-        # var = "O3_ppb"
-        var = "CH2O_ppb"
+        var = "O3_ppb"
+        # var = "CH2O_ppb"
         if var not in df.columns:
             continue
-        if date.find("20250415") == -1:
+        if date.find("202501") == -1:
             continue
         df = df.filter(
             pl.col(var).is_between(-20, 300)
@@ -233,7 +233,8 @@ for inst, dfs in tqdm(data.items()):
             width=1800,
             height=500,
             invert=True,
-            s=100
+            s=100,
+            by="SamplingLocation"
             )
         scatter2 = outliers.hvplot.scatter(
             x=var,
