@@ -90,7 +90,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         if file.startswith("."):
             continue
         path = os.path.join(root, file)
-        if path.find("DAQ") != -1:
+        if path.find("DAQ") == -1:
             continue
         for inst in insts:
             if path.find(inst) != -1:
@@ -129,7 +129,8 @@ for inst in insts:
 
 #%%
 for inst, dfs in tqdm(data.items()):
-    if inst != "2BTech_405nm": continue
+    # if inst != "2BTech_205_A": continue
+    if inst != "Picarro_G2307": continue
     for date, df in tqdm(dfs.items()):
         if "UTC_DateTime" in df.columns:
             tcol1 = tcol2 = "FTC_DateTime"
@@ -143,11 +144,12 @@ for inst, dfs in tqdm(data.items()):
             join_tcol2 = "FTC_Stop_right"
             strat = "backward"
 
-        var = "NO2_ppb"
+        # var = "O3_ppb"
+        var = "CH2O_ppb"
         if var not in df.columns:
             continue
-        # if date.find("2024072") == -1:
-        #     continue
+        if date.find("20250415") == -1:
+            continue
         df = df.filter(
             pl.col(var).is_between(-20, 300)
             ).with_columns(
@@ -223,7 +225,7 @@ for inst, dfs in tqdm(data.items()):
         
         uza_starts = uza_starts.with_columns(pl.col("UZA_Start").dt.replace_time_zone(None))
         uza_stops = uza_stops.with_columns(pl.col("UZA_Stop").dt.replace_time_zone(None))
-        if uza_starts.is_empty(): continue
+        # if uza_starts.is_empty(): continue
         scatter = df.hvplot.scatter(
             x=var,
             y=tcolplot,
