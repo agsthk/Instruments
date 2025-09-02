@@ -129,7 +129,7 @@ for inst in insts:
 
 #%%
 for inst, dfs in tqdm(data.items()):
-    if inst != "2BTech_205_A": continue
+    if inst != "2BTech_405nm": continue
     for date, df in tqdm(dfs.items()):
         if "UTC_DateTime" in df.columns:
             tcol1 = tcol2 = "FTC_DateTime"
@@ -143,11 +143,11 @@ for inst, dfs in tqdm(data.items()):
             join_tcol2 = "FTC_Stop_right"
             strat = "backward"
 
-        var = "O3_ppb"
+        var = "NO2_ppb"
         if var not in df.columns:
             continue
-        if date.find("2024072") == -1:
-            continue
+        # if date.find("2024072") == -1:
+        #     continue
         df = df.filter(
             pl.col(var).is_between(-20, 300)
             ).with_columns(
@@ -223,19 +223,21 @@ for inst, dfs in tqdm(data.items()):
         
         uza_starts = uza_starts.with_columns(pl.col("UZA_Start").dt.replace_time_zone(None))
         uza_stops = uza_stops.with_columns(pl.col("UZA_Stop").dt.replace_time_zone(None))
-        
+        if uza_starts.is_empty(): continue
         scatter = df.hvplot.scatter(
             x=var,
             y=tcolplot,
             title=date,
-            width=900,
+            width=1800,
             height=500,
-            invert=True
+            invert=True,
+            s=100
             )
         scatter2 = outliers.hvplot.scatter(
             x=var,
             y=tcolplot,
-            invert=True)
+            invert=True,
+            s=100)
         lines = hv.HLines(uza_starts["UZA_Start"]) * hv.HLines(uza_stops["UZA_Stop"])
         # line = df.hvplot.line(
         #     x="d/dt",
@@ -244,53 +246,61 @@ for inst, dfs in tqdm(data.items()):
         gap1 = uza_starts.hvplot.scatter(
             x="l1",
             y=tcolplot,
-            width=900,
+            width=1800,
             height=300,
-            invert=True)
+            invert=True,
+            s=100)
         gapx = uza_starts.with_columns(
             )
         gap2 = uza_starts.hvplot.scatter(
             x="l2",
             y=tcolplot,
-            width=900,
+            width=1800,
             height=300,
-            invert=True)
+            invert=True,
+            s=100)
         gap3 = uza_stops.hvplot.scatter(
             x="l1",
             y=tcolplot,
-            width=900,
+            width=1800,
             height=300,
-            invert=True)
+            invert=True,
+            s=100)
         gap4 = uza_stops.hvplot.scatter(
             x="l2",
             y=tcolplot,
             width=900,
             height=300,
-            invert=True)
+            invert=True,
+            s=100)
         gap5 = uza_starts.hvplot.scatter(
             x="l1",
             y="UZA_Start",
-            width=900,
+            width=1800,
             height=300,
-            invert=True)
+            invert=True,
+            s=100)
         gap6 = uza_starts.hvplot.scatter(
             x="l2",
             y="UZA_Start",
-            width=900,
+            width=1800,
             height=300,
-            invert=True)
+            invert=True,
+            s=100)
         gap7 = uza_stops.hvplot.scatter(
             x="l1",
             y="UZA_Stop",
-            width=900,
+            width=1800,
             height=300,
-            invert=True)
+            invert=True,
+            s=100)
         gap8 = uza_stops.hvplot.scatter(
             x="l2",
             y="UZA_Stop",
-            width=900,
+            width=1800,
             height=300,
-            invert=True)
+            invert=True,
+            s=100)
         gaps = gap1 * gap2 * gap3 * gap4 * gap5 * gap6 * gap7 * gap8
         if tcolplot != tcol1:
             errorbars = df.hvplot.errorbars(
@@ -304,7 +314,7 @@ for inst, dfs in tqdm(data.items()):
             plot = (scatter * lines) + gaps
             
         hvplot.show(plot.cols(1))
-        
+
 #%%
 # for inst, dfs in tqdm(data.items()):
 #     if inst != "2BTech_205_A": continue
