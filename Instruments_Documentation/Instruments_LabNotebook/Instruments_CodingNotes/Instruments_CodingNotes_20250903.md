@@ -1,0 +1,27 @@
+# evaluate_timeoffset.py
+- Need to establish the time offset between the instrument and DAQ computer, as well as any instrument drift
+- Can't use the structured data because I drop the instrument times, but using some of the code from structure_rawdata.py script to read in the raw DAQ data and define both instrument and UTC times
+- Okay !
+- I have figures although I'm not sure what they mean
+	- Calculated the offset as instrument time - DAQ time
+	- Positive offset means the instrument is ahead, negative means behind
+	- ![[2BTech_205_A_DAQTimeOffset.png]]
+		- Instrument always ahead of DAQ, but by variable amount
+	- ![[2BTech_205_B_DAQTimeOffset.png]]
+		- Instrument always ahead of DAQ, but by variable amount
+	- ![[ThermoScientific_42i-TL_DAQTimeOffset_NoOutliers.png]]
+		- Instrument always behind DAQ, but by variable amount
+		- Odd outliers on 4/15, don't know what the source is, pretending they don't exist
+- The DAQ certainly seems to be drifting
+	- I have a decent idea of the drift of the 2BTech instruments (an extra 5.2e-6 seconds/second), which suggests that the DAQ offset should be slowly increasing (linearly) - not the case
+		- I think this tells me that the DAQ clock is slower than the real clock by some amount - Megan was correct about it not pinging a server
+	- The jumps are interesting - why do they do that?
+	- Straight sections in April - May are interesting and warrant a closer look for sure
+		- From ~4/8 - 5/8, 2BTech_205_A offset increases ~10 seconds
+		- Increase of ~12 seconds for 2BTech_205_B
+			- Much less scattered also? Like shows less variability over 4 hour periods
+		- Stays roughly steady for ThermoScientific_42i-TL
+			- Maybe drops back by another half second
+	- If I can account for the known change in 2B_205_A, maybe I can better characterize the DAQ drift
+		- Appears to have changed nothing?
+		- Will return to this with fresh eyes tomorrow
