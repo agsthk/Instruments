@@ -1,0 +1,220 @@
+# clean_rawdata.py
+- Before Megan meeting, need to have the Phase II sampling locations properly assigned
+- Switching from explicit declaration in script to external file read-in
+- Adding Phase II timestamps to SamplingLocation files
+- Going to plot all of the DAQ data to check timestamps
+	- 2BTech_205_A
+		- Don't have any documentation on installation which is awesome
+		- Definitely on line through 01/19
+		- 2025-01-20
+			- Restarted twice
+				- Back on 17:05:46-0700 and 17:22:55-0700
+		- O3 additions start 20250121
+		- 2025-01-27 is when other instruments installed and overflow pump turned on for first time
+			- ~11:00 - 12:00
+			- Doing something 17:07:11 - 17:24:51 (starts zeroing after?)
+				- I believe this is a result of the zeroing sequence starting on startup
+			- Zeros not in derived file!
+			- 17:24:51 - 17:45:31 - check on Picarro for better timing as possible
+			- 21:44:10 - 21:53:40 - check on Picarro for better timing as possible
+		- 2025-01-28
+			- Unrecorded zero ~01:44:20 - 01:54:10 - check on Picarro for better timing as possible
+		- 2025-01-29
+			- Something odd ~13:30, zero during "decay" drops initial UZA measurements too low, then too high when returning to real measurements - pressure?
+		- 2025-01-30
+			- ~14:20, odd spike (citrus?)
+		- 2025-02-03
+			- 09:53:54 - 12:04:14 doing flow measurements?
+			- 14:35:23 - 14:47:03 more measurements?
+			- 16:22:43 - 17:28:23 more measurements?
+			- May be the first day with leak fixed?
+		- 2025-02-06
+			- 15:17:18 - 16:26:27 more measurements?
+			- 17:30:17 odd spike and decay - citrus?
+		- 20250210
+			- 10:06:58 - 11:35:18 more measurements?
+		- 20250211
+			- 23:38:45, noise increases just before zero?
+		- 20250212
+			- 07:51:25 - 07:57:15 something odd
+			- Restarted, starts back up 09:20:42
+		- 20250213
+			- Restarted 09:18:56
+		- 20250214
+			- Peak ~10:55 that I'm not 100% about - squalene?
+		- 20250215
+			- No zeros?
+			- 14:15:31 - 14:24:51 and 14:31:21 - 14:39:21 suddenly very noisy
+		- 20250216
+			- Still no zeros
+		- 20250217
+			- Noise 08:00:00 - 08:13:20, 12:15:30 - 12:16:10
+			- Zeros restart ~14:45
+		- 20250218
+			- Maybe squalene 10:45:37?
+		- 20250219
+			- Maybe squalene 12:35:45
+		- 20250306
+			- Restarted? Back on 08:53:07
+		- 20250309
+			- Restarted? Not likely, back transmitting  ~03:00
+		- 20250312
+			- Missing zeros until ~17:45
+		- 20250318
+			- Doing periodic B203 measurements
+			- 08:54:58 - 09:05:58
+			- 09:15:18 - 09:24:38
+			- 09:34:38 - 09:44:58
+			- small elevation 10:03:18?
+		- 20250319
+			- small elevation ~10:13?
+		- 20250320
+			- Manual B203 measurements
+				- 08:32:13 - 08:42:53
+				- 08:50:43 - 09:04:03
+				- 09:13:13 - 09:23:13
+			- solenoid valve states from 09:42 - 14:34 are switching between C200 and B203
+		- 20250321
+			- Some peaks just before an O3 addition - ~15:00, ~16:00
+		- 20250327
+			- Spike ~15:57?
+		- 20250328
+			- Spike ~05:33?
+		- 20250407
+			- Spike ~ 10:25, 17:17 ?
+		- 20250415
+			- Missing data - instrument restart?
+			- 14:06:59 - 14:57:29
+		- 20250418
+			- Spike ~11:57
+		- 20250419
+			- Zeros stop after 02:55
+		- 20250424
+			- Zeros back ~11:45
+			- Spike 09:41:43
+	- ThermoScientific_42i-TL
+		- I forgot I need to deal with the odd averaging issue (1 minute average, transmitted every second, changes every 10 seconds)
+		- 2025-01-20
+			- Restarted twice
+				- Back on 17:16:35 and 17:27:35
+					- Maybe matches O3? unclear
+		- 2025-01-27
+			- Odd readings ~10:37 - 11:24
+			- Restarted, back on 16:48
+			- Doing something ~17:15 - 17:46
+			- Zeroing at 21:45 not recorded
+		- 2025-01-28
+			- Zeroing not recorded until ~13:45, but does occur before
+		- 2025-02-03
+			- Doing something (flow measurements?) 09:54:52 - 11:50
+			- Restarted, but doing something 14:35 - 14:53
+			- Restarted, back on ~16:58, maybe doing something until 17:35
+		- 2025-02-04
+			- Shut down ~08:50, back on 14:56:34 (on B203 air)
+		- 2025-02-06
+			- Shut down 11:47:41, back on 15:05:49
+			- Doing something 15:05:49 - 17:13:28
+			- Then back on TGLine
+				- Maybe back on 15:49:17
+				- Then back off? 17:12:08
+					- Best guess
+		- 2025-02-07
+			- Back on TG line 08:06:47
+		- 2025-02-10
+			- Restarted, off 10:05:12, back on 11:38:25 (flow measurements between)
+		- 2025-02-12
+			- Restarted, off 08:01:36, back on 09:23:56, noisy until like 09:36
+			- Off 15:29:33
+		- 2025-02-13
+			- On 09:20:13
+			- There's a zero off ~09:50, but no zero on?
+		- Zeros not happening after 2025-02-14 ~18:00, don't start back up until 2024-02-17
+		- 2025-02-17
+			- Zeros restart, one that isn't logged 12:31:47 - 12:35:18 ish
+		- 2025-02-27
+			- Something maybe odd 13:10:32 - 17:28:06
+		- 2025-03-06
+			- restarted 07:54:30 - 08:53:46
+		- 2025-03-09
+			- Restarted 01:59:59 - 03:00:00 ????
+		- 2025-03-12
+			- ~12:57 something odd?
+		- 2025-03-17
+			- Restarted 09:31:55 - 09:41:45
+		- 2025-03-18
+			- B203 measurements
+				- 08:54:33 - 09:06:53
+				- ~09:15 - 09:25
+				- 09:35:13 - 09:45:53
+		- 2025-03-19
+			- B203 measurements
+				- 08:32:14 - 08:43:45
+				- 08:50:34 - 09:04:45
+				- 09:13:14 - 09:23:25
+			- From 10:00 - 15:00, valve states correspond to switch between C200 and B203
+		- 2025-03-21
+			- Spikes ~13:41:44 - 13:48:16
+			- and 14:07:38 - 14:11:01
+		- 2025-04-15
+			- Missing data 13:48:52 - 14:56:57
+		- 2025-04-19 UZA stops after ~02:55
+		- 2025-04-24 UZA starts back up ~11:45
+	- Picarro_G2307
+		- Don't have data between 2025-01-17 and 2025-01-24 ?
+		- 2025-01-25
+			- Increase then drop in CH2O from ~04:45 - 20:00
+		- 2025-01-27
+			- Doing something 10:37:43 - 11:34:26, then instrument is off
+				- I think Drierite starts 11:33:46 (check H2O)
+				- I think B203 starts11:30:15
+			- Back on 16:50:55, then off 16:59:59
+		- 2025-01-28 back on 10:22:41
+		- 2025-02-03
+			- Doing something 09:56:13 - 12:02:57
+			- Doing something 14:35:29 - 14:46:54
+			- Doing something 16:24:44 - 17:28:14
+		- 2025-02-04
+			- Spikes (NOx box?) 09:01:23 - 09:02:18
+			- Maybe odd measurements 17:17:18 - 18:01:19 (there's a zero in there)
+		- 2025-02-06
+			- Doing something 15:18:40 - 16:25:53
+			- Spike 16:56:24 - 16:56:31
+		- 2025-02-07
+			- Spikes 08:07:07 - 08:07:17
+		- 2025-02-10
+			- Doing something 10:07:19 - 11:54:03
+		- 2025-02-12
+			- Spikes 08:13:44, 09:21:10, 15:30:46
+			- Shut down 15:32:19, Shift 15:30:35 - maybe UZA or B203?
+				- 15:30:35 is B203
+				- 15:31:52 is drierite
+		- 2025-02-13
+			- A solenoid valve close but no corresponding open registered?
+			- 09:51:02, registers 09:51:08
+		- 2025-03-09
+			- ~~Missing data 01:59:59~~
+			- Hey idiot it's daylight savings, there's not actually any data missing
+		- 2025-03-17
+			- Odd behavior following gap 09:28:49 - 09:42:14
+		- 2025-03-18
+			- B203 measurements
+				- 08:55:06 - 09:05:48
+				- 09:15:24 - 09:24:32
+				- 09:34:37 - 09:44:54
+		- 2025-03-20
+			- B203 measurements
+				- 08:32:18 - 08:42:57
+				- 08:50:44 - 09:04:09
+				- 09:13:18 - 09:23:08
+				- 10:00 - 15:00, solenoid valve states correspond to B203/C200 sampling
+		- 2025-04-15
+			- missing data 13:49:21 - 14:57:27
+		- 2025-05-05
+			- Shutdown prep 12:50:18, shutdown 13:03:18
+			- Based on H2O, had drierite connected 12:55:46 - 12:57:31 and again 13:02:46 through shutdown
+- Sufficiently happy with the sampling location files (I think), revising script to pull the locations from these files instead of hard coding them
+	- Using delete.py to check what I've done
+		- Looks like it worked! Slay
+- Rerunning zero characterization and calibration scripts on new cleaned data
+# evaluate_leak.py
+- Created new script to look at the ozone additions pre and post fixing the leak in the bypass pump
