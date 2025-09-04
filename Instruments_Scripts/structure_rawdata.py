@@ -203,7 +203,7 @@ def read_rawdata(path, inst, source, schema):
                            schema=schema,
                            ignore_errors=True,
                            skip_rows=1)
-    data = data.drop_nulls().with_row_index("order")
+    data = data.drop_nulls()
     return data
 
 def define_datetime(df, inst):
