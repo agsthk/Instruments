@@ -135,6 +135,29 @@ def read_picarro(path, schema):
     data = data.select(
         *rename.keys()
         ).rename(rename)
+    
+    if not data.filter(pl.col("DateTime").is_duplicated()).is_empty():
+        part_data = data.partition_by("DateTime")
+        sorted_data = []
+        prev_sv = 0
+        for df in part_data:
+            sv_values = set(df["SolenoidValves"])
+            if len(sv_values) == 1:
+                descending = False
+                if 0 in sv_values:
+                    prev_sv = 0
+                else:
+                    prev_sv = 1
+            else:
+                if prev_sv == 0:
+                    descending = False
+                else:
+                    descending = True
+                prev_sv = 0.5
+            sorted_data.append(
+                df.sort(by="SolenoidValves", descending=descending)
+                )
+        data = pl.concat(sorted_data)
     return data
     
 def read_rawdata(path, inst, source, schema):
@@ -180,7 +203,7 @@ def read_rawdata(path, inst, source, schema):
                            schema=schema,
                            ignore_errors=True,
                            skip_rows=1)
-    data = data.drop_nulls()
+    data = data.drop_nulls().with_row_index("order")
     return data
 
 def define_datetime(df, inst):
@@ -298,7 +321,7 @@ for inst in data.keys():
                 dfs.append(df)
                 continue
             dfs.append(define_datetime(df, inst))
-        concat_df = pl.concat(dfs).unique().sort("UTC_DateTime")
+        concat_df = pl.concat(dfs).unique().sort("UTC_DateTime", "order")
         if inst == "ThermoScientific_42i-TL":
             if source == "DAQ":
                 concat_df.insert_column(
@@ -311,6 +334,7 @@ for inst in data.keys():
                     pl.col("NOx_ppb").sub(pl.col("NO_ppb")).alias("NO2_ppb")
                     )
         data[inst][source] = split_by_date(concat_df)
+        
 #%%
 for inst in data.keys():
     for source in data[inst].keys():
