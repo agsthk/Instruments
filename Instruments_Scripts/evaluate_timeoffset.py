@@ -227,22 +227,6 @@ for subdir in os.listdir(RAW_DATA_DIR):
         for file in os.listdir(path2):
             path3 = os.path.join(path2, file)
             data[inst][source].append(define_datetime(read_daqdata(path3, schema), inst))
-
-for inst in data.keys():
-    for source in data[inst].keys():
-        dfs = []
-        for df in data[inst][source]:
-            
-            df = df.with_columns(
-                pl.col("Inst_UTC_DateTime")
-                .sub(pl.col("UTC_DateTime"))
-                .dt
-                .total_microseconds()
-                .truediv(1e6)
-                .alias("Offset")
-                )
-            dfs.append(df)
-        data[inst][source] = dfs
    
 for inst in data.keys():
     for source, dfs in data[inst].items():
@@ -255,9 +239,23 @@ for inst in data.keys():
             .alias("SecondsPassed")
             ).with_columns(
                 pl.col("UTC_DateTime").dt.offset_by(((pl.col("SecondsPassed").mul(5.2e-6)).cast(pl.Int64()).cast(pl.String()) + "s"))
-                )
+                ).with_columns(
+                    pl.col("UTC_DateTime").sub(pl.col("UTC_DateTime").shift(1)).dt.total_microseconds().truediv(1e6).alias("dt"),
+                    pl.col("Inst_UTC_DateTime").sub(pl.col("Inst_UTC_DateTime").shift(1)).dt.total_microseconds().truediv(1e6).alias("Inst_dt")
+                    ).with_columns(
+                        pl.col("Inst_UTC_DateTime")
+                        .sub(pl.col("UTC_DateTime"))
+                        .dt
+                        .total_microseconds()
+                        .truediv(1e6)
+                        .alias("Offset")
+                        ).with_columns(
+                            pl.col("Inst_dt")
+                            .sub(pl.col("dt"))
+                            .alias("dt_Offset")
+                            )
         data[inst][source] = df
-        
+
 #%%
 for inst in data.keys():
     for source, df in data[inst].items():
@@ -269,4 +267,23 @@ for inst in data.keys():
             height=500,
             s=1
             )
-        hvplot.show(scatter)
+        # hvplot.show(scatter)
+        dtplot = df.hvplot.scatter(
+            x="dt",
+            y="Inst_dt",
+            title=inst,
+            width=1000,
+            height=500,
+            s=20)
+        # hvplot.show(dtplot)
+        # hvplot.show(
+        #     df.hvplot.scatter(
+        #         x="UTC_DateTime",
+        #         y="dt_Offset",
+        #         title=inst,
+        #         width=1000,
+        #         height=500,
+        #         s=1
+        #         )
+        #     )
+        print(df["dt_Offset"].median())
