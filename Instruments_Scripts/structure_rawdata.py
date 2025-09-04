@@ -309,8 +309,6 @@ def split_by_date(df):
 data = {}
 
 for subdir in os.listdir(RAW_DATA_DIR):
-    if subdir == "test.yml":
-        continue
     path = os.path.join(RAW_DATA_DIR, subdir)
     for subdir2 in os.listdir(path):
         path2 = os.path.join(path, subdir2)
@@ -426,12 +424,6 @@ for inst in data.keys():
                         .then(pl.col("WarmUp").cast(pl.Int64))
                         .otherwise(pl.lit(0))
                         )
-            
-            
-        if inst == "LI-COR_LI-840A_B":
-            concat_df = concat_df.with_columns(
-                pl.selectors.contains("UTC", "FTC").dt.offset_by("-12m15s")
-                )
         if inst == "ThermoScientific_42i-TL":
             if source == "DAQ":
                 concat_df.insert_column(
