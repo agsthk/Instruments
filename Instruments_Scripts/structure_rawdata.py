@@ -9,6 +9,7 @@ import os
 import polars as pl
 import pandas as pd
 from datetime import datetime, timedelta
+import yaml
 
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
@@ -25,232 +26,25 @@ STRUCT_DATA_DIR = RAW_DATA_DIR.replace("Raw", "Structured")
 if not os.path.exists(STRUCT_DATA_DIR):
     os.makedirs(STRUCT_DATA_DIR)
 
-schemas = {
-    "2BTech_202": {
-        "Logger": {
-            "O3_ppb": pl.Float64(),
-            "CellTemp_C": pl.Float64(),
-            "CellPressure_mbar": pl.Float64(),
-            "SampleFlow_ccm": pl.Float64(),
-            "Date": pl.String(),
-            "Time": pl.String()
-            }
-        },
-    "2BTech_405nm": {
-        "SD": {
-            "NO2_ppb": pl.Float64(),
-            "NO_ppb": pl.Float64(),
-            "NOx_ppb": pl.Float64(),
-            "CellTemp_C": pl.Float64(),
-            "CellPressure_mbar": pl.Float64(),
-            "SampleFlow_ccm": pl.Float64(),
-            "O3Flow_ccm": pl.Float64(),
-            "PhotodiodeVoltage_V": pl.Float64(),
-            "O3Voltage_V": pl.Float64(),
-            "ScrubberTemp_C": pl.Float64(),
-            "ErrorByte": pl.String(),
-            "Date": pl.String(),
-            "Time": pl.String(),
-            "InstrumentStatus": pl.Int64()
-            }
-        },
-    "AdditionValves": {
-        "Igor": {
-            "IgorTime": pl.Int64(),
-            "Date": pl.String(),
-            "Time": pl.String(),
-            "SetPosition": pl.String(),
-            "ReadVoltage_V": pl.Float64(),
-            "ReadPosition": pl.String()
-            }
-        },
-    "Aranet4_1F16F": {
-        "Logger": {
-            "DateTime": pl.String(),
-            "CO2_ppm": pl.Float64(),
-            "RoomTemp_C": pl.Float64(),
-            "RoomRH_percent": pl.Float64(),
-            "AtmosphericPressure_hPa": pl.Float64()
-            }
-        },
-    "LI-COR_LI-840A_A": {
-        "Logger": {
-            "Date": pl.String(),
-            "Time": pl.String(),
-            "CO2_ppm": pl.Float64(),
-            "H2O_ppt": pl.Float64(),
-            "H2O_C": pl.Float64(),
-            "CellTemp_C": pl.Float64(),
-            "CellPressure_kPa": pl.Float64(),
-            "CO2Absorption": pl.Float64(),
-            "H2OAbsorption": pl.Float64()
-            }
-        },
-    "Picarro_G2307": {
-        "Logger": {
-            "ALARM_STATUS": pl.Float64(),
-            "CH4": pl.Float64(),
-            "CavityPressure": pl.Float64(),
-            "CavityTemp": pl.Float64(),
-            "DATE_TIME": pl.Float64(),
-            "DasTemp": pl.Float64(),
-            "EPOCH_TIME": pl.Float64(),
-            "EtalonTemp": pl.Float64(),
-            "FRAC_DAYS_SINCE_JAN1": pl.Float64(),
-            "FRAC_HRS_SINCE_JAN1": pl.Float64(),
-            "H2CO": pl.Float64(),
-            "H2CO_2min": pl.Float64(),
-            "H2CO_30s": pl.Float64(),
-            "H2CO_5min": pl.Float64(),
-            "H2O": pl.Float64(),
-            "INST_STATUS": pl.Float64(),
-            "JULIAN_DAYS": pl.Float64(),
-            "MPVPosition": pl.Float64(),
-            "OutletValve": pl.Float64(),
-            "WarmBoxTemp": pl.Float64(),
-            "solenoid_valves": pl.Float64(),
-            "species": pl.Float64()
-            },
-        "DAQ": {
-            "UnixTime": pl.Float64(),
-            "CavityPressure_Torr": pl.Float64(),
-            "CavityTemp_C": pl.Float64(),
-            "DASTemp_C": pl.Float64(),
-            "EtalonTemp_C": pl.Float64(),
-            "WarmBoxTemp_C": pl.Float64(),
-            "Species": pl.Float64(),
-            "MPVPosition": pl.Float64(),
-            "OutletValve_DN": pl.Float64(),
-            "SolenoidValves": pl.Float64(),
-            "CH2O_ppb": pl.Float64(),
-            "CH2O_30s_ppb": pl.Float64(),
-            "CH2O_2min_ppb": pl.Float64(),
-            "CH2O_5min_ppb": pl.Float64(),
-            "H2O_percent": pl.Float64(),
-            "CH4_ppm": pl.Float64(),
-            "YMD": pl.Float64(),
-            "HMS": pl.Float64(),
-            "UTC_DateTime": pl.Datetime(time_zone="UTC"),
-            "WarmUp": pl.Int64()
-            }
-        },
-    "Teledyne_N300": {
-        "Logger": {
-            "FTC_DateTime": pl.String(),
-            "DateTime": pl.String(),
-            "AtmosphericPressure_Pa": pl.Float64(),
-            "BenchTemp_C": pl.Float64(),
-            "BoxTemp_C": pl.Float64(),
-            "CO_ppm": pl.Float64(),
-            "COStability_ppm": pl.Float64(),
-            "DetectorTemp_C": pl.Float64(),
-            "PeakIRMeasure_MV": pl.Float64(),
-            "PeakIRReference_MV": pl.Float64(),
-            "PHTDrive_mV": pl.Float64(),
-            "PumpDutyCycle": pl.Float64(),
-            "PumpFlow_ccm": pl.Float64(),
-            "SamplePressure_inHg": pl.Float64(),
-            "SampleTemp_C": pl.Float64(),
-            "WheelTemp_C": pl.Float64()
-            }
-        },
-    "TempRHDoor": {
-        "Igor": {
-            "IgorTime": pl.Int64(),
-            "Date": pl.String(),
-            "Time": pl.String(),
-            "Ch0Voltage_V": pl.Float64(),
-            "RoomTemp_C": pl.Float64(),
-            "Ch1Voltage_V": pl.Float64(),
-            "RoomRH_percent": pl.Float32(),
-            "TC3Temp_C": pl.Float64(),
-            "TC5Tempe_C": pl.Float64(),
-            "TC7Temp_C": pl.Float64(),
-            "DoorStatus": pl.Int64()
-            }
-        },
-    "ThermoScientific_42i-TL": {
-        "Logger": {
-            "Time": pl.String(),
-            "Date": pl.String(),
-            "Flags": pl.String(),
-            "NO_ppb": pl.Float64(),
-            "NOx_ppb": pl.Float64(),
-            "HighNO": pl.Int64(),
-            "HighNOx": pl.Int64(),
-            "ChamberPressure_mmHg": pl.Float64(),
-            "PMTTemp_C": pl.Float64(),
-            "InternalTemp_C": pl.Float64(),
-            "ChamberTemp_C": pl.Float64(),
-            "NO2ConverterTemp_C": pl.Float64(),
-            "SampleFlow_LPM": pl.Float64(),
-            "O3Flow_LPM": pl.Float64(),
-            "PMTVoltage_V": pl.Float64()
-            },
-        "DAQ": {
-            "Time": pl.String(),
-            "Date": pl.String(),
-            "Flags": pl.String(),
-            "NO_ppb": pl.Float64(),
-            "NO2_ppb": pl.Float64(),
-            "ChamberTemp_C": pl.Float64(),
-            "PMTVoltage_V": pl.Float64(),
-            "InternalTemp_C": pl.Float64(),
-            "ChamberPressure_mmHg": pl.Float64(),
-            "SampleFlow_LPM": pl.Float64(),
-            "O3Flow_LPM": pl.Float64(),
-            "UTC_DateTime": pl.Datetime(time_zone="UTC"),
-            "WarmUp": pl.Int64()
-            }
-        }
-    }
+PARAM_DIR = os.path.join(data_dir, "Instruments_ManualData", "Instruments_RawDataParameters")
 
-schemas["2BTech_202"]["SD"] = schemas["2BTech_202"]["Logger"]
-schemas["2BTech_202"]["DAQ"] = (
-    schemas["2BTech_202"]["Logger"]
-    | {"UTC_DateTime": pl.Datetime(time_zone="UTC"),
-       "WarmUp": pl.Int64()}
-    )
-schemas["2BTech_205_A"] = schemas["2BTech_205_B"] = schemas["2BTech_202"]
-schemas["Aranet4_1FB20"] = schemas["Aranet4_1F16F"]
-schemas["LI-COR_LI-840A_B"] = schemas["LI-COR_LI-840A_A"]
+schemas = {}
+date_fmts = {}
+time_fmts = {}
+datetime_fmts = {}
+timezones = {}
 
-date_fmts = {"2BTech_202": "%d/%m/%y",
-             "AdditionValves": "%Y/%m/%d",
-             "LI-COR_LI-840A_A": "%Y-%m-%d",
-             "TempRHDoor": "%Y-%m-%d",
-             "ThermoScientific_42i-TL": "%m-%d-%y"}
-
-for inst in ["2BTech_205_A", "2BTech_205_B", "2BTech_405nm"]:
-    date_fmts[inst] = date_fmts["2BTech_202"]
-date_fmts["LI-COR_LI-840A_B"] = date_fmts["LI-COR_LI-840A_A"]
-
-
-time_fmts = {"2BTech_202": "%H:%M:%S",
-             "ThermoScientific_42i-TL": "%H:%M"}
-
-for inst in ["2BTech_205_A", "2BTech_205_B", "2BTech_405nm",
-             "AdditionValves", "LI-COR_LI-840A_A", "LI-COR_LI-840A_B",
-             "TempRHDoor"]:
-    time_fmts[inst] = time_fmts["2BTech_202"]
-    
-datetime_fmts = {"Aranet4_1F16F": "%d/%m/%Y %H:%M:%S",
-                 "Teledyne_N300": "%m/%d/%Y %H:%M:%S"}
-datetime_fmts["Aranet4_1FB20"] = datetime_fmts["Aranet4_1F16F"]
-
-timezones = {"2BTech_202": "MST",
-             "2BTech_205_A": "MST",
-             "2BTech_205_B": "MST",
-             "2BTech_405nm": "MST",
-             "AdditionValves": "America/Denver",
-             "Aranet4_1F16F": "America/Denver",
-             "Aranet4_1FB20": "America/Denver",
-             "LI-COR_LI-840A_A": "America/Denver",
-             "LI-COR_LI-840A_B": "America/Denver",
-             "Picarro_G2307": "UTC",
-             "Teledyne_N300": "UTC", # NOT ALWAYS TRUE
-             "TempRHDoor": "America/Denver",
-             "ThermoScientific_42i-TL": "MST"}
+for param_file in os.listdir(PARAM_DIR):
+    inst = param_file.rsplit("_", 1)[0]
+    param_path = os.path.join(PARAM_DIR, param_file)
+    with open(param_path, "r") as file:
+        params = yaml.load(file, Loader=yaml.Loader)
+    if "datetime_format" in params.keys():
+        datetime_fmts[inst] = params["datetime_format"]
+    elif "date_format" in params.keys():
+        date_fmts[inst] = params["date_format"]
+        time_fmts[inst] = params["time_format"]
+    timezones[inst] = params["timezone"]
 
 avg_times = {
     "2BTech_202": {
