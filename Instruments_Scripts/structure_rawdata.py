@@ -47,52 +47,6 @@ for param_file in os.listdir(PARAM_DIR):
         time_fmts[inst] = params["time_format"]
     timezones[inst] = params["timezone"]
 
-avg_times = {
-    "2BTech_202": {
-        "2024-01-18 20:39:16+00:00": "10s",
-        "2024-01-19 23:05:11+00:00": "60s"
-        },
-    "2BTech_205_A": {
-        "2022-09-30 18:49:04+00:00": "10s",
-        "2024-01-20 02:54:18+00:00": "60s",
-        "2024-01-19 17:22:26+00:00": "10s",
-        "2024-01-19 23:05:18+00:00": "60s",
-        "2024-03-11 19:27:01+00:00": "2s",
-        "2024-03-11 23:30:47+00:00": "60s",
-        "2024-06-04 16:21:24+00:00": "2s",
-        "2024-06-04 19:01:29+00:00": "60s",
-        "2024-06-05 21:11:14+00:00": "2s",
-        "2024-06-11 14:03:39+00:00": "60s",
-        "2025-01-15 16:04:20+00:00": "10s"
-        },
-    "2BTech_205_B": {
-        "2023-05-12 03:50:59+00:00": "10s",
-        "2024-06-04 18:52:23+00:00": "2s",
-        "2024-06-10 20:39:53+00:00": "60s",
-        "2025-01-15 17:17:42+00:00": "10s",
-        },
-    "2BTech_405nm": {
-        "2024-01-17 18:38:28+00:00": "60s",
-        "2024-01-19 20:44:52+00:00": "5s",
-        "2024-02-01 22:30:59+00:00": "60s",
-        "2024-06-05 21:11:35+00:00": "5s",
-        "2024-06-11 14:04:55+00:00": "60s",
-        "2024-06-25 18:31:08+00:00": "5s",
-        "2024-06-25 21:09:43+00:00": "60s",
-        "2024-07-02 15:42:36+00:00": "5s",
-        "2024-07-02 20:17:40+00:00": "60s",
-        },
-    "Aranet4_1F16F": {
-        "2025-03-21 02:14:00+00:00": "60s"
-        },
-    "Aranet4_1FB20": {
-        "2025-03-21 02:15:00+00:00": "60s"
-        },
-    "ThermoScientific_42i-TL": {
-        "2024-01-19 17:39:00+00:00": "60s"
-        }
-    }
-
 def read_daqdata(path, schema): 
     data = pl.read_csv(path,
                        has_header=False,
@@ -344,86 +298,7 @@ for inst in data.keys():
                 dfs.append(df)
                 continue
             dfs.append(define_datetime(df, inst))
-        data[inst][source] = dfs
-
-for inst in data.keys():
-    for source in data[inst].keys():
-        concat_df = pl.concat(data[inst][source]).unique().sort("UTC_DateTime")
-        if inst in avg_times.keys():
-            for start, avg_time in avg_times[inst].items():
-                if "UTC_Start" not in concat_df.columns:
-                    concat_df = concat_df.select(
-                        pl.when(
-                            pl.col("UTC_DateTime").ge(
-                                datetime.fromisoformat(start)
-                                )
-                            )
-                        .then(
-                            pl.col("UTC_DateTime").dt.offset_by("-" + avg_time)
-                            ).alias("UTC_Start"),
-                        pl.exclude("UTC_Start")
-                        )
-                    continue
-                concat_df = concat_df.select(
-                    pl.when(
-                        pl.col("UTC_DateTime").ge(
-                            datetime.fromisoformat(start)
-                            )
-                        )
-                    .then(
-                        pl.col("UTC_DateTime").dt.offset_by("-" + avg_time)
-                        )
-                    .otherwise(
-                        pl.col("UTC_Start")
-                        ).alias("UTC_Start"),
-                    pl.exclude("UTC_Start")
-                    )
-            concat_df = concat_df.select(
-                pl.col("UTC_Start"),
-                pl.col("UTC_DateTime").alias("UTC_Stop"),
-                pl.col("UTC_Start").dt.convert_time_zone("America/Denver").alias("FTC_Start"),
-                pl.col("FTC_DateTime").alias("FTC_Stop"),
-                pl.exclude("UTC_Start", "UTC_DateTime", "FTC_DateTime")
-                )
-        if source != "DAQ" and inst in ["2BTech_202", "2BTech_205_A",
-                                        "2BTech_205_B", "2BTech_405nm",
-                                        "LI-COR_LI-840A", "LI-COR_LI-840B",
-                                        "Picarro_G2307",
-                                        "ThermoScientific_42i-TL"]:
-            if "UTC_Start" not in concat_df.columns:
-                concat_df = concat_df.with_columns(
-                    pl.col("UTC_DateTime").sub(pl.col("UTC_DateTime").shift(1)).alias("Gap"),
-                    pl.lit(timedelta(seconds=60)).alias("AvgT")
-                    )
-                left_on = "UTC_DateTime"
-            else:
-                concat_df = concat_df.with_columns(
-                    pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(1)).alias("Gap"),
-                    pl.col("UTC_Stop").sub(pl.col("UTC_Start")).alias("AvgT")
-                    )
-                left_on = "UTC_Stop"
-            logstart = concat_df.filter(
-                (pl.col("Gap").gt(pl.col("AvgT").add(timedelta(seconds=10)))
-                | pl.col("Gap").gt((pl.col("AvgT").add(timedelta(seconds=10))).shift(1))
-                | pl.col("Gap").is_null())
-                ).select(
-                    pl.col(left_on).alias("LogStart")
-                    )
-            concat_df = concat_df.join_asof(
-                logstart,
-                left_on=left_on,
-                right_on="LogStart",
-                strategy="backward"
-                ).select(
-                    pl.exclude("Gap", "AvgT", "LogStart"),
-                    pl.col(left_on).sub(pl.col("LogStart"))
-                    .dt.total_microseconds().truediv(1e6).mul(-1).add(600)
-                    .alias("WarmUp")
-                    ).with_columns(
-                        pl.when(pl.col("WarmUp").gt(0))
-                        .then(pl.col("WarmUp").cast(pl.Int64))
-                        .otherwise(pl.lit(0))
-                        )
+        concat_df = pl.concat(dfs).unique().sort("UTC_DateTime")
         if inst == "ThermoScientific_42i-TL":
             if source == "DAQ":
                 concat_df.insert_column(
