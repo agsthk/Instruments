@@ -45,7 +45,7 @@ for root, dirs, files in os.walk(STRUCT_DATA_DIR):
 # Concatenates all Picarro G2307 valve state LazyFrames
 valve_states = pl.concat(valve_states).sort(
     # Sorts so that rows with rounded DateTimes are appropriately ordered
-    by=["UTC_DateTime", "SolenoidValves"]
+    by="UTC_DateTime"
     ).collect().with_columns(
         # Assigns a new sampling interval at every SolenoidValves value change
         pl.col("SolenoidValves").rle_id().alias("intv")
