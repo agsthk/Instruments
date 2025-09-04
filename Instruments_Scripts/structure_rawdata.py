@@ -39,6 +39,7 @@ for param_file in os.listdir(PARAM_DIR):
     param_path = os.path.join(PARAM_DIR, param_file)
     with open(param_path, "r") as file:
         params = yaml.load(file, Loader=yaml.Loader)
+    schemas[inst] = params["schemas"]
     if "datetime_format" in params.keys():
         datetime_fmts[inst] = params["datetime_format"]
     elif "date_format" in params.keys():
@@ -443,7 +444,7 @@ for inst in data.keys():
                     pl.col("NOx_ppb").sub(pl.col("NO_ppb")).alias("NO2_ppb")
                     )
         data[inst][source] = split_by_date(concat_df)
-
+#%%
 for inst in data.keys():
     for source in data[inst].keys():
         for date, df in data[inst][source].items():
