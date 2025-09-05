@@ -205,9 +205,12 @@ for inst, df in sampling_locs.items():
                     .alias("SamplingLocation")
                     )]
         ).sort(by="UTC_Start")
-    sampling_locs[inst] = temp_locs.with_columns(
-        pl.col("UTC_Start").dt.offset_by("20s"),
-        pl.col("UTC_Stop").dt.offset_by("-20s")
+    sampling_locs[inst] = temp_locs
+    
+for inst, df in sampling_locs.items():
+    sampling_locs[inst] = df.with_columns(
+        pl.col("UTC_Start").dt.offset_by("60s"),
+        pl.col("UTC_Stop").dt.offset_by("-60s")
         )
 
 #%%
