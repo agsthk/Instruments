@@ -352,6 +352,11 @@ def define_warmup(df, inst):
             ).select(
                 pl.col("UTC_DateTime").alias("LogStart")
                 )
+    else:
+        df = df.with_columns(
+            pl.lit(0).alias("WarmUp")
+            )
+        return df
     df = df.join_asof(
         log_start,
         left_on="UTC_DateTime",
@@ -367,8 +372,6 @@ def define_warmup(df, inst):
                 .otherwise(pl.lit(0))
                 )
     return df
-
-define_warmup(data["ThermoScientific_42i-TL"]["Logger"], "ThermoScientific_42i-TL")
 
 #%%
 dfs = split_by_date(df)
