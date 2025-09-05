@@ -334,12 +334,13 @@ for inst in data.keys():
         
 #%%
 
-df = data["2BTech_205_A"]["Logger"].with_columns(
+df = data["Picarro_G2307"]["Logger"].with_columns(
     pl.col("UTC_DateTime").sub(pl.col("UTC_DateTime").shift(1)).alias("dt")
     )
 
 log_start = df.filter(
     pl.col("dt").ge(pl.duration(minutes=3))
+    | pl.col("dt").is_null()
     ).select(
         pl.col("UTC_DateTime").alias("LogStart")
         )
@@ -358,8 +359,23 @@ df = df.join_asof(
             .then(pl.col("WarmUp").cast(pl.Int64))
             .otherwise(pl.lit(0))
             )
-
-
+#%%
+dfs = split_by_date(df)
+import hvplot.polars
+for date, d in dfs.items():
+    d = d.with_columns(
+        pl.when(pl.col("WarmUp").eq(0))
+        .then(pl.lit("Warm"))
+        .otherwise(pl.lit("NotWarm"))
+        .alias("Warm"))
+    hvplot.show(
+        d.hvplot.scatter(
+            x="UTC_DateTime",
+            y="CH2O_ppb",
+            by="Warm",
+            title=date
+            )
+        )
 
 #%%
 for inst in data.keys():
