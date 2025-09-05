@@ -214,6 +214,64 @@ for inst, df in sampling_locs.items():
         )
 
 #%%
+
+avg_times = {
+    "2BTech_202": {
+        "2024-01-18 20:39:16+00:00": "10s",
+        "2024-01-19 23:05:11+00:00": "60s"
+        },
+    "2BTech_205_A": {
+        "2022-09-30 18:49:04+00:00": "10s",
+        "2024-01-20 02:54:18+00:00": "60s",
+        "2024-01-19 17:22:26+00:00": "10s",
+        "2024-01-19 23:05:18+00:00": "60s",
+        "2024-03-11 19:27:01+00:00": "2s",
+        "2024-03-11 23:30:47+00:00": "60s",
+        "2024-06-04 16:21:24+00:00": "2s",
+        "2024-06-04 19:01:29+00:00": "60s",
+        "2024-06-05 21:11:14+00:00": "2s",
+        "2024-06-11 14:03:39+00:00": "60s",
+        "2025-01-15 16:04:20+00:00": "10s"
+        },
+    "2BTech_205_B": {
+        "2023-05-12 03:50:59+00:00": "10s",
+        "2024-06-04 18:52:23+00:00": "2s",
+        "2024-06-10 20:39:53+00:00": "60s",
+        "2025-01-15 17:17:42+00:00": "10s",
+        },
+    "2BTech_405nm": {
+        "2024-01-17 18:38:28+00:00": "60s",
+        "2024-01-19 20:44:52+00:00": "5s",
+        "2024-02-01 22:30:59+00:00": "60s",
+        "2024-06-05 21:11:35+00:00": "5s",
+        "2024-06-11 14:04:55+00:00": "60s",
+        "2024-06-25 18:31:08+00:00": "5s",
+        "2024-06-25 21:09:43+00:00": "60s",
+        "2024-07-02 15:42:36+00:00": "5s",
+        "2024-07-02 20:17:40+00:00": "60s",
+        },
+    "Aranet4_1F16F": {
+        "2025-03-21 02:14:00+00:00": "60s"
+        },
+    "Aranet4_1FB20": {
+        "2025-03-21 02:15:00+00:00": "60s"
+        },
+    "ThermoScientific_42i-TL": {
+        "2024-01-19 17:39:00+00:00": "60s"
+        }
+    }
+
+for inst, times in avg_times.items():
+    avg_times[inst] = pl.DataFrame(times).transpose(
+        include_header=True,
+        header_name="UTC_Start",
+        column_names=["AvgT"]
+        ).sort(
+            by="UTC_Start"
+            ).with_columns(
+                pl.col("UTC_Start").str.to_datetime()
+                ).lazy()
+#%%
 data = {inst: {} for inst in insts}
 
 for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
@@ -234,6 +292,20 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
             pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
             )
+        if inst in avg_times.keys():
+            lf = lf.join_asof(
+                avg_times[inst],
+                left_on="UTC_DateTime",
+                right_on="UTC_Start",
+                strategy="backward"
+                )
+            lf = lf.select(
+                pl.col("UTC_DateTime").dt.offset_by("-" + pl.col("AvgT")).alias("UTC_Start"),
+                pl.col("UTC_DateTime").alias("UTC_Stop"),
+                pl.col("FTC_DateTime").dt.offset_by("-" + pl.col("AvgT")).alias("FTC_Start"),
+                pl.col("FTC_DateTime").alias("FTC_Stop"),
+                pl.exclude("UTC_DateTime", "FTC_DateTime", "UTC_Start", "AvgT")
+                )
         if inst in sampling_locs.keys():
             if "UTC_DateTime" in lf.collect_schema().names():
                 on = "UTC_DateTime"
@@ -261,7 +333,8 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             lf = lf.filter(
                 pl.col("WarmUp").eq(0)
                 ).select(
-                    pl.exclude("WarmUp"))
+                    pl.exclude("WarmUp")
+                    )
         if inst == "ThermoScientific_42i-TL":
             lf = lf.filter(
                 pl.col("SampleFlow_LPM").gt(0.5)
@@ -328,7 +401,8 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                     )
         if inst == "2BTech_205_B":
             lf = lf.filter(
-                pl.col("O3_ppb").is_between(-5, 200))
+                pl.col("O3_ppb").is_between(-5, 200)
+                )
         lf = lf.select(
             pl.exclude("Sampling_Stop")
             )
