@@ -333,6 +333,35 @@ for inst in data.keys():
         data[inst][source] = concat_df
         
 #%%
+
+df = data["2BTech_205_A"]["Logger"].with_columns(
+    pl.col("UTC_DateTime").sub(pl.col("UTC_DateTime").shift(1)).alias("dt")
+    )
+
+log_start = df.filter(
+    pl.col("dt").ge(pl.duration(minutes=3))
+    ).select(
+        pl.col("UTC_DateTime").alias("LogStart")
+        )
+
+df = df.join_asof(
+    log_start,
+    left_on="UTC_DateTime",
+    right_on="LogStart",
+    strategy="backward"
+    ).select(
+        pl.exclude("dt", "LogStart"),
+        pl.col("UTC_DateTime").sub(pl.col("LogStart")).dt.total_microseconds().truediv(1e6).mul(-1).add(600)
+        .alias("WarmUp")
+        ).with_columns(
+            pl.when(pl.col("WarmUp").gt(0))
+            .then(pl.col("WarmUp").cast(pl.Int64))
+            .otherwise(pl.lit(0))
+            )
+
+
+
+#%%
 for inst in data.keys():
     for source in data[inst].keys():
         for date, df in data[inst][source].items():
