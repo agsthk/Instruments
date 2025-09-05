@@ -1,0 +1,40 @@
+# structure_rawdata.py
+- Continuing work on identifying log starts
+- To be honest, I'm not sure that log starts need to be identified for any instrument other than Thermo
+	- Potentially the 2B instruments - but those can just be based on if it's a new log or not
+- New idea!
+	- For Thermo, identify log start any time the gap is > 1 minute
+	- For 2B, identify log start based on the actual start of the log
+		- Using with_row_index when the log is read in, and identifying the log start by that value being zero
+	- Picarro doesn't necessarily need a WarmUp column, but maybe I'll just make one anyway that is all zeros?
+		- Doing this for all instruments that aren't Thermo or 2BTech
+			- Can adjust as necessary, but I don't think it will be
+- I believe I have changed everything I intended to in this script - moving on to changes in cleaning
+# clean_rawdata.py
+- Changes that need to be made:
+	- Need to incorporate averaging time determination
+	- Need to address time offsets
+		- A whole nother can of worms - maybe hold off on this?
+	- Need to handle the changes in date that come with these revisions
+- Beyond the changes, I need to ensure that the SamplingLocation determination is accurate and complete
+- Averaging times
+	- Going to change how I was originally doing this and instead do a join_asof to determine averaging time for each entry
+	- Running into an issue where there are duplicate rows in 2BTech_205_A data on 20240119 - what's the source of this?
+		- Not sure - but it has to be a problem in structure_rawdata.py - need to return there later
+	- Use of join_asof was successful
+- Time offsets
+	- A Challenge
+	- I'm not yet confident in what the time offsets are (aside from the vent CO2 monitor), so I don't know that I want to do this quite yet
+	- Not relevant for Phase II data - come back later
+- Date changes
+	- Basically my idea is that I identify the logs that start on a different date and append them to the other date if it exists or otherwise create a new file for that date?
+	- I don't want to read all of them in and concatenate again
+	- Perhaps for now I just split based on stop time?
+		- This won't work well for the ICARTT files though
+	- Essentially, I am repartitioning the DataFrames by the start date where applicable, then I am adding the improperly dated entries to a wrong_dates dict
+		- This will be rewritten for each new source
+		- Will contain all of the rows that are improperly dated for all files from the given source
+	- First, data will be written to CSV with wrong dates removed - they will not be in any data file initially
+	- Then, for each mis-dated dataframe, I will read in the proper date file, concatenate it with the improperly identified one, and rewrite it to the same original file
+		- Kind of a lot of work but whatever
+	- I think this implementation is going to be challenging given I have zero comments and I don't know what the script does, but I'm sure I can manage it - tomorrow though, I want to be done for today :)
