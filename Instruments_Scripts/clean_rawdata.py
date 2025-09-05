@@ -179,6 +179,8 @@ sampling_locs["TGLine"] = pl.concat([
     ]).sort(by="UTC_Start")
 
 for inst, df in sampling_locs.items():
+    if "TGLine" not in df["SamplingLocation"]:
+        continue
     temp_locs = pl.concat(
         [sampling_locs[inst].filter(
             ~pl.col("SamplingLocation").eq("TGLine")
@@ -204,10 +206,11 @@ for inst, df in sampling_locs.items():
                     )]
         ).sort(by="UTC_Start")
     sampling_locs[inst] = temp_locs.with_columns(
-        pl.col("UTC_Start").dt.offset_by("60s"),
-        pl.col("UTC_Stop").dt.offset_by("-60s")
+        pl.col("UTC_Start").dt.offset_by("20s"),
+        pl.col("UTC_Stop").dt.offset_by("-20s")
         )
 
+#%%
 data = {inst: {} for inst in insts}
 
 for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
