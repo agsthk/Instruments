@@ -224,7 +224,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         for inst in insts:
             if path.find(inst) != -1:
                 break
-        if inst == "ThermoScientific_42i-TL" and path.find(inst) == -1:
+        if path.find(inst) == -1:
             continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
