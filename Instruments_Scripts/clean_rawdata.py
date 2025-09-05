@@ -271,8 +271,34 @@ for inst, times in avg_times.items():
             ).with_columns(
                 pl.col("UTC_Start").str.to_datetime()
                 ).lazy()
-#%%
+
 data = {inst: {} for inst in insts}
+
+#%%
+wrong_dates = {}
+for date, df in data["2BTech_202"].items():
+    df = df.with_columns(
+        pl.col("FTC_Start").dt.strftime("%Y%m%d").alias("Date")
+        )
+    dfs = {key[0]: d for key, d in df.partition_by(
+        "Date", as_dict=True, include_key=False
+        ).items()}
+    
+    wrong_date_keys = [d for d in dfs.keys() if d != date]
+    for key in dfs.keys():
+        if key == date:
+            continue
+        if key in wrong_dates.keys():
+            wrong_dates[key] = pl.concat(
+                [wrong_dates[key],
+                 dfs[key]]
+                )
+        else:
+            wrong_dates[key] = dfs[key]
+    df = dfs[date]
+                     
+                     
+#%%
 
 for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
     for file in tqdm(files):
