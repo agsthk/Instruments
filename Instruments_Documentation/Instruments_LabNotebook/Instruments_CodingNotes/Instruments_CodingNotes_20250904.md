@@ -1,0 +1,73 @@
+# evaluate_timeoffset.py
+- An idea I had yesterday was to check the dt values of the instrument versus the DAQ and see how the averaging time/frequency/whatever compares
+	- 2BTech_205_A
+		- Sporadic occasions where DAQ gap is 1 second longer than instrument gap
+		- Also some (but fewer) instances where DAQ gap is 1 second shorter
+		- In general, the difference is less than 0.03 seconds in either direction
+		- Median offset is 0.00319 seconds longer for instrument gap
+	- 2BTech_205_B
+		- Sporadic occasions where DAQ gap is 1 second longer than instrument gap
+		- Median offset is 0.0160 seconds longer for instrument gap
+		- In general, difference less than 0.05 seconds in either direction
+	- ThermoScientific_42i-TL
+		- Sporadic occasions where DAQ gap is 1 second longer than instrument gap
+		- Median offset is 0.000228 seconds shorter for instrument gap
+		- In general, difference less than 0.5 seconds in either direction
+	- The differences between consecutive timestamps do vary by up to a second, but in general are centered around zero
+- I think there's a fair amount more to do here, but I think it should come a little later
+	- Main concern is that instruments are synchronized, even if they aren't exactly on real time - DAQ ensures this
+	- Do not need to correct times for any of the Phase II data!!!
+# structure_rawdata.py
+- A few changes I'd like to make on this
+	- Remove time offset correction (will go in cleaning script)
+	- Remove averaging time handling (will go in cleaning script)
+	- Handle problems with the Picarro data when it has the time repeating for consecutive entries, as they end up out of order and give problems with the solenoid valve interpretation (and log start!)
+	- Adjust log start determination (for Picarro)
+	- Put hard-coded information into YAML files
+- YAML files
+	- Need schemas, date/time/datetime formats, timezone information, column renaming information for Picarro
+		- Trying to think about how to handle multiple possible schemas
+		- Could I use multiple YAML files for each instrument?
+			- I mean yes, but is this my best option?
+	- Created one YAML file per instrument, information is entered in a way so as to replicate the hard-coded dictionaries
+	- Checked that the code still runs after this change and it does
+- Removing time stuff
+	- Mostly this is a matter of deleting extra information and revising the script to define datetimes to not consider averaging time
+		- I actually just realized that the log start definition uses the averaging time - what do I do?
+			- Figure out later
+	- For now, removing code that handles averaging times and time offsets, as well as information to go along with it
+- Fixing Picarro issues
+	- I suspect the Picarro issues arise from the sorting by UTC_DateTime when they repeat
+	- I wonder if I can create an order column when read in?
+		- This seems like it might cause more problems than it's worth - secondary sort by Solenoid Valve?
+		- This likely won't work for the valve off - would go 1 from previous datetime to 0 back up to 1, so that would make it seem like it turned back on even though it didn't
+		- An order column may be the best option actually
+			- I can do it for just the Picarro read in!
+				- Actually will do it for all of them, because otherwise I worry that sorting will be overly complicated
+		- Created an "order" index 
+		- This didn't work at all :/
+		- Maybe! I partition by the datetime, sort each subset, then do something fancy to concatenate?
+			- This is the best approach I think
+			- Partition by datetime, then depending on if previous partitioned df has solenoid valve values of 0 or 1, sort in ascending or descending order, then reconcatenate with all of them appropriately sorted
+			- Beautiful this worked - now how to implement?
+				- Not on the concatenated dataframe that's for sure! Takes too long!
+				- Perhaps check if there are repeat times?
+					- This is it
+	- Implemented sorting into read_picarro function and confirmed that it worked as expected
+- At this state, ran exporting function to create structured data with
+	- No averaging times or offset
+	- Properly sorted Picarro data
+# interpret_solenoidvalve.py
+- Ran interpret_solenoidvalve.py to correct errors from previously unsorted data
+- Changed sorting in this script to not sort by the solenoid valve value, as that messes up the order
+	- From a quick look at the updated valve state file, this change was effective!
+# structure_rawdata.py
+- I need to establish when new logs start using a different method that does not rely on averaging time - how to do so?
+- I believe I can use the time gaps still, I just need to think about what I am comparing them to
+- The plan was to maybe use a rolling median, but it is taking forever to calculate so I'm not sure that's the best move
+- This is surprisingly difficult
+	- If not for the Picarro repeat times, it would be quite straightforward
+	- Maybe I just set a hard cutoff of 3 minutes?
+	- Or I do a check on the difference between consecutive ones?
+		- Wherever it changes by a certain amount, call that a log start? I'm not sure
+	- Right now, just setting hard cutoff
