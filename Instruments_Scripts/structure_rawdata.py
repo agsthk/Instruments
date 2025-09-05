@@ -269,6 +269,44 @@ def define_datetime(df, inst):
         
     return df
 
+def define_warmup(df, inst):
+    if inst.find("2BTech") != -1:
+        log_start = df.filter(
+            pl.col("LogNumber").eq(0)
+            ).select(
+                pl.col("UTC_DateTime").alias("LogStart")
+                )
+    elif inst == "ThermoScientific_42i-TL":
+        df = df.with_columns(
+            pl.col("UTC_DateTime").sub(pl.col("UTC_DateTime").shift(1)).alias("dt")
+            )
+        log_start = df.filter(
+            pl.col("dt").ge(pl.duration(seconds=90))
+            | pl.col("dt").is_null()
+            ).select(
+                pl.col("UTC_DateTime").alias("LogStart")
+                )
+    else:
+        df = df.with_columns(
+            pl.lit(0).alias("WarmUp")
+            )
+        return df
+    df = df.join_asof(
+        log_start,
+        left_on="UTC_DateTime",
+        right_on="LogStart",
+        strategy="backward"
+        ).select(
+            pl.exclude("dt", "LogStart", "LogNumber"),
+            pl.col("UTC_DateTime").sub(pl.col("LogStart")).dt.total_microseconds().truediv(1e6).mul(-1).add(600)
+            .alias("WarmUp")
+            ).with_columns(
+                pl.when(pl.col("WarmUp").gt(0))
+                .then(pl.col("WarmUp").cast(pl.Int64))
+                .otherwise(pl.lit(0))
+                )
+    return df
+
 def split_by_date(df):
     df_with_date = df.with_columns(
         pl.col("FTC_DateTime").dt.date().alias("Date")
@@ -330,67 +368,10 @@ for inst in data.keys():
                     6,
                     pl.col("NOx_ppb").sub(pl.col("NO_ppb")).alias("NO2_ppb")
                     )
-        # data[inst][source] = split_by_date(concat_df)
-        data[inst][source] = concat_df
+        if source != "DAQ":
+            concat_df = define_warmup(concat_df, inst)
+        data[inst][source] = split_by_date(concat_df)
         
-#%%
-
-def define_warmup(df, inst):
-    if inst.find("2BTech") != -1:
-        log_start = df.filter(
-            pl.col("LogNumber").eq(0)
-            ).select(
-                pl.col("UTC_DateTime").alias("LogStart")
-                )
-    elif inst == "ThermoScientific_42i-TL":
-        df = df.with_columns(
-            pl.col("UTC_DateTime").sub(pl.col("UTC_DateTime").shift(1)).alias("dt")
-            )
-        log_start = df.filter(
-            pl.col("dt").ge(pl.duration(seconds=90))
-            | pl.col("dt").is_null()
-            ).select(
-                pl.col("UTC_DateTime").alias("LogStart")
-                )
-    else:
-        df = df.with_columns(
-            pl.lit(0).alias("WarmUp")
-            )
-        return df
-    df = df.join_asof(
-        log_start,
-        left_on="UTC_DateTime",
-        right_on="LogStart",
-        strategy="backward"
-        ).select(
-            pl.exclude("dt", "LogStart", "LogNumber"),
-            pl.col("UTC_DateTime").sub(pl.col("LogStart")).dt.total_microseconds().truediv(1e6).mul(-1).add(600)
-            .alias("WarmUp")
-            ).with_columns(
-                pl.when(pl.col("WarmUp").gt(0))
-                .then(pl.col("WarmUp").cast(pl.Int64))
-                .otherwise(pl.lit(0))
-                )
-    return df
-
-#%%
-dfs = split_by_date(df)
-import hvplot.polars
-for date, d in dfs.items():
-    d = d.with_columns(
-        pl.when(pl.col("WarmUp").eq(0))
-        .then(pl.lit("Warm"))
-        .otherwise(pl.lit("NotWarm"))
-        .alias("Warm"))
-    hvplot.show(
-        d.hvplot.scatter(
-            x="UTC_DateTime",
-            y="O3_ppb",
-            by="Warm",
-            title=date
-            )
-        )
-
 #%%
 for inst in data.keys():
     for source in data[inst].keys():
