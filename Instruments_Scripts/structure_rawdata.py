@@ -317,7 +317,7 @@ for inst in data.keys():
                 dfs.append(df)
                 continue
             dfs.append(define_datetime(df, inst))
-        concat_df = pl.concat(dfs).unique().sort("UTC_DateTime", "order")
+        concat_df = pl.concat(dfs).unique().sort("UTC_DateTime")
         if inst == "ThermoScientific_42i-TL":
             if source == "DAQ":
                 concat_df.insert_column(
@@ -329,7 +329,8 @@ for inst in data.keys():
                     6,
                     pl.col("NOx_ppb").sub(pl.col("NO_ppb")).alias("NO2_ppb")
                     )
-        data[inst][source] = split_by_date(concat_df)
+        # data[inst][source] = split_by_date(concat_df)
+        data[inst][source] = concat_df
         
 #%%
 for inst in data.keys():
