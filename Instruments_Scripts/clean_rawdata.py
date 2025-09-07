@@ -358,6 +358,10 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             lf = lf.filter(
                 pl.col("O3_ppb").is_between(-5, 200)
                 )
+        if inst.find("LI-COR") != -1:
+            lf = lf.filter(
+                pl.col("CO2_ppm").gt(0)
+                )
         lf = lf.select(
             pl.exclude("Sampling_Stop")
             )
@@ -408,7 +412,6 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                             f_name)
         df.write_csv(path)
 #%%
-
 for inst, sources in wrong_dates.items():
     for source, dates in sources.items():
         for date, df in dates.items():
