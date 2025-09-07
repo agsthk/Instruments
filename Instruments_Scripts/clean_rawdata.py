@@ -474,5 +474,10 @@ for inst, sources in wrong_dates.items():
                 pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
                 pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
                 )
-            df = pl.concat([df_i, df]).sort(by=df.columns[0])
+            df = pl.concat(
+                [df_i, df],
+                how="vertical_relaxed"
+                ).unique().sort(
+                    by=df.columns[0]
+                    )
             df.write_csv(f_path)
