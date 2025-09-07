@@ -266,11 +266,11 @@ for inst, times in avg_times.items():
         include_header=True,
         header_name="UTC_Start",
         column_names=["AvgT"]
-        ).sort(
-            by="UTC_Start"
-            ).with_columns(
+        ).with_columns(
                 pl.col("UTC_Start").str.to_datetime()
-                ).lazy()
+                ).sort(
+                    by="UTC_Start"
+                    ).lazy()
 
 data = {inst: {} for inst in insts}
 
@@ -320,11 +320,11 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             )
         if inst in avg_times.keys():
             lf = lf.join_asof(
-                avg_times[inst],
-                left_on="UTC_DateTime",
-                right_on="UTC_Start",
-                strategy="backward"
-                )
+                    avg_times[inst],
+                    left_on="UTC_DateTime",
+                    right_on="UTC_Start",
+                    strategy="backward"
+                    )
             lf = lf.select(
                 pl.col("UTC_DateTime").dt.offset_by("-" + pl.col("AvgT")).alias("UTC_Start"),
                 pl.col("UTC_DateTime").alias("UTC_Stop"),
@@ -347,7 +347,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                     {"UTC_Stop": "Sampling_Stop"}
                     ).lazy()
             lf = lf.join_asof(
-                locs, on=on, strategy="backward", coalesce=True
+                locs.sort(by=on), on=on, strategy="backward", coalesce=True
                 )
             lf = lf.with_columns(
                 pl.when(pl.col(compare).gt(pl.col("Sampling_Stop")))
@@ -436,6 +436,9 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         
         if df.is_empty():
             continue
+        #%%
+        
+        
         data[inst][file.rsplit("_", 1)[-1][:-4]] = df
         _, source = file[:-17].split("_Structured")
         f_name = inst + "_Clean" + source + "Data_" + path[-12:-4] + ".csv"
