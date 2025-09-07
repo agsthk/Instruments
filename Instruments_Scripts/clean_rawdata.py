@@ -273,32 +273,7 @@ for inst, times in avg_times.items():
                     ).lazy()
 
 data = {inst: {} for inst in insts}
-
-#%%
-wrong_dates = {}
-for date, df in data["2BTech_202"].items():
-    df = df.with_columns(
-        pl.col("FTC_Start").dt.strftime("%Y%m%d").alias("Date")
-        )
-    dfs = {key[0]: d for key, d in df.partition_by(
-        "Date", as_dict=True, include_key=False
-        ).items()}
-    
-    wrong_date_keys = [d for d in dfs.keys() if d != date]
-    for key in dfs.keys():
-        if key == date:
-            continue
-        if key in wrong_dates.keys():
-            wrong_dates[key] = pl.concat(
-                [wrong_dates[key],
-                 dfs[key]]
-                )
-        else:
-            wrong_dates[key] = dfs[key]
-    df = dfs[date]
-                     
-                     
-#%%
+wrong_dates = {inst: {} for inst in insts}
 
 for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
     for file in tqdm(files):
@@ -436,11 +411,39 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         
         if df.is_empty():
             continue
-        #%%
-        
-        
-        data[inst][file.rsplit("_", 1)[-1][:-4]] = df
+
         _, source = file[:-17].split("_Structured")
+        date = file.rsplit("_", 1)[-1][:-4]
+        if "FTC_Start" in df.columns:
+            part_col = "FTC_Start"
+        else:
+            part_col = "FTC_DateTime"
+        
+        df = df.with_columns(
+            pl.col(part_col).dt.strftime("%Y%m%d").alias("Date")
+            )
+        dfs = {key[0]: d for key, d in df.partition_by(
+            "Date", as_dict=True, include_key=False
+            ).items()}
+        
+        wrong_date_keys = [d for d in dfs.keys() if d != date]
+        for key in wrong_date_keys:
+            if source in wrong_dates[inst].keys():
+                if key in wrong_dates[inst][source].keys():
+                    wrong_dates[inst][source][key] = pl.concat(
+                        [wrong_dates[inst][source][key],
+                         dfs[key]]
+                        )
+                else:
+                    wrong_dates[inst][source][key] = dfs[key]
+            else:
+                wrong_dates[inst][source] = {}
+                wrong_dates[inst][source][key] = dfs[key]
+        df = dfs[date]
+        if source not in data[inst].keys():
+            data[inst][source] = {}
+        data[inst][source][date] = df
+        #%%
         f_name = inst + "_Clean" + source + "Data_" + path[-12:-4] + ".csv"
         f_dir = os.path.join(CLEAN_DATA_DIR,
                              inst + "_CleanData",
@@ -450,3 +453,20 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         path = os.path.join(f_dir,
                             f_name)
         df.write_csv(path)
+
+
+#%%
+import hvplot.polars
+#%%
+inst = "2BTech_405nm"
+i = 0
+for date, df in data[inst]["SD"].items():
+    hvplot.show(
+        df.hvplot.scatter(
+            x="FTC_Start",
+            y="NOx_ppb",
+            by="SamplingLocation",
+            title=date,
+            )
+        )
+
