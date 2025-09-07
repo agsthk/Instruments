@@ -1,0 +1,112 @@
+# clean_rawdata.py
+- Since the data processing does not proceed source by source, I suspect I will need a separate dictionary that contains the improperly dated data for all instruments and all sources
+- After the data for a given date is cleaned, the logs that start on a different date are identified and added to a dictionary keyed first by instrument, then source, then new date
+	- Logs are concatenated if there is already a df keyed by the given date
+- While I think this worked, I am a bit concerned by the "null" sampling locations I am seeing for the Thermo data - they shouldn't ALL be null
+	- Need to check the sampling location assignment - visualize
+		- Looks fine actually, at least the DAQ
+			- Check what's happening 20250120 - was that when sampling from exhaust?
+			- Missing a UZA time 20250127 ~21:45 - 21:55, need to add that into the trace gas sampling file
+		- Logger
+			- A lot of these failed to plot - try again?
+				- Still failed - why are sampling locations all null for a lot of these?
+				- Potentially thanks to a missing comma?
+			- 20240415 becomes all null
+			- 20240416 all null
+			- Doesn't plot null sampling locations?
+			- Identified the issue, it's in the sampling_locs for Thermo - Only has the occasion on 4/17 where location is null, missing several entries that are in the text file
+			- I identified the problem - I still haven't gone through Phase I notes and identified TGLine sampling locations - my bad!
+			- For now, just added that the TGLine starts sampling C200/B203 beginning 4/15/24 17:13:12 MDT - will still be wrong, but should at least successfully plot now (and identify UZA)
+			- Also added the missing UZA time in TGLine sampling locations
+			- Now the plotting works!
+				- Or it would if the kernel would stop dying :/
+		- Need to determine a way to stop assigning sampling location as UZA when UZA ran out - 20240617 - 20240624
+		- Solenoid valve state stopped recording 20240721 - 20240722, but UZA still being delivered- fix
+	- 2BTech_205_A
+		- 20250213 on DAQ there is data that should be filtered but isn't
+			- Actually jk its location is None
+		- SD
+			- Filtering is seemingly not happening at all?
+			- A lot to check here, but it's not Phase II so will come back
+	- 2BTech_205_B
+		- DAQ looks fine, can't check SD because I don't have any sampling locations for those dates in the file yet so they aren't plotting
+	- Picarro_G2307
+		- Logger
+			- Do need to figure out what was going on 20240327
+			- 20240605 there is a point that needs to be filtered
+			- 20240606 there is a UZA point that is definitely not UZA
+			- 20240607 UZA not logged as UZA?
+				- For sure has to do with the time repeat issue
+			- 20240612 one UZA interval much more noisy?
+			- 20240613 weird interval - should be None?
+			- 20240614 interesting behavior
+			- Should be fine once I get the sampling locations appropriately characterized
+		- DAQ
+			- Looks pretty good I think
+	- 2BTech_405nm
+		- Just briefly checking it out, I know it's going to be not great
+		- Sampling location is kept as "TGLine" - no replacement?
+			- That's because it's in the file as TG Line, not TGLine - fixed!
+			- Check again later, I don't want to rerun the code again
+		- Missing calibration 20240119
+		- May need filtering
+			- 20240416
+		- Can kind of sort of see zeros, but sooo noisy
+		- 20241216 should just be calibration source but has it as B213 about halfway through?
+			- Timezone issue
+	- Aranet sensors look good
+	- LI-COR_LI-840A_A
+		- Killed the kernel again (booooo!)
+		- Might need to plot only a subset at a time - taking a really long time to load
+		- Don't have any 2024 sampling locations, won't plot
+		- 20240416 is the date that the logging starts freaking out
+			- Can likely fix this by adding real WarmUp times
+	- LI-COR_LI-840A_B
+		- Does need a real WarmUp column - need to go back into structuring script and fix that
+- Checked the sampling location assignment and am mostly satisfied with where it's at
+	- Still need to fix locations for Phase I, but can handle that later
+- Moving on to add improperly dated data to appropriate files
+	- This is generally working, although there are a couple files that it's not re-writing at all - why?
+		- Has to be a product of filtering somewhere, but all I see is the continue if df is empty
+		- Actually it's a result of me originally splitting by UTC date and never removing the files after switching to FTC date
+- Script works as it should!
+- Still need to:
+	- Account for time offset
+	- Move averaging times to external input file
+- Moving averaging times to external input file
+	- In Instruments_ManualData, created new folder Instruments_AveragingTimes
+	- Transferred hard-coded averaging times to individual files
+	- After doing this, script ran with no issues
+- Time offset will be something I do later
+- Going to move back to structuring script to make a real WarmUp column for LI-COR instruments
+# structure_rawdata.py
+- Went into define_warmup function and basically copied over the way I define the log start for Thermo for a LI-COR specific action, but with a duration of 15 seconds instead of 90 seconds (should be 1 Hz data)
+- Re-ran this script to get the structured LI-COR data with the warmup columns I want
+- Then re-ran clean_rawdata.py again
+# clean_rawdata.py
+- Want to be sure that the WarmUp determination did what I expected it to
+- After re-running script, quickly plotting the LI-COR data after non-zero WarmUp is filtered out
+- It did work for the WarmUp, though I am seeing some filtering that needs to be done in the room CO2 data
+	- Added a line to filter out CO2 < 0 - should be good now!
+# Next steps
+- There was an issue that I saw (can't remember source) with repeating data
+	- I think it was for Thermo only, and I think it's because of the addition of a log start column?
+	- Maybe I have resolved this?
+		- There are no duplicate times when I check the structured files for Thermo
+	- There are duplicate times for TempRHDoor, LI-COR_LI-840 A and B, some Picarro (but we knew that one), and some 2BTech_205_A
+	- When I ran checking for full duplicates, then only 2BTech_205_A, and only Logger files from 20240119 and 20240120
+		- Not sure why things are duplicated, but I definitely see it
+		- It is because LOGX4 and LOGX2 overlap, but I'm not sure why filtering using unique isn't dropping the duplicates
+		- When I read it in from the structured data, using unique does fix it - why not in the structuring script?
+			- Cannot figure out why this is, but going to just add another .unique() when splitting by date and see if this fixes it
+				- And it does!
+				- No clue why the .unique() I already have isn't working, but maybe a problem for another time
+	- Fixed this
+- As I've mentioned many times, need to handle time offsets, but not doing that immediately
+- Check that the sampling locations are accurate
+- Ensure filtering is appropriate
+- Then calibration considerations
+	- Determine how S/N from calibrations is going to be used to define uncertainty
+	- Determine what is going to be used as offset/LOD when not in a zeroing regime
+	- Calculate uncertainty based on what is decided from S/N and manufacturer reports
+- I think I'm in a good place to stop for today and pick up tomorrow, and I think (hope) I will be able to get Phase II ICARTT data out tomorrow at the very least
