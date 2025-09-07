@@ -286,6 +286,16 @@ def define_warmup(df, inst):
             ).select(
                 pl.col("UTC_DateTime").alias("LogStart")
                 )
+    elif inst.find("LI-COR") != -1:
+        df = df.with_columns(
+            pl.col("UTC_DateTime").sub(pl.col("UTC_DateTime").shift(1)).alias("dt")
+            )
+        log_start = df.filter(
+            pl.col("dt").ge(pl.duration(seconds=15))
+            | pl.col("dt").is_null()
+            ).select(
+                pl.col("UTC_DateTime").alias("LogStart")
+                )
     else:
         df = df.with_columns(
             pl.lit(0).alias("WarmUp")
