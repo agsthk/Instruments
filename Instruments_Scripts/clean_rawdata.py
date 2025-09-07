@@ -37,6 +37,7 @@ add_times = {key[0]: df for key, df in
                  "Species", as_dict=True, include_key=False
                  ).items()}
 SAMPLING_LOC_DIR = os.path.join(data_dir, "Instruments_ManualData", "Instruments_SamplingLocations")
+AVG_TIME_DIR = os.path.join(data_dir, "Instruments_ManualData", "Instruments_AveragingTimes")
 
 insts = ["2BTech_202",
          "2BTech_205_A",
@@ -213,65 +214,18 @@ for inst, df in sampling_locs.items():
         pl.col("UTC_Stop").dt.offset_by("-60s")
         )
 
+avg_times = {}
+for avg_times_file in os.listdir(AVG_TIME_DIR):
+    inst = avg_times_file.rsplit("_", 1)[0]
+    avg_times_path = os.path.join(AVG_TIME_DIR,
+                                  avg_times_file)
+    avg_times[inst] = pl.read_csv(avg_times_path).with_columns(
+        pl.col("UTC_Start").str.to_datetime()
+        ).sort(
+            by="UTC_Start"
+            ).lazy()
+
 #%%
-
-avg_times = {
-    "2BTech_202": {
-        "2024-01-18 20:39:16+00:00": "10s",
-        "2024-01-19 23:05:11+00:00": "60s"
-        },
-    "2BTech_205_A": {
-        "2022-09-30 18:49:04+00:00": "10s",
-        "2024-01-20 02:54:18+00:00": "60s",
-        "2024-01-19 17:22:26+00:00": "10s",
-        "2024-01-19 23:05:18+00:00": "60s",
-        "2024-03-11 19:27:01+00:00": "2s",
-        "2024-03-11 23:30:47+00:00": "60s",
-        "2024-06-04 16:21:24+00:00": "2s",
-        "2024-06-04 19:01:29+00:00": "60s",
-        "2024-06-05 21:11:14+00:00": "2s",
-        "2024-06-11 14:03:39+00:00": "60s",
-        "2025-01-15 16:04:20+00:00": "10s"
-        },
-    "2BTech_205_B": {
-        "2023-05-12 03:50:59+00:00": "10s",
-        "2024-06-04 18:52:23+00:00": "2s",
-        "2024-06-10 20:39:53+00:00": "60s",
-        "2025-01-15 17:17:42+00:00": "10s",
-        },
-    "2BTech_405nm": {
-        "2024-01-17 18:38:28+00:00": "60s",
-        "2024-01-19 20:44:52+00:00": "5s",
-        "2024-02-01 22:30:59+00:00": "60s",
-        "2024-06-05 21:11:35+00:00": "5s",
-        "2024-06-11 14:04:55+00:00": "60s",
-        "2024-06-25 18:31:08+00:00": "5s",
-        "2024-06-25 21:09:43+00:00": "60s",
-        "2024-07-02 15:42:36+00:00": "5s",
-        "2024-07-02 20:17:40+00:00": "60s",
-        },
-    "Aranet4_1F16F": {
-        "2025-03-21 02:14:00+00:00": "60s"
-        },
-    "Aranet4_1FB20": {
-        "2025-03-21 02:15:00+00:00": "60s"
-        },
-    "ThermoScientific_42i-TL": {
-        "2024-01-19 17:39:00+00:00": "60s"
-        }
-    }
-
-for inst, times in avg_times.items():
-    avg_times[inst] = pl.DataFrame(times).transpose(
-        include_header=True,
-        header_name="UTC_Start",
-        column_names=["AvgT"]
-        ).with_columns(
-                pl.col("UTC_Start").str.to_datetime()
-                ).sort(
-                    by="UTC_Start"
-                    ).lazy()
-
 data = {inst: {} for inst in insts}
 wrong_dates = {inst: {} for inst in insts}
 
@@ -301,11 +255,11 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                     strategy="backward"
                     )
             lf = lf.select(
-                pl.col("UTC_DateTime").dt.offset_by("-" + pl.col("AvgT")).alias("UTC_Start"),
+                pl.col("UTC_DateTime").dt.offset_by("-" + pl.col("AveragingTime")).alias("UTC_Start"),
                 pl.col("UTC_DateTime").alias("UTC_Stop"),
-                pl.col("FTC_DateTime").dt.offset_by("-" + pl.col("AvgT")).alias("FTC_Start"),
+                pl.col("FTC_DateTime").dt.offset_by("-" + pl.col("AveragingTime")).alias("FTC_Start"),
                 pl.col("FTC_DateTime").alias("FTC_Stop"),
-                pl.exclude("UTC_DateTime", "FTC_DateTime", "UTC_Start", "AvgT")
+                pl.exclude("UTC_DateTime", "FTC_DateTime", "UTC_Start", "AveragingTime")
                 )
         if inst in sampling_locs.keys():
             if "UTC_DateTime" in lf.collect_schema().names():
