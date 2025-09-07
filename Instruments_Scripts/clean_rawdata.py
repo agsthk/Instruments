@@ -443,7 +443,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         if source not in data[inst].keys():
             data[inst][source] = {}
         data[inst][source][date] = df
-        #%%
+        
         f_name = inst + "_Clean" + source + "Data_" + path[-12:-4] + ".csv"
         f_dir = os.path.join(CLEAN_DATA_DIR,
                              inst + "_CleanData",
@@ -453,20 +453,26 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         path = os.path.join(f_dir,
                             f_name)
         df.write_csv(path)
-
-
 #%%
-import hvplot.polars
-#%%
-inst = "2BTech_405nm"
-i = 0
-for date, df in data[inst]["SD"].items():
-    hvplot.show(
-        df.hvplot.scatter(
-            x="FTC_Start",
-            y="NOx_ppb",
-            by="SamplingLocation",
-            title=date,
-            )
-        )
 
+for inst, sources in wrong_dates.items():
+    for source, dates in sources.items():
+        for date, df in dates.items():
+            f_name = inst + "_Clean" + source + "Data_" + date + ".csv"
+            f_dir = os.path.join(CLEAN_DATA_DIR,
+                                 inst + "_CleanData",
+                                 inst + "_Clean" + source + "Data")
+            f_path = os.path.join(f_dir, f_name)
+            if not os.path.exists(f_path):
+                df.write_csv(f_path)
+                continue
+            if inst == "2BTech_405nm":
+                df_i = pl.read_csv(f_path, infer_schema_length=None)
+            else:
+                df_i = pl.read_csv(f_path)
+            df_i = df_i.with_columns(
+                pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
+                pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
+                )
+            df = pl.concat([df_i, df]).sort(by=df.columns[0])
+            df.write_csv(f_path)
