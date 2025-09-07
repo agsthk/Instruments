@@ -324,7 +324,7 @@ def split_by_date(df):
     df_by_date = df_with_date.partition_by(
         "Date", include_key=False, as_dict=True
         )
-    df_by_date = {key[0].strftime("%Y%m%d"): df
+    df_by_date = {key[0].strftime("%Y%m%d"): df.unique(maintain_order=True)
                   for key, df in df_by_date.items()}
     return df_by_date
 
@@ -395,3 +395,4 @@ for inst in data.keys():
             path = os.path.join(f_dir,
                                 f_name)
             df.write_csv(path)
+
