@@ -285,15 +285,20 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 .alias("SamplingLocation")
                 )
         if "WarmUp" in lf.collect_schema().names():
-            lf = lf.filter(
-                pl.col("WarmUp").eq(0)
+            lf = lf.with_columns(
+                pl.when(pl.col("WarmUp").ne(0))
+                .then(pl.lit(None))
+                .otherwise(pl.col("SamplingLocation"))
+                .alias("SamplingLocation")
                 ).select(
                     pl.exclude("WarmUp")
                     )
         if inst == "ThermoScientific_42i-TL":
-            lf = lf.filter(
-                pl.col("SampleFlow_LPM").gt(0.5)
-                )
+            lf = lf.with_columns(
+                pl.when(pl.col("SampleFlow_LPM").le(0.5))
+                .then(pl.lit(None))
+                .otherwise(pl.col("SamplingLocation"))
+                .alias("SamplingLocation"))
         if inst == "2BTech_205_A":
             lf_room = lf.filter(
                 pl.col("SamplingLocation").str.contains("C200")
@@ -336,11 +341,16 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                         pl.mean_horizontal("f_d/dt", "r_d/dt").alias("d/dt"),
                         pl.col("abs_diff").rolling_median_by(by="UTC_Start", window_size="10m").mul(1.4826).alias("MAD")
                         )
-            lf_room = lf_room.filter(
-                (pl.col("O3_ppb").sub(pl.col("median")).abs().le(pl.col("MAD").mul(3))
-                | pl.col("d/dt").lt(0.25)
-                | pl.col("KeepDefault"))
-                & pl.col("O3_ppb").gt(-8)
+            lf_room = lf_room.with_columns(
+                pl.when(
+                    (pl.col("O3_ppb").sub(pl.col("median")).abs().le(pl.col("MAD").mul(3))
+                    | pl.col("d/dt").lt(0.25)
+                    | pl.col("KeepDefault"))
+                    & pl.col("O3_ppb").gt(-8)
+                    )
+                .then(pl.col("SamplingLocation"))
+                .otherwise(pl.lit(None))
+                .alias("SamplingLocation")
                 )
             hf = lf_room.collect().height
             keep_cols = lf.collect_schema().names()
@@ -355,18 +365,25 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                     by="UTC_Start"
                     )
         if inst == "2BTech_205_B":
-            lf = lf.filter(
-                pl.col("O3_ppb").is_between(-5, 200)
+            lf = lf.with_columns(
+                pl.when(pl.col("O3_ppb").is_between(-5, 200))
+                .then(pl.col("SamplingLocation"))
+                .otherwise(pl.lit(None))
+                .alias("SamplingLocation")
                 )
         if inst.find("LI-COR") != -1:
-            lf = lf.filter(
-                pl.col("CO2_ppm").gt(0)
+            lf = lf.with_columns(
+                pl.when(pl.col("CO2_ppm").is_between(0, 20000))
+                .then(pl.col("SamplingLocation"))
+                .otherwise(pl.lit(None))
+                .alias("SamplingLocation")
                 )
         lf = lf.select(
             pl.exclude("Sampling_Stop")
             )
         df = lf.collect()
-        
+        #%%
+        #%%
         if df.is_empty():
             continue
 
