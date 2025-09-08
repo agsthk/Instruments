@@ -187,7 +187,7 @@ for inst, df in sampling_locs.items():
             ~pl.col("SamplingLocation").eq("TGLine")
             | pl.col("SamplingLocation").is_null()
             ),
-        df.join(
+        df.filter(pl.col("SamplingLocation").eq("TGLine")).join(
             sampling_locs["TGLine"], on=None, how="cross").filter(
                 (pl.col("UTC_Start") < pl.col("UTC_Stop_right")) &
                 (pl.col("UTC_Start_right") < pl.col("UTC_Stop"))
@@ -224,7 +224,6 @@ for avg_times_file in os.listdir(AVG_TIME_DIR):
         ).sort(
             by="UTC_Start"
             ).lazy()
-
 #%%
 data = {inst: {} for inst in insts}
 wrong_dates = {inst: {} for inst in insts}
@@ -286,7 +285,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 )
         if "WarmUp" in lf.collect_schema().names():
             lf = lf.with_columns(
-                pl.when(pl.col("WarmUp").ne(0))
+                pl.when(pl.col("WarmUp").gt(300))
                 .then(pl.lit(None))
                 .otherwise(pl.col("SamplingLocation"))
                 .alias("SamplingLocation")
@@ -397,24 +396,23 @@ import hvplot.polars
 for inst, sources in data.items():
     for source, dates in sources.items():
         for date, df in dates.items():
-            if date[:4] != "2025":
+            if date.find("20250205") == -1:
                 continue
-            if inst != "2BTech_205_A":
+            if inst != "ThermoScientific_42i-TL":
                 continue
-            null_plot = df.filter(
-                pl.col("SamplingLocation").is_null()
-                ).hvplot.scatter(
-                    x="FTC_Start",
-                    y="O3_ppb",
-                    title=date
-                    )
+            df = df.with_columns(
+                pl.when(pl.col("SamplingLocation").is_null())
+                .then(pl.lit("None"))
+                .otherwise(pl.col("SamplingLocation"))
+                .alias("SamplingLocation")
+                )
             split_plot = df.hvplot.scatter(
                 x="FTC_Start",
-                y="O3_ppb",
+                y="NOx_ppb",
                 by="SamplingLocation",
                 title=date
                 )
-            hvplot.show(split_plot * null_plot)
+            hvplot.show(split_plot)
 
         #%%
         if "FTC_Start" in df.columns:
