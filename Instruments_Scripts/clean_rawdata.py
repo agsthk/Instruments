@@ -285,7 +285,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 )
         if "WarmUp" in lf.collect_schema().names():
             lf = lf.with_columns(
-                pl.when(pl.col("WarmUp").gt(300))
+                pl.when(pl.col("WarmUp").ne(0))
                 .then(pl.lit(None))
                 .otherwise(pl.col("SamplingLocation"))
                 .alias("SamplingLocation")
@@ -396,19 +396,19 @@ import hvplot.polars
 for inst, sources in data.items():
     for source, dates in sources.items():
         for date, df in dates.items():
-            if date.find("20250205") == -1:
+            if date.find("2025") == -1:
                 continue
-            if inst != "ThermoScientific_42i-TL":
+            if inst != "2BTech_205_A":
                 continue
-            df = df.with_columns(
-                pl.when(pl.col("SamplingLocation").is_null())
-                .then(pl.lit("None"))
-                .otherwise(pl.col("SamplingLocation"))
-                .alias("SamplingLocation")
-                )
+            # df = df.with_columns(
+            #     pl.when(pl.col("SamplingLocation").is_null())
+            #     .then(pl.lit("None"))
+            #     .otherwise(pl.col("SamplingLocation"))
+            #     .alias("SamplingLocation")
+            #     )
             split_plot = df.hvplot.scatter(
                 x="FTC_Start",
-                y="NOx_ppb",
+                y="O3_ppb",
                 by="SamplingLocation",
                 title=date
                 )
