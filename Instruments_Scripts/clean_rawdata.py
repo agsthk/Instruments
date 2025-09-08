@@ -55,7 +55,7 @@ sampling_locs = {}
 for sampling_locs_file in os.listdir(SAMPLING_LOC_DIR):
     inst = sampling_locs_file.rsplit("_", 1)[0]
     sampling_locs_path = os.path.join(SAMPLING_LOC_DIR, sampling_locs_file)
-    sampling_locs[inst] = pl.read_csv(sampling_locs_path).with_columns(
+    sampling_locs[inst] = pl.read_csv(sampling_locs_path, null_values="None").with_columns(
         UTC_Start=pl.col("FTC_Start").str.to_datetime()
         ).select(
             pl.col("UTC_Start"),
@@ -438,54 +438,3 @@ for inst, sources in wrong_dates.items():
                     by=df.columns[0]
                     )
             df.write_csv(f_path)
-#%%
-
-check = {inst: {} for inst in insts}
-
-for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
-    for file in tqdm(files):
-        if file.startswith("."):
-            continue
-        path = os.path.join(root, file)
-        for inst in insts:
-            if path.find(inst) != -1:
-                break
-        if path.find(inst) == -1:
-            continue
-        if inst == "2BTech_405nm":
-            lf = pl.scan_csv(path, infer_schema_length=None)
-        else:
-            lf = pl.scan_csv(path)
-        lf = lf.with_columns(
-            pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
-            pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
-            )
-        _, source = file[:-17].split("_Clean")
-        date = file.rsplit("_", 1)[-1][:-4]
-        if source not in check[inst].keys():
-            check[inst][source] = {}
-        check[inst][source][date] = lf.collect()
-        
-#%%
-import hvplot.polars
-#%%
-for inst, sources in check.items():
-    # if inst.find("LI-COR") != -1 or inst.find("2BTech_205_B") != -1:
-    #     continue
-    for source, dates in sources.items():
-        for date, df in dates.items():
-            for dvar in ["O3_ppb", "CO2_ppm", "NOx_ppb", "CH2O_ppb"]:
-                if dvar not in df.columns:
-                    continue
-                if date.find("20250130") == -1:
-                    continue
-                tvar = df.columns[0]
-                hvplot.show(
-                    df.hvplot.scatter(
-                        x=tvar,
-                        y=dvar,
-                        by="SamplingLocation",
-                        title=inst + " " + date
-                        )
-                    )
-            
