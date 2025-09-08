@@ -360,6 +360,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                     ),
                  lf.filter(
                      ~pl.col("SamplingLocation").str.contains("C200")
+                     | pl.col("SamplingLocation").is_null()
                      )]
                 ).sort(
                     by="UTC_Start"
@@ -382,13 +383,40 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             pl.exclude("Sampling_Stop")
             )
         df = lf.collect()
-        #%%
-        #%%
         if df.is_empty():
             continue
 
         _, source = file[:-17].split("_Structured")
         date = file.rsplit("_", 1)[-1][:-4]
+        if source not in data[inst].keys():
+            data[inst][source] = {}
+        data[inst][source][date] = df
+        #%%
+import hvplot.polars
+#%%
+for inst, sources in data.items():
+    for source, dates in sources.items():
+        for date, df in dates.items():
+            if date[:4] != "2025":
+                continue
+            if inst != "2BTech_205_A":
+                continue
+            null_plot = df.filter(
+                pl.col("SamplingLocation").is_null()
+                ).hvplot.scatter(
+                    x="FTC_Start",
+                    y="O3_ppb",
+                    title=date
+                    )
+            split_plot = df.hvplot.scatter(
+                x="FTC_Start",
+                y="O3_ppb",
+                by="SamplingLocation",
+                title=date
+                )
+            hvplot.show(split_plot * null_plot)
+
+        #%%
         if "FTC_Start" in df.columns:
             part_col = "FTC_Start"
         else:
