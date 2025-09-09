@@ -74,7 +74,7 @@ for inst, dfs in uza_stats.items():
         cs.contains("_pp", "_perc").mean().name.suffix("_Mean"),
         cs.contains("_pp", "_perc").std().name.suffix("_STD")
         ).select(
-            ~cs.contains("NOx", "intv")
+            ~cs.contains("NOx", "intv", "30s", "2min", "5min")
             )
     uza_stats[inst] = df
     
