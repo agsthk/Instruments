@@ -15,3 +15,7 @@
 - Would it be useful to export these results? Probably
 - Revised code to create a correlation file to export
 	- Same location as the UZA statistics files
+# calibrate_instruments.py
+- I want to take the S/N that I determined and add it to calibration results output
+- Straightforward given it was already calculated, I just needed to add it to the output files
+	- Checked and doing so was successful

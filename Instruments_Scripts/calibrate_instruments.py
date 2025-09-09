@@ -9,13 +9,11 @@ import os
 import polars as pl
 import polars.selectors as cs
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 import scipy as sp
 import numpy as np
 import matplotlib.dates as mdates
 from matplotlib import ticker
 import pytz
-import shutil
 
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
@@ -340,10 +338,10 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     ts_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Time Series",
                                     size=15)
                     ts_fig_name = inst + "_" + var_nounits + "_CalibrationTimeSeries_" + date + ".png"
-                    # ts_fig.savefig(os.path.join(
-                    #     inst_cal_fig_dir,
-                    #     ts_fig_name
-                    #     ))
+                    ts_fig.savefig(os.path.join(
+                        inst_cal_fig_dir,
+                        ts_fig_name
+                        ))
                     plt.close()
                     sens, off, unc_sens, unc_off = perform_odr(
                         odr_cal_data[var + "_Delivered"],
@@ -396,10 +394,10 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     fit_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Fit",
                                     size=15)
                     
-                    # fit_fig.savefig(os.path.join(
-                    #     inst_cal_fig_dir,
-                    #     inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
-                    #     ))
+                    fit_fig.savefig(os.path.join(
+                        inst_cal_fig_dir,
+                        inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
+                        ))
                     
                     plt.close()
 
@@ -410,6 +408,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         )
                     output = sp.odr.ODR(data, model, beta0=[0.005, 0]).run()
                     ns_slope, ns_off = output.beta
+                    ns_slope_unc, ns_off_unc = output.sd_beta
                     
                     ns_r2 = calc_r2(
                         odr_cal_data[var + "_Measured"],
@@ -418,6 +417,12 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         ns_off
                         )
                     
+                    date_cal_factors[var]["NoiseSignal_Slope"] = ns_slope
+                    date_cal_factors[var]["NoiseSignal_Offset"] = ns_off
+                    date_cal_factors[var]["NoiseSignal_Slope_Uncertainty"] = ns_slope_unc
+                    date_cal_factors[var]["NoiseSignal_Offset_Uncertainty"] = ns_off_unc
+                    date_cal_factors[var]["NoiseSignal_R2"] = ns_r2
+
                     fit_label = (var_name
                                  + " Noise = "
                                  + f'{ns_slope:.5f}'
@@ -451,7 +456,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         inst_cal_fig_dir,
                         inst + "_" + var_nounits + "_CalibrationSNR_" + date + ".png"
                         ))
-                    
+                    date_cal_factors[var]
                     plt.close()
                 inst_cal_factors[date] = date_cal_factors
     cal_factors[inst] = inst_cal_factors
@@ -470,7 +475,7 @@ for inst, factors in cal_factors.items():
         inst_cal_results.append(pl.concat(date_results, how="align"))
     inst_cal_results = pl.concat(inst_cal_results, how="diagonal").sort(by="CalDate")
     inst_cal_results.write_csv(os.path.join(CAL_DIR,
-                                             inst + "_Calibrations",
-                                             inst + "_CalibrationResults.txt"),
+                                            inst + "_Calibrations",
+                                            inst + "_CalibrationResults.txt"),
                                float_precision=6)
           
