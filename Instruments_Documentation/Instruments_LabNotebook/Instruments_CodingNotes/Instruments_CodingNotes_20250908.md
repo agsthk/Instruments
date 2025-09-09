@@ -1,0 +1,216 @@
+# clean_rawdata.py
+- Checking Sampling Locations
+	- Beginning with all 2023 data
+		- 2BTech_205_B
+			- Not sure where it was sampling from, most of this is from before I got here
+			- Some data from October/November of 2023, still wasn't me using it, I'd guess Tucker was using it to check O3 production
+			- Going to call the sampling location None starting 2023-05-11T21:50:59.000000-0600 (first record)
+			- I also think I filtered out Tucker's data - oops, but doesn't matter and not fixing it
+		- LI-COR_LI-840A_A
+			- I believe it was sampling C200 from the beginning - 2023-12-14T16:07:46.000000-0700
+			- Need to check that I'm not filtering any data out - there are gaps
+				- Might be an artifact of WarmUp - need to fix
+			- Pretty sure this instrument was always sampling C200
+	- 2024 data
+		- January
+			- 2BTech_202
+				- Sampling locations look good, consider them complete
+			- 2BTech_205_A
+				- Looks good
+			- 2BTech_405_nm
+				- Missing calibration source 20240118 I think
+				- Adding to locations but a little difficult to tell where it actually starts - just saying 13:23 for now
+				- Also missing 20240119 cal
+					- Starts 13:20 we say
+				- Good for the rest of January
+			- ThermoScientific_42i-TL
+				- No data from 20240118
+				- Calibration from 20240119 is on there, going to use to check 2B times
+					- Close enough, maybe fix later?
+			- LI-COR_LI-840A_A
+				- I think I'm filtering out stuff I shouldn't
+				- Not assigned to locations, but should be fixed with previous change
+		- February
+			- Thermo, 2B NOx, Picarro look good
+				- Maybe check what's happening ~17:19 UTC for Picarro?
+			- LI-COR_LI-840A_A
+				- Still need to fix WarmUp selection
+				- 20240210 it's just 698.03 for 24 hours straight?
+					- Actually starts 20240209 ~18:19 UTC
+					- And continues on until 20240223?
+					- Not sure what to make of this
+		- March
+			- 2BTech_205_A
+				- First date I have is 20240301
+				- Need to fix filtering - start of manual O3 additions are not being kept
+					- 20240311
+			- Picarro_G2307
+				- 20240327 is WEIRD
+			- LI-COR_LI-840A_A
+				- Another weird constant value on 20240329 from ~16:00 - 18:30?
+				- Spikes 20240331?
+		- April
+			- 2BTech_205_A
+				- 20240417 check
+			- 2BTech_405nm
+				- 20240416 check
+				- 20240417 check
+			- Picarro_G2307
+				- 20240422 check
+			- ThermoScientific_42i-TL
+				- 20240416 check
+				- 20240417 check
+			- LI-COR_LI-840A_A
+				- Filtering actually looks fine here, so need to double check what's going on
+		- May
+			- 2BTech_205_A
+				- Filtering doesn't seem to be happening at all
+			- No thermo?
+			- LI-COR_LI-840A_A
+				- 20240623 - warmup doesn't seem to be working?
+		- June
+			- 2BTech_205_A
+				- Missing calibration 20240604 - added
+				- Check 20240605
+				- Check 20240606 zeros
+				- 20240612 there is "UZA" that is for sure not UZA
+				- Check 20240613
+				- Need to remove the "UZA" from when tank ran out
+					- 20240617-20240624
+					- Something weird 20240617
+				- Somewhat weird behavior with the zeroing 20240625
+			- 2BTech_405nm
+				- Not sure that the zero timing is actually correct but whatever
+			- Picarro
+				- Check 20240605
+				- Weird zero 20240612
+				- Check 20240613 - flows?
+					- I think when reconnecting NOx
+				- Check 20240614
+				- Check 20240617
+			- 2BTech_205_B
+				- Only 20240604 is there?
+				- 20240610 on the Sampling location isn't assigned?
+		- July
+			- Picarro
+				- Double check 20240708
+					- For sure a line change
+				- Check 20240715
+				- UZA missing 20240721 - 20240722
+			- Thermo
+				- Don't have cal source correctly attributed 20240708
+				- Changed sampling of B211 to start at 18:31 instead of 16:31
+				- Check 20240730
+			- 2BTech_205_A
+				- Double check 20240715
+				- 20240719 there's a UZA point that shouldn't be there
+		- August
+			- LICOR stops 20240814
+			- 2B 205 B stops 20240830
+			- 2B 205 A
+				- Missing UZA 20240812
+				- stops 20240816
+		- December looks good
+	- 2025 data
+		- Need to get citrus additions in there
+		- January
+			- LICOR
+				- Sampling location doesn't start until 20250110
+		- February
+			- Looks good
+		- March
+			- One of the "B203" sampling is actually a UZA on 20250320 - fix!
+		- April
+			- LI-COR on 20250417 and 18 - WarmUp should have eliminated these points?
+		- May
+			- Looks good
+- To get Phase II data ready need to:
+	- Change 20250320 B203 to UZA - done
+	- Add citrus additions as None for O3 - done
+	- Then will check filters
+- Changing the sampling locations read in to consider "None" as null value rather than a string "None"
+- To make filtering easier to investigate, I'm going to change the filtering to make the sampling location None rather than just removing the data
+	- Challenging with the Hampel filter
+		- No it's not
+	- TempRHDoor doesn't have any sampling location, so throwing error - fixing by creating a sampling location file
+		- Checking if it works - it does!
+	- Trying to figure out why the 2BTech_205_A locations that are None are being filtered out
+		- Has to do with Hampel filter - NOx is fine
+		- Added a line when concatenating the filtered and unfiltered (non C200) data to include the null sampling locations I think - testing it 
+			- That fixed it!
+	- When the kernel dies again :)))))))
+- Checking Hampel filter
+	- Check 20250123 - there's clusters of points that I don't think should be removed?
+		- Investigating - not a log restart, check warmup?
+		- It is a WarmUp thing - logged as warming up even though there wasn't a time gap in the DAQ
+		- Not sure I am concerned enough to bother
+			- This is in all of the instruments so was an acquisition thing - getting rid of 15 minutes total is fine with me
+	- Check 20250204
+		- NOT warmup - why removed?
+		- TGLine sampling location is None (not sure why, but sure let's go with it)
+	- Check 20250206
+		- Part explained by TGLine locations
+		- Other by WarmUp - all good
+	- Check 20250207
+		- Good
+	- Check 20250226
+		- Limonene interference???? Why???
+	- Filter mostly does what I want 20250212 and 13 and 15
+	- Check 20250301
+		- This was the day I messed up and had a zero start right when the addition did - all good
+	- 20250312
+		- A point that would be reasonable to remove but isn't caught by the filter - assess
+	- Check 20250319
+		- There is an alpha pinene interference (lame!)
+			- Not as significant as the real citrus though
+		- Going to account for this by making sampling location None for O3 
+	- Check 20250327
+		- Another alpha pinene interference, putting sampling location as None
+	- Check 20250415 - there's an O3 addition but not registered?
+		- I think it's because of the WarmUp condition - may need to revise for O3 and instead of 0 do greater than some value
+	- 2024 data?
+		- 20240301 small spike ~20:30
+		- 20240311 - I think these may have been the original O3 additions, spike VERY high
+			- Check, also some points that maybe shouldn't be removed are
+		- 20240324 there's a point that should be filtered out and isn't
+			- Same for 20240325
+		- Check 20240417 - probably a line change
+		- Fails to filter 20240427
+		- Fails to filter 20240503, 04, 05, 07, 08
+		- Investigate event 20240509
+		- Doesn't fully filter 20240516, 20, 21, 22, 23, 29
+		- Overfilters 20240605 through 11 because at 2sec averaging :(
+		- Okay leaving this for later there's no reason to get distracted - NEED THE PHASE II ICARTT FILES DONE!!!!!!
+- Changing WarmUp filter to be when less than 300 consider it warm
+	- Works great for ozone - NOx is what I need to be concerned with though
+	- NOx
+		- It looks like on 20250205 it is taking out the data that would surround a zero, but there is no zero?
+			- That's what it's doing through 20250207
+			- Looked at the sampling location and it's just B203 over and over again? It's definitely following the UZA time though
+			- Should just be B203 straight through
+			- I think I see the problem! Need to filter to be only the data with TGLine as sampling location before joining with the TGLine location DF
+		- Otherwise looks good with just the 300 seconds
+- After changes made, seems to be working the way I want it to
+	- "Quickly" checking (will kill the kernel I suspect)
+		- Double check 20250212 Thermo
+			- Okay I think it does need to be the full 600 second warmup for thermo
+			- And 20250312 - there's a little dip
+				- This is Picarro warm up, going to make its location None on the TG line
+					- Fixes an ozone problem too!
+	- Just going to keep the 600 second warmup for all instruments it's fine
+- All is fine, removing the plotting checks
+- Rerunning clean_rawdata.py with changes
+- Then re-ran characterize_zeros.py
+	- Not sure that there were any changes but perhaps
+- Reran calibrate_cleandata.py
+	- Threw an error
+# characterize_zeros.py
+- Changed to exclude statistics calculations for 30s, 2min, and 5min averaged CH2O
+- After fixing this and running the script, calibrate_cleandata.py ran without issue
+# calibrate_cleandata.py
+- Need to add the uncertainty calculations to this file
+- Also trying to think about Thermo NOx data averaging
+	- What if I just pick the start time and delete what comes after until a minute has passed?
+# clean_rawdata.py
+- Going back in to pick the first log of every minute for Thermo to keep and drop all others
+- Then reran characterize_zeros.py and calibrate_cleandata.py
