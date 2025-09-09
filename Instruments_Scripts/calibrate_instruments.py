@@ -454,6 +454,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     
                     plt.close()
                 inst_cal_factors[date] = date_cal_factors
+    cal_factors[inst] = inst_cal_factors
 
 for inst, factors in cal_factors.items():
     inst_cal_results = []
