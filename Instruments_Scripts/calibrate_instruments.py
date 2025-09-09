@@ -456,7 +456,15 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         inst_cal_fig_dir,
                         inst + "_" + var_nounits + "_CalibrationSNR_" + date + ".png"
                         ))
-                    date_cal_factors[var]
+                    avg_t = (cal_plot_data.select(
+                        pl.col("UTC_DateTime")
+                        .sub(pl.col("UTC_DateTime").shift(1))
+                        .dt.total_seconds().cast(pl.String)
+                        ).filter(
+                            pl.col("UTC_DateTime").ne("0")
+                            )["UTC_DateTime"].mode().item() + "s")
+                    date_cal_factors[var]["AveragingTime"] = avg_t
+                    
                     plt.close()
                 inst_cal_factors[date] = date_cal_factors
     cal_factors[inst] = inst_cal_factors

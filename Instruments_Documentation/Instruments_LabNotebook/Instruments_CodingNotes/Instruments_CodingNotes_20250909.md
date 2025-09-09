@@ -19,3 +19,19 @@
 - I want to take the S/N that I determined and add it to calibration results output
 - Straightforward given it was already calculated, I just needed to add it to the output files
 	- Checked and doing so was successful
+# calibrate_cleandata.py
+- Need to carefully think about how I am going to determine uncertainty
+- Also need to think about how I am going to get estimated zero offset from the correlation plots
+- I think it might be useful to go back to calibrate_instruments.py and get another entry that is the averaging time
+	- Actually, I have the averaging times stored in external files - use those?
+	- This might work, but the challenge is that the averaging time can change in a day and I only have the date of the calibration recorded, not the time
+	- I think I will revise the calibration script again
+# calibrate_instruments.py
+- Revising to have an averaging time determined
+- Using the gap between consecutive UTC_DateTimes
+- Convert time differences to total seconds
+	- Automatically rounds
+- Get the mode
+	- With zero second averaging time filtered out (for Picarro)
+- Cast the mode to a string and add "s" to get the averaging time over the calibration
+- Add it to the file to be exported
