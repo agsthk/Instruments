@@ -3,3 +3,12 @@
 - Going to revise to not calculate mean/std if number of points is too small (2 or less?)
 - Joined the grouped dataframe with a dataframe that counts the number of items in each group, then filtered out zero intervals with 2 or fewer rows
 	- Ensures all zero intervals have a standard deviation calculated
+- I want to look at the cell temperature versus zero - won't want to keep this, but do want figures
+- Creating a branch uza_temps
+- Going to plot the mean zero value against the instrument temperature and see if there is a correlation
+	- Absolutely there is!
+	- Positive for Thermo, negative for O3
+	- Will run an ODR to get an idea of the correlation slope
+- Have ODR results for Thermo and 2B 205A
+	- Picarro no clear correlation, but also never deployed without zeroing so not a concern
+- Only using the 2025 zeros because I know that my sampling locations aren't all correct for 2024
