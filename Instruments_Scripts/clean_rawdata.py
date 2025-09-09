@@ -387,34 +387,6 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
 
         _, source = file[:-17].split("_Structured")
         date = file.rsplit("_", 1)[-1][:-4]
-        if source not in data[inst].keys():
-            data[inst][source] = {}
-        data[inst][source][date] = df
-        #%%
-import hvplot.polars
-#%%
-for inst, sources in data.items():
-    for source, dates in sources.items():
-        for date, df in dates.items():
-            if date.find("2025") == -1:
-                continue
-            if inst != "2BTech_205_A":
-                continue
-            # df = df.with_columns(
-            #     pl.when(pl.col("SamplingLocation").is_null())
-            #     .then(pl.lit("None"))
-            #     .otherwise(pl.col("SamplingLocation"))
-            #     .alias("SamplingLocation")
-            #     )
-            split_plot = df.hvplot.scatter(
-                x="FTC_Start",
-                y="O3_ppb",
-                by="SamplingLocation",
-                title=date
-                )
-            hvplot.show(split_plot)
-
-        #%%
         if "FTC_Start" in df.columns:
             part_col = "FTC_Start"
         else:
