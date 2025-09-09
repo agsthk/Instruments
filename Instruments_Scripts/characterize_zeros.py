@@ -54,7 +54,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         if df.height == 0:
             continue
         uza_stats[inst].append(df)
-        
+
 for inst, dfs in uza_stats.items():
     if len(dfs) == 0:
         continue
@@ -66,6 +66,7 @@ for inst, dfs in uza_stats.items():
             ).with_columns(
                 pl.col("intv").rle_id()
                 )
+    length = df.group_by("intv").len()
     df = df.group_by("intv").agg(
         cs.contains("UTC_Start").min(),
         cs.contains("UTC_Stop").max(),
@@ -73,11 +74,20 @@ for inst, dfs in uza_stats.items():
         cs.contains("UTC_DateTime").max().alias("UTC_Stop"),
         cs.contains("_pp", "_perc").mean().name.suffix("_Mean"),
         cs.contains("_pp", "_perc").std().name.suffix("_STD")
-        ).select(
-            ~cs.contains("NOx", "intv", "30s", "2min", "5min")
-            )
+        ).join(
+            df.group_by("intv").len(),
+            on="intv",
+            how="full",
+            coalesce=True,
+            validate="1:1",
+            maintain_order="left"
+            ).filter(
+                pl.col("len").gt(2)
+                ).select(
+                    ~cs.contains("NOx", "30s", "2min", "5min", "intv", "len")
+                    )
     uza_stats[inst] = df
-    
+
 for inst, df in uza_stats.items():
     if isinstance(df, list):
         continue
