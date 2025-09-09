@@ -12,3 +12,6 @@
 - Have ODR results for Thermo and 2B 205A
 	- Picarro no clear correlation, but also never deployed without zeroing so not a concern
 - Only using the 2025 zeros because I know that my sampling locations aren't all correct for 2024
+- Would it be useful to export these results? Probably
+- Revised code to create a correlation file to export
+	- Same location as the UZA statistics files

@@ -129,13 +129,16 @@ for inst, dfs in uza_stats.items():
 
 temps = ["CellTemp_C", "CavityTemp_C", "InternalTemp_C", "ChamberTemp_C"]
 
+temp_corr = {}
+
 for inst, df in uza_stats.items():
+    inst_temp_corr = {}
     df = df.filter(
         pl.col("UTC_Start").dt.year().eq(2025)
         )
     if df.is_empty():
         continue
-    for temp in ["CellTemp_C", "CavityTemp_C", "InternalTemp_C"]:
+    for temp in ["CellTemp_C", "InternalTemp_C"]:
         tvar = temp + "_Mean"
         tvar_unc = temp + "_STD"
         if tvar in df.columns:
@@ -158,6 +161,15 @@ for inst, df in uza_stats.items():
         linreg = sp.stats.linregress(x, y)
         sens, off, unc_sens, unc_off = perform_odr(x, y, x_unc, y_unc, [linreg.slope, linreg.intercept])
         r2 = calc_r2(x, y, sens, off)
+        
+        if inst not in temp_corr.keys():
+            temp_corr[inst] = {}
+        
+        temp_corr[inst][var] = {"Slope": sens,
+                                "Intercept": off,
+                                "Slope_Uncertainty": unc_sens,
+                                "Intercept_Uncertainty": unc_off,
+                                "R2": r2}
         fit_label = ('['
                      + yname
                      + ']$_{UZA}$ = '
@@ -193,7 +205,7 @@ for inst, df in uza_stats.items():
         # Turns on major and minor gridlines
         fit_ax.grid(which='major')
         fit_ax.grid(which='minor', linestyle=':')
-        
+
 for inst, df in uza_stats.items():
     if isinstance(df, list):
         continue
@@ -207,3 +219,17 @@ for inst, df in uza_stats.items():
     file = inst + "_UZAStatistics.csv"
     path = os.path.join(direct, file)
     df.write_csv(path)
+    if inst in temp_corr.keys():
+        inst_corrs = []
+        for var, corr in temp_corr[inst].items():
+            inst_corrs.append(
+                pl.DataFrame(corr).select(
+                    pl.lit(var.split("_")[0]).alias("Species"),
+                    pl.all()
+                    )
+                )
+        inst_corrs = pl.concat(inst_corrs)
+        file = inst + "_UZATemperatureCorrelation.csv"
+        path = os.path.join(direct, file)
+        inst_corrs.write_csv(path,
+                             float_precision=6)
