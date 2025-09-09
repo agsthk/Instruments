@@ -238,6 +238,8 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 break
         if path.find(inst) == -1:
             continue
+        _, source = file[:-17].split("_Structured")
+        date = file.rsplit("_", 1)[-1][:-4]
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -298,6 +300,14 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 .then(pl.lit(None))
                 .otherwise(pl.col("SamplingLocation"))
                 .alias("SamplingLocation"))
+            if source == "DAQ":
+                lf = lf.group_by_dynamic(
+                    index_column="UTC_Start",
+                    every="1m",
+                    label="datapoint"
+                    ).agg(
+                        pl.all().first()
+                        )
         if inst == "2BTech_205_A":
             lf_room = lf.filter(
                 pl.col("SamplingLocation").str.contains("C200")
@@ -385,8 +395,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         if df.is_empty():
             continue
 
-        _, source = file[:-17].split("_Structured")
-        date = file.rsplit("_", 1)[-1][:-4]
+        
         if "FTC_Start" in df.columns:
             part_col = "FTC_Start"
         else:
