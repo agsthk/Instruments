@@ -9,6 +9,9 @@ import os
 import polars as pl
 import polars.selectors as cs
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+from matplotlib import ticker
+import scipy as sp
 
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
@@ -22,6 +25,39 @@ CLEAN_DATA_DIR = os.path.join(data_dir, "Instruments_CleanData")
 # Full path to directory containing zero results
 ZERO_RESULTS_DIR = os.path.join(data_dir, "Instruments_DerivedData")
 
+def linear(B, x):
+    return B[0] * x + B[1]
+
+def perform_odr(x, y, unc_x, unc_y, beta0):
+    model = sp.odr.Model(linear)
+    unc_x = unc_x.replace(0, 1e-15)
+    unc_x = unc_x.replace(None, 1e-15)
+    unc_y = unc_y.replace(0, 1e-15)
+    unc_y = unc_y.replace(None, 1e-15)
+    data = sp.odr.RealData(x,
+                           y,
+                           sx=unc_x,
+                           sy=unc_y)
+    output = sp.odr.ODR(data, model, beta0=beta0).run()
+    sensitivity, offset = output.beta
+    unc_sensitivity, unc_offset = output.sd_beta
+    return sensitivity, offset, unc_sensitivity, unc_offset
+
+def calc_r2(x, y, sensitivity, offset):
+    ideal_y = linear([sensitivity, offset], x)
+    ss_residual = ((y - ideal_y) ** 2).sum()
+    ss_total = ((y - y.mean()) ** 2).sum()
+    r2 = 1 - (ss_residual / ss_total)
+    return r2
+
+ebar_kwargs = {'fmt': 'o', # Marker style
+               'linestyle': '', # Turns off lines between points
+               'linewidth': 3, # Width of error bars
+               'capsize': 3, # Length of error bar caps
+               'barsabove': False,
+               "mec": "black"} # Error bars drawn on top of markers
+line_kwargs = {'linewidth': 3,
+               'color': "#D9782D"}
 
 insts = ["2BTech_205_A",
          "2BTech_405nm",
@@ -86,47 +122,11 @@ for inst, dfs in uza_stats.items():
             ).filter(
                 pl.col("len").gt(2)
                 ).select(
-                    ~cs.contains("NOx", "30s", "2min", "5min", "intv", "len")
+                    ~cs.contains("NOx", "30", "2min", "5min", "intv", "len")
                     )
     uza_stats[inst] = df
-#%%
 
-import matplotlib.pyplot as plt
-from matplotlib import ticker
-import scipy as sp
 
-def linear(B, x):
-    return B[0] * x + B[1]
-
-def perform_odr(x, y, unc_x, unc_y, beta0):
-    model = sp.odr.Model(linear)
-    unc_x = unc_x.replace(0, 1e-15)
-    unc_x = unc_x.replace(None, 1e-15)
-    unc_y = unc_y.replace(0, 1e-15)
-    unc_y = unc_y.replace(None, 1e-15)
-    data = sp.odr.RealData(x,
-                           y,
-                           sx=unc_x,
-                           sy=unc_y)
-    output = sp.odr.ODR(data, model, beta0=beta0).run()
-    sensitivity, offset = output.beta
-    unc_sensitivity, unc_offset = output.sd_beta
-    return sensitivity, offset, unc_sensitivity, unc_offset
-
-def calc_r2(x, y, sensitivity, offset):
-    ideal_y = linear([sensitivity, offset], x)
-    ss_residual = ((y - ideal_y) ** 2).sum()
-    ss_total = ((y - y.mean()) ** 2).sum()
-    r2 = 1 - (ss_residual / ss_total)
-    return r2
-ebar_kwargs = {'fmt': 'o', # Marker style
-               'linestyle': '', # Turns off lines between points
-               'linewidth': 3, # Width of error bars
-               'capsize': 3, # Length of error bar caps
-               'barsabove': False,
-               "mec": "black"} # Error bars drawn on top of markers
-line_kwargs = {'linewidth': 3,
-               'color': "#D9782D"}
 temps = ["CellTemp_C", "CavityTemp_C", "InternalTemp_C", "ChamberTemp_C"]
 
 for inst, df in uza_stats.items():
@@ -194,15 +194,17 @@ for inst, df in uza_stats.items():
         fit_ax.grid(which='major')
         fit_ax.grid(which='minor', linestyle=':')
         
-
-#%%
-# for inst, df in uza_stats.items():
-#     if isinstance(df, list):
-#         continue
-#     folder = inst + "_DerivedData"
-#     direct = os.path.join(ZERO_RESULTS_DIR, folder)
-#     if not os.path.exists(direct):
-#         os.makedirs(direct)
-#     file = inst + "_UZAStatistics.csv"
-#     path = os.path.join(direct, file)
-#     df.write_csv(path)
+uza_stats[insts[2]]
+for inst, df in uza_stats.items():
+    if isinstance(df, list):
+        continue
+    df = df.select(
+        ~cs.contains("_C")
+        )
+    folder = inst + "_DerivedData"
+    direct = os.path.join(ZERO_RESULTS_DIR, folder)
+    if not os.path.exists(direct):
+        os.makedirs(direct)
+    file = inst + "_UZAStatistics.csv"
+    path = os.path.join(direct, file)
+    df.write_csv(path)
