@@ -434,6 +434,12 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         fit_label += f'+ {ns_off:.3f}\nR' + '$^2$ = ' + f'{ns_r2:.4f}'
                     else: # Subtract negative zero
                         fit_label += f'\u2212 {-ns_off:.3f}\nR' + '$^2$ = ' + f'{ns_r2:.4f}'
+                    
+                    if var.find("NO") != -1:
+                        odr_cal_data = odr_cal_data.filter(
+                            odr_cal_data[var + "_Delivered"].lt(70)
+                            )
+                    
                     ns_fig, ns_ax = plt.subplots(figsize=(6, 6))
                     ns_ax.errorbar(
                         odr_cal_data[var + "_Measured"],
