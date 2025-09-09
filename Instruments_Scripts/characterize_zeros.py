@@ -194,7 +194,6 @@ for inst, df in uza_stats.items():
         fit_ax.grid(which='major')
         fit_ax.grid(which='minor', linestyle=':')
         
-uza_stats[insts[2]]
 for inst, df in uza_stats.items():
     if isinstance(df, list):
         continue
