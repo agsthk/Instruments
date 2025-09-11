@@ -85,8 +85,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 break
         if path.find(inst) == -1:
             continue
-        # if inst != "ThermoScientific_42i-TL": continue
-        if inst != "2BTech_205_A": continue
+        if inst != "ThermoScientific_42i-TL": continue
+        # if inst != "2BTech_205_A": continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -166,13 +166,16 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             #     )
 
             if file[-12:-8] == "2025":
+                lf = lf.with_columns(
+                    (pl.col(var + "_Predicted").sub(pl.col(var + "_Mean"))).truediv(pl.col(var + "_Predicted").add(pl.col(var + "_Mean"))).mul(2).alias(var + "_Diff")
+                    )
                 df = lf.collect()
                 cols = [var + "_Mean", var + "_Predicted"]
                 cols = [col for col in cols if col in df.columns]
                 hvplot.show(
                     df.hvplot.scatter(
                         x=left_on,
-                        y=cols,
+                        y=var + "_Diff",
                         title=inst + " Offsets Comparison: " + file[-12:-4]
                         )
                     

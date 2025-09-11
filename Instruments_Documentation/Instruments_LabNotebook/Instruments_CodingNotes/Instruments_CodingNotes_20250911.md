@@ -19,3 +19,10 @@
 	- Fixed offset does not look reasonable at all really
 		- Removing
 	- Visualizing known vs predicted zeros for Thermo and room O3
+	- Determining the relative percent difference between the two methods of zeroing
+		- Difference isn't too large for 2BTech_205_A
+			- Gets up to 40% at times, but mostly less than ~20%
+				- For a zero, this is great! Will be even smaller for the actual O3 concentration I bet
+		- Thermo is also pretty good
+			-  Very small for NO, a bit larger for NO2 which makes sense given the larger denominator for NO
+		- This is not as useful as determining a percent change in the final value - moving on to that
