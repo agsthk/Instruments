@@ -84,7 +84,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 break
         if path.find(inst) == -1:
             continue
-        # if inst != "2BTech_205_A": continue
+        # if inst != "2BTech_205_B": continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -98,23 +98,10 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         cal_vars = {"_".join(col.split("_", 2)[:2])
                     for col in inst_cal_factors.columns
                     if col != "CalDate"}
-        for var in cal_vars:
-            sens = inst_cal_factors[var + "_Sensitivity"]
-            off = inst_cal_factors[var + "_Offset"]
-            lf = lf.with_columns(
-                (pl.col(var).sub(off)).truediv(sens)
-                )
-            if inst in zeros.keys():
-                # Applies calibration factors to UZA stats
-                inst_uza_stats = inst_uza_stats.with_columns(
-                    (pl.col(var + "_Mean").sub(off)).truediv(sens),
-                    (pl.col(var + "_STD").truediv(sens))
-                    )
         if "UTC_DateTime" in lf.collect_schema().names():
             left_on = "UTC_DateTime"
         else:
             left_on = "UTC_Start"
-            
         if inst in zeros.keys():
             stats_cols = inst_uza_stats.select(
                 cs.contains("Mean", "STD")
@@ -135,28 +122,31 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                         pl.col(stats_cols)
                         .interpolate_by(left_on)
                         )
-            # Up through here looks good I think
-            #%%
-            lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0]).collect()
-            lf.collect()
-            #%%
-            # for col in stats_cols:
-            #     lf = lf.with_columns(
-            #         pl.col(col).fill_null(inst_uza_stats[col].median())
-            #         )
-            lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])
-            for var in cal_vars:
+            lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])        
+        for var in cal_vars:
+            sens = inst_cal_factors[var + "_Sensitivity"].item()
+            off = inst_cal_factors[var + "_Offset"].item()
+            if (var + "_Mean") not in lf.collect_schema().names():
                 lf = lf.with_columns(
-                    pl.col(var).sub(pl.col(var + "_Mean")),
-                    pl.col(var + "_STD").mul(3).alias(var + "_LOD")
+                    pl.lit(off).alias(var + "_Mean"),
+                    pl.lit(0).alias(var + "_STD")
                     )
+            lf = lf.with_columns(
+                pl.col(var + "_Mean").fill_null(off),
+                pl.col(var + "_STD").fill_null(0)
+                )
+            lf = lf.with_columns(
+                pl.col(var).sub(pl.col(var + "_Mean")),
+                pl.col(var + "_STD").mul(3).alias(var + "_LOD")
+                )
             lf = lf.select(
                 ~cs.contains("Mean", "STD")
                 )
-            # lf = lf.filter(
-            #     pl.col("SamplingLocation").ne("UZA"))
+            lf = lf.with_columns(
+                pl.col(var).truediv(sens)
+                )            
         df = lf.collect()
-        
+
         f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
         f_name = f_name[0] + "_" + cal_dates[inst] + "Calibration_" + f_name[1]
         f_dir = root.replace("Clean", "Calibrated")
