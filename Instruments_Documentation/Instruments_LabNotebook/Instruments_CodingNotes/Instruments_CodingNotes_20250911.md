@@ -4,3 +4,18 @@
 	- Apply the UZA offset first, then just apply sensitivity
 	- Ran into some trouble, turns out it was because it was treating the offset and sensitivity as an array instead of a single value
 		- Changed assignment to include .item()
+- Based on Megan's suggestion, decided to simply not apply zero offset correction outside of zeroing periods
+	- No forward fill or backward fill
+	- Does raise the question - how long of gaps in zero should lead me to switch to my temperature based method?
+	- Need to decide a cutoff for what should be considered a useable zero - 6 hours?
+- Going to check the validity of the cell temperature - offset correlation
+	- Using the correlation and cell temperature to define a "Predicted" zero
+	- Also creating a column with the fixed offset determined by the calibration
+	- Plotting the three different methods against each other - fixed vs using zeros vs predicted by cell temperature
+		- For Phase II, I believe that zeroing started 20250127 - prior to that, interpolation not giving useful information
+	- Shape wise, there are several dates where the cell temperature predicted offset and true zeros seem to match quite well
+		- Some are offset by a different amount
+		- May want to check to see if the correlation changes with time? Go back to characterize_zeros.py and color by month maybe?
+	- Fixed offset does not look reasonable at all really
+		- Removing
+	- Visualizing known vs predicted zeros for Thermo and room O3

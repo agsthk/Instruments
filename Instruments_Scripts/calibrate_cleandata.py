@@ -10,6 +10,7 @@ import polars as pl
 import polars.selectors as cs
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import hvplot.polars
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
 # Starts in Instruments/ directory
@@ -84,7 +85,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 break
         if path.find(inst) == -1:
             continue
-        # if inst != "2BTech_205_B": continue
+        # if inst != "ThermoScientific_42i-TL": continue
+        if inst != "2BTech_205_A": continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -126,27 +128,61 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         for var in cal_vars:
             sens = inst_cal_factors[var + "_Sensitivity"].item()
             off = inst_cal_factors[var + "_Offset"].item()
-            if (var + "_Mean") not in lf.collect_schema().names():
-                lf = lf.with_columns(
-                    pl.lit(off).alias(var + "_Mean"),
-                    pl.lit(0).alias(var + "_STD")
-                    )
             lf = lf.with_columns(
-                pl.col(var + "_Mean").fill_null(off),
-                pl.col(var + "_STD").fill_null(0)
-                )
-            lf = lf.with_columns(
-                pl.col(var).sub(pl.col(var + "_Mean")),
-                pl.col(var + "_STD").mul(3).alias(var + "_LOD")
-                )
-            lf = lf.select(
-                ~cs.contains("Mean", "STD")
-                )
-            lf = lf.with_columns(
-                pl.col(var).truediv(sens)
-                )            
-        df = lf.collect()
+                pl.lit(off).alias(var + "_Fixed"))
+            # if (var + "_Mean") not in lf.collect_schema().names():
+            #     lf = lf.with_columns(
+            #         pl.lit(off).alias(var + "_Mean"),
+            #         pl.lit(0).alias(var + "_STD")
+            #         )
+            # lf = lf.with_columns(
+            #     pl.col(var + "_Mean").fill_null(off),
+            #     pl.col(var + "_STD").fill_null(0)
+            #     )
+            # lf = lf.with_columns(
+            #     pl.col(var).sub(pl.col(var + "_Mean")),
+            #     pl.col(var + "_STD").mul(3).alias(var + "_LOD")
+            #     )
+            if inst in correlations.keys():
+                if var.split("_")[0] in correlations[inst]["Species"]:
+                    if inst == "2BTech_205_A":
+                        temp = "CellTemp_C"
+                    else:
+                        temp = "InternalTemp_C"
+                    corr = correlations[inst].filter(
+                        pl.col("Species").eq(var.split("_")[0])
+                        )
+                    m = corr["Slope"].item()
+                    b = corr["Intercept"].item()
+                    lf = lf.with_columns(
+                        pl.col(temp).mul(m).add(b).alias(var + "_Predicted")
+                        )
+            
+            # lf = lf.select(
+            #     ~cs.contains("Mean", "STD")
+            #     )
+            # lf = lf.with_columns(
+            #     pl.col(var).truediv(sens)
+            #     )
 
+            if file[-12:-8] == "2025":
+                df = lf.collect()
+                cols = [var + "_Mean", var + "_Predicted"]
+                cols = [col for col in cols if col in df.columns]
+                hvplot.show(
+                    df.hvplot.scatter(
+                        x=left_on,
+                        y=cols,
+                        title=inst + " Offsets Comparison: " + file[-12:-4]
+                        )
+                    
+                    )
+
+            
+        df = lf.collect()
+        
+        
+#%%
         f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
         f_name = f_name[0] + "_" + cal_dates[inst] + "Calibration_" + f_name[1]
         f_dir = root.replace("Clean", "Calibrated")
