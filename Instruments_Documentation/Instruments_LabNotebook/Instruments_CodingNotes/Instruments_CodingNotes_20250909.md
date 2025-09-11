@@ -35,3 +35,5 @@
 	- With zero second averaging time filtered out (for Picarro)
 - Cast the mode to a string and add "s" to get the averaging time over the calibration
 - Add it to the file to be exported
+# calibrate_cleandata.py
+- Now I have the averaging times for during the calibration in the cal_factors files

@@ -82,7 +82,7 @@ data = {loc[0]: df for loc, df in data.partition_by("SamplingLocation", include_
 for loc, df in data.items():
     fig, ax = plt.subplots(figsize=(10, 8))
     for add_start in add_times["O3"]["UTC_Start"]:
-        if add_start < datetime(2025, 1, 1, tzinfo=pytz.UTC) or add_start > datetime(2025, 2, 1, tzinfo=pytz.UTC):
+        if add_start < datetime(2025, 1, 24, tzinfo=pytz.UTC) or add_start > datetime(2025, 2, 1, tzinfo=pytz.UTC):
             continue
         add_stop = add_start + timedelta(hours=3)
         add_start_2 = add_start - timedelta(minutes=15)
@@ -122,3 +122,66 @@ for loc, df in data.items():
     ax.set_xlabel("Seconds from addition start")
     ax.set_ylabel("Background-subtracted O3 (ppb, linear interpolation used)")
     ax.legend(bbox_to_anchor=(1.1, 1.05))
+
+#%%
+
+colors = {"C200": "red",
+          "C200/B203": "blue"}
+fig, ax = plt.subplots(figsize=(10, 8))
+for loc, df in data.items():
+    for add_start in add_times["O3"]["UTC_Start"]:
+        if add_start < datetime(2025, 1, 25, tzinfo=pytz.UTC) or add_start > datetime(2025, 2, 1, tzinfo=pytz.UTC):
+            continue
+        add_stop = add_start + timedelta(hours=3)
+        add_start_2 = add_start - timedelta(minutes=15)
+        temp_df = df.filter(
+            pl.col("UTC_Start").is_between(add_start_2, add_stop)
+            | pl.col("UTC_Stop").is_between(add_start_2, add_stop)
+            )
+        if temp_df.is_empty():
+            continue
+        temp_df = temp_df.with_columns(
+            pl.col("UTC_Start").sub(add_start).dt.total_seconds()
+            )
+        
+        pre_add = temp_df.filter(
+            pl.col("UTC_Start").lt(0)
+            )["O3_ppb"].mean()
+        post_add = temp_df.filter(
+            pl.col("UTC_Start").gt(8000)
+            )["O3_ppb"].mean()
+
+        temp_df = temp_df.with_columns(
+            pl.when(pl.col("UTC_Start").lt(0))
+            .then(pre_add)
+            .when(pl.col("UTC_Start").gt(8000))
+            .then(post_add)
+            .alias("BG_O3")
+            ).with_columns(
+                pl.col("BG_O3").interpolate_by("UTC_Start")
+                ).with_columns(
+                    pl.col("O3_ppb").sub(pl.col("BG_O3"))
+                    )
+        max_o3 = temp_df["O3_ppb"].max()
+        
+        temp_df = temp_df.with_columns(
+            pl.col("O3_ppb").truediv(max_o3)
+            )
+                
+        max_o3 = temp_df["O3_ppb"].max()
+        ax.plot(temp_df["UTC_Start"], temp_df["O3_ppb"],
+                color=colors[loc],
+                label=(add_start.strftime("%Y-%m-%d %H:%M"))
+                )
+    ax.set_title("Normalized O3 Decay")
+    ax.set_xlabel("Seconds from addition start")
+    ax.set_ylabel("Normalized O3 (linear interpolation used)")
+    ax.legend(bbox_to_anchor=(1.1, 1.05))
+    
+    
+#%%
+fig, ax = plt.subplots(figsize=(10, 8))
+for loc, df in data.items():
+    for add_start in add_times["O3"]["UTC_Start"]:
+        df = df.filter(
+            pl.col("UTC_Start"))
