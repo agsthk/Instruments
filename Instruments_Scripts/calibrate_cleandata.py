@@ -28,7 +28,7 @@ if not os.path.exists(CALIBRATED_DATA_DIR):
     os.makedirs(CALIBRATED_DATA_DIR)
 # Full path to directory containing zero results
 ZERO_RESULTS_DIR = os.path.join(data_dir, "Instruments_DerivedData")
-
+            
 # Date to use calibration factor from
 cal_dates = {"2BTech_202": "20240118",
              "2BTech_205_A": "20250115",
@@ -38,6 +38,7 @@ cal_dates = {"2BTech_202": "20240118",
              "ThermoScientific_42i-TL": "20241216"}
 
 cal_factors = {}
+sn_factors = {}
 for root, dirs, files in os.walk(CAL_RESULTS_DIR):
     for file in files:
         if file.find("CalibrationResults") == -1:
@@ -45,6 +46,11 @@ for root, dirs, files in os.walk(CAL_RESULTS_DIR):
         inst = file.rsplit("_", 1)[0]
         path = os.path.join(root, file)
         inst_cal_factors = pl.read_csv(path)
+        sn_factors[inst] = inst_cal_factors.select(
+            pl.col("CalDate"),
+            pl.selectors.contains("AveragingTime"),
+            pl.selectors.contains("NoiseSignal")
+            )
         cal_factors[inst] = inst_cal_factors.filter(
             pl.col("CalDate").cast(pl.String()).eq(cal_dates[inst])
             ).select(
@@ -52,19 +58,21 @@ for root, dirs, files in os.walk(CAL_RESULTS_DIR):
                 )
         
 zeros = {}
+correlations = {}
 for root, dirs, files in os.walk(ZERO_RESULTS_DIR):
     for file in files:
-        if file.find("UZAStatistics") == -1:
-            continue
-        inst = file.rsplit("_", 1)[0]
-        path = os.path.join(root, file)
-        inst_zeros = pl.read_csv(path)
-        zeros[inst] = inst_zeros.with_columns(
-            cs.contains("UTC").str.to_datetime()
-            )
-
-for inst, factors in cal_factors.items():
-    cal_vars = {"_".join(col.split("_", 2)[:2]) for col in factors.columns}
+        if file.find("UZAStatistics") != -1:
+            inst = file.rsplit("_", 1)[0]
+            path = os.path.join(root, file)
+            inst_zeros = pl.read_csv(path)
+            zeros[inst] = inst_zeros.with_columns(
+                cs.contains("UTC").str.to_datetime()
+                )
+        if file.find("UZATemperatureCorrelation") != -1:
+            inst = file.rsplit("_", 1)[0]
+            path = os.path.join(root, file)
+            correlations[inst] = pl.read_csv(path)
+        
 
 for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
     for file in tqdm(files):
@@ -88,7 +96,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         if inst in zeros.keys():
             inst_uza_stats = zeros[inst]
         cal_vars = {"_".join(col.split("_", 2)[:2])
-                    for col in inst_cal_factors.columns}
+                    for col in inst_cal_factors.columns
+                    if col != "CalDate"}
         for var in cal_vars:
             sens = inst_cal_factors[var + "_Sensitivity"]
             off = inst_cal_factors[var + "_Offset"]
@@ -126,10 +135,15 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                         pl.col(stats_cols)
                         .interpolate_by(left_on)
                         )
-            for col in stats_cols:
-                lf = lf.with_columns(
-                    pl.col(col).fill_null(inst_uza_stats[col].median())
-                    )
+            # Up through here looks good I think
+            #%%
+            lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0]).collect()
+            lf.collect()
+            #%%
+            # for col in stats_cols:
+            #     lf = lf.with_columns(
+            #         pl.col(col).fill_null(inst_uza_stats[col].median())
+            #         )
             lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])
             for var in cal_vars:
                 lf = lf.with_columns(
@@ -139,9 +153,10 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             lf = lf.select(
                 ~cs.contains("Mean", "STD")
                 )
-            lf = lf.filter(
-                pl.col("SamplingLocation").ne("UZA"))
+            # lf = lf.filter(
+            #     pl.col("SamplingLocation").ne("UZA"))
         df = lf.collect()
+        
         f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
         f_name = f_name[0] + "_" + cal_dates[inst] + "Calibration_" + f_name[1]
         f_dir = root.replace("Clean", "Calibrated")
