@@ -36,3 +36,16 @@
 - First things first, want to visualize cell temperature and rates of change, see what we get
 	- Adding the calibration minimum and maximum temperatures and median dTemp/dT to figures as horizontal lines to visualize difference between calibration conditions and measurement conditions
 	- Saving figures in here, but not necessarily long term - depends on how useful they end up being
+		- Insane number of figures - by week would likely be better, but that would require reading in all files at once which I don't want to do
+		- Basically, temperature is nearly always out of the calibration range
+# structure_rawdata.py
+- Not the point right now, but I do have more calibrations from Audrey to run
+	- Downloaded the data to raw data folders, now going to run structure_rawdata.py and hope it works like it should
+		- Well Picarro isn't an HDF file so that obviously threw an error
+		- Revising to just add a csv reading code to get data from Logger that isn't H5 file - would prefer H5 file if I can get my hands on it, but hopefully this is fine
+		- The DATE_TIME column is error in a lot of places?
+			- Going to use Epoch time as the datetime instead and see what that does, and set the real date time column type to be a string
+			- Threw an error because one of the other files is open somewhere idk
+				- Adding a line to not write the new file if it already exists, so hopefully it'll just do the new ones and then I can delete that
+				- It ran! With no error! Let's see if it even worked
+					- It did! Picarro has the stupid dumb repeating times tho :/

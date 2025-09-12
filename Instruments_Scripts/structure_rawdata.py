@@ -126,17 +126,45 @@ def read_picarro(path, schema):
               "OutletValve": "OutletValve_DN",
               "solenoid_valves": "SolenoidValves",
               "H2CO": "CH2O_ppb",
-              "H2CO_30s": "CH2O_30_ppb",
+              "H2CO_30s": "CH2O_30s_ppb",
               "H2CO_2min": "CH2O_2min_ppb",
               "H2CO_5min": "CH2O_5min_ppb",
               "H2O": "H2O_percent",
               "CH4": "CH4_ppm"}
-    data = pd.read_hdf(path, "results")
-    data = pl.from_pandas(data, schema_overrides=schema)
+    if path.split(".")[-1] == "h5":
+        data = pd.read_hdf(path, "results")
+        data = pl.from_pandas(data, schema_overrides=schema)
+    else:
+        data = pl.read_csv(
+            path,
+            skip_rows=1,
+            schema={"ALARM_STATUS": pl.Float64,
+                    "datetime": pl.String,
+                    "DATE_TIME": pl.Float64,
+                    "CH4": pl.Float64,
+                    "CavityPressure": pl.Float64,
+                    "CavityTemp": pl.Float64,
+                    "DasTemp": pl.Float64,
+                    "EtalonTemp": pl.Float64,
+                    "FracDays": pl.Float64,
+                    "FracHours": pl.Float64,
+                    "H2CO": pl.Float64,
+                    "H2CO_2min": pl.Float64,
+                    "H2CO_30s": pl.Float64,
+                    "H2CO_5min": pl.Float64,
+                    "H2O": pl.Float64,
+                    "INST_STATUS": pl.Float64,
+                    "JulianDays": pl.Float64,
+                    "MPVPosition": pl.Float64,
+                    "OutletValve": pl.Float64,
+                    "WarmBoxTemp": pl.Float64,
+                    "solenoid_valves": pl.Float64,
+                    "species": pl.Float64,
+                    }
+            )
     data = data.select(
         *rename.keys()
         ).rename(rename)
-    
     if not data.filter(pl.col("DateTime").is_duplicated()).is_empty():
         part_data = data.partition_by("DateTime")
         sorted_data = []
