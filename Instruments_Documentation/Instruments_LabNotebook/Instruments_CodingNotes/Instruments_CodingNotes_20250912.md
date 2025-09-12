@@ -30,3 +30,5 @@
 	- As in, what if the temperature is changing significantly during zeroing period?
 	- No clear relationship visually, not even going to attempt to fit it
 - Calling script complete for now, moving on
+# calibrate_instruments.py
+- Thought of a way to get a more representative median d(Temp)/dt - fill the ones that would be zero with the one after, that way if it's maintaining that rate of change for a while, a representative number of points are contributed to the median

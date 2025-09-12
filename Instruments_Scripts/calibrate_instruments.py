@@ -275,17 +275,21 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     )
                 # Identifies the column name for temperature data
                 temp_col = temp_data.columns[-1]
-                # Calculates d(Temp)/dt
-                ddt_data = temp_data.with_columns(
+                # Assigns unique ID every time instrument temperature changes
+                temp_data = temp_data.with_columns(
                     pl.col(temp_col).rle_id().alias("ID")
-                    ).filter(
+                    )
+                # Calculates d(Temp)/dt
+                ddt_data = temp_data.filter(
                         pl.col("ID").is_first_distinct()
                         ).with_columns(
-                            pl.col(temp_col).sub(pl.col(temp_col).shift(1)).alias("dTemp"),
-                            pl.col(left_on).sub(pl.col(left_on).shift(1)).dt.total_microseconds().truediv(1e6).alias("dt")
-                            ).with_columns(
+                            pl.col(temp_col).shift(-1).sub(pl.col(temp_col)).alias("dTemp"),
+                            pl.col(left_on).shift(-1).sub(pl.col(left_on)).dt.total_microseconds().truediv(1e6).alias("dt")
+                            ).select(
+                                pl.col("ID"),
                                 pl.col("dTemp").truediv(pl.col("dt")).alias("d/dt")
                                 )
+                temp_data = temp_data.join(ddt_data, on="ID", how="left")
                 date_cal_factors[temp_col] = {
                     "Min": temp_data[temp_col].min(),
                     "Max": temp_data[temp_col].max(),
@@ -295,8 +299,8 @@ for inst, inst_cal_inputs in cal_inputs.items():
                 temp_fig, temp_ax = plt.subplots(figsize=(8, 6))
                 change_ax = temp_ax.twinx()
                 change_ax.scatter(
-                    ddt_data[left_on],
-                    ddt_data["d/dt"],
+                    temp_data[left_on],
+                    temp_data["d/dt"],
                     s=25,
                     color="#D9782D")
                 temp_ax.scatter(
