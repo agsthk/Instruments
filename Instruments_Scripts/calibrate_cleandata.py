@@ -130,6 +130,10 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             off = inst_cal_factors[var + "_Offset"].item()
             lf = lf.with_columns(
                 pl.lit(off).alias(var + "_Fixed"))
+            lf = lf.with_columns(
+                pl.col(var).sub(pl.col(var + "_Mean")).truediv(sens).alias(var + "_TrueOffset"),
+                pl.col(var).sub(off).truediv(sens).alias(var +"_FixedOffset")
+                )
             # if (var + "_Mean") not in lf.collect_schema().names():
             #     lf = lf.with_columns(
             #         pl.lit(off).alias(var + "_Mean"),
@@ -157,6 +161,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                     lf = lf.with_columns(
                         pl.col(temp).mul(m).add(b).alias(var + "_Predicted")
                         )
+                    lf = lf.with_columns(
+                        pl.col(var).sub(pl.col(var + "_Predicted")).truediv(sens).alias(var + "_TempOffset"))
             
             # lf = lf.select(
             #     ~cs.contains("Mean", "STD")
@@ -165,19 +171,35 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             #     pl.col(var).truediv(sens)
             #     )
 
-            if file[-12:-8] == "2025":
+            if file[-12:-6] == "202501":
                 lf = lf.with_columns(
-                    (pl.col(var + "_Predicted").sub(pl.col(var + "_Mean"))).truediv(pl.col(var + "_Predicted").add(pl.col(var + "_Mean"))).mul(2).alias(var + "_Diff")
-                    )
+                    (pl.col(var + "_TempOffset").sub(pl.col(var + "_TrueOffset"))).alias(var + "_AbsDiff"),
+                    (pl.col(var + "_TempOffset").add(pl.col(var + "_TrueOffset"))).truediv(2).alias(var + "_Avg")
+                    ).with_columns(
+                        pl.col(var + "_AbsDiff").truediv(pl.col(var + "_Avg")).alias(var + "_RelDiff")
+                        ).filter(
+                            pl.col("SamplingLocation").str.contains("C200")
+                            )
                 df = lf.collect()
-                cols = [var + "_Mean", var + "_Predicted"]
+                cols = [var + "_TrueOffset", var + "_TempOffset"]#, var + "_FixedOffset"]
                 cols = [col for col in cols if col in df.columns]
                 hvplot.show(
-                    df.hvplot.scatter(
+                    (df.hvplot.scatter(
                         x=left_on,
-                        y=var + "_Diff",
+                        y=cols,
                         title=inst + " Offsets Comparison: " + file[-12:-4]
                         )
+                    + (df.hvplot.scatter(
+                        x=left_on,
+                        y=var + "_AbsDiff"
+                        ) * (
+                            df.hvplot.scatter(
+                                x=left_on,
+                                y=var + "_RelDiff"
+                                )
+                            )
+                            ).opts(multi_y=True)
+                    ).cols(1)
                     
                     )
 

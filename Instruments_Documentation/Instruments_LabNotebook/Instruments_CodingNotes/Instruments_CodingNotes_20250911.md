@@ -26,3 +26,16 @@
 		- Thermo is also pretty good
 			-  Very small for NO, a bit larger for NO2 which makes sense given the larger denominator for NO
 		- This is not as useful as determining a percent change in the final value - moving on to that
+	- Visually examining the difference in final measured value using the three different offset methods
+		- Plotting with absolute and percent difference (% is pretty useless tbh)
+			- For O3, absolute difference is < ~2ppb, mostly <1 ppb, does end up ~3 ppb on 20250327 and 0331, ~4 ppb on 20250328 and 0329
+			- Really solid in April! And May! <1 ppb difference always
+				- Likely because temperature in B203 not fluctuating as much, I think that's a good sign for applying in January
+			- Thermo
+				- May, differences are <0.1 ppb!
+				- <0.2 ppb April
+				- March: <0.3 ppb, mostly way  smaller than that
+				- Feb: as high as 0.6 ppb, but mostly lower than that
+				- January, up to 0.5 ppb, mostly lower
+		- I think I've convinced myself that the temperature correlation works well!
+			- Do need some better figures to actually save and show Megan, though
