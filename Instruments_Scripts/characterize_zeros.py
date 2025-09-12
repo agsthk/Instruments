@@ -135,8 +135,9 @@ temp_corr = {}
 lod_corr = {}
 for inst, df in uza_stats.items():
     inst_temp_corr = {}
+    year = 2025
     df = df.filter(
-        pl.col("UTC_Start").dt.year().eq(2025)
+        pl.col("UTC_Start").dt.year().eq(year)
         )
     if df.is_empty():
         continue
@@ -208,6 +209,17 @@ for inst, df in uza_stats.items():
         fit_ax.grid(which='major')
         fit_ax.grid(which='minor', linestyle=':')
         
+        folder = inst + "_DerivedData"
+        direct = os.path.join(ZERO_RESULTS_DIR, folder, folder + "_Figures")
+        if not os.path.exists(direct):
+            os.makedirs(direct)
+        fit_fig.savefig(os.path.join(
+            direct,
+            inst + "_" + yname + "_OffsetTemperatureCorrelation_" + str(year) + ".png"
+            ))
+        plt.close()
+
+        
         lod = y_unc * 3
         lodreg = sp.stats.linregress(x, lod)
         lodsens, lodoff, unc_lodsens, lodunc_off = perform_odr(x, lod, x_unc, None, [lodreg.slope, lodreg.intercept])
@@ -255,6 +267,12 @@ for inst, df in uza_stats.items():
         # Turns on major and minor gridlines
         lod_ax.grid(which='major')
         lod_ax.grid(which='minor', linestyle=':')
+        
+        lod_fig.savefig(os.path.join(
+            direct,
+            inst + "_" + yname + "_LODTemperatureCorrelation_" + str(year) + ".png"
+            ))
+        plt.close()
 
 for inst, df in uza_stats.items():
     if isinstance(df, list):

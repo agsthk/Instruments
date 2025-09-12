@@ -15,3 +15,7 @@
 - LOD is 3 times the uncertainty in y
 - From here, it's just following the same procedure as with the offset
 - Added code to export the LOD correlation information
+	- Only significant for Thermo I think
+- Quickly plotting LOD vs offset - I bet there is a correlation for Thermo
+	- Not interested in keeping these plots, doesn't look informative
+- Revised to export figures
