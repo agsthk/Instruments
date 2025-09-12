@@ -200,7 +200,7 @@ for inst, df in uza_stats.items():
         fit_ax.legend()
         fit_ax.set_xlabel(xname + " (" + xunit + ")")
         fit_ax.set_ylabel(yname + " Offset (" + yunit + ")")
-        fit_ax.set_title(inst + " Mean UZA measurement vs. Temperature")
+        fit_ax.set_title(inst + " Mean " + yname + " Offset vs. Temperature")
         fit_ax.xaxis.set_major_locator(ticker.AutoLocator())
         fit_ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
         fit_ax.yaxis.set_major_locator(ticker.AutoLocator())
@@ -252,7 +252,7 @@ for inst, df in uza_stats.items():
             xerr=x_unc,
             color="#1E4D2B",
             **ebar_kwargs)
-        lod_ax.plot(x, x * lodreg.slope + lodreg.intercept,
+        lod_ax.plot(x, x * lodsens + lodoff,
                     **line_kwargs,
                     zorder=10,
                     label=fit_label)

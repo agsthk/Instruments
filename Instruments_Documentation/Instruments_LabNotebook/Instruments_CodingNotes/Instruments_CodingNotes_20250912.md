@@ -19,3 +19,14 @@
 - Quickly plotting LOD vs offset - I bet there is a correlation for Thermo
 	- Not interested in keeping these plots, doesn't look informative
 - Revised to export figures
+- Want to investigate month-to-month change in correlation
+	- Ozone monitor definitely does not show a clear correlation between LOD and cell temperature for any month
+		- For offset vs cell temperature, strongest correlation is in April
+		- Month to month change isn't clear enough - how would I apply it anyway?
+	- Thermo
+		- Feb, March, April show clearest correlations, April is a bit different than all together (weaker correlation), but Feb and march basically the same
+	- Definitely not significant enough to account for - full Phase II measurements works just fine if not better
+- Interested if the range of temperatures has a correlation with noise
+	- As in, what if the temperature is changing significantly during zeroing period?
+	- No clear relationship visually, not even going to attempt to fit it
+- Calling script complete for now, moving on
