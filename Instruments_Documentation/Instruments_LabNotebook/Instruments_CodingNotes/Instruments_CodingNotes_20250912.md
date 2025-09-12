@@ -6,3 +6,7 @@
 	- End up with a lot of zeros that I don't want because temperature does remain "constant" for some time
 	- Instead of determining d/dt everywhere, identifying constant temperature intervals, taking the first time that temperature is registered, and dividing it by the time difference between two consecutive new temperatures
 		- Justification is that the temperature is definitely changing over the interval, just not enough for the change to record at the instrument's precision
+		- Was previously getting too many 0 values
+- Added the minimum and maximum instrument temperature and median d(Temp)/dt to calibration outputs
+- Revised averaging time to only be in there once
+- Reordered calibration output to have extra information after

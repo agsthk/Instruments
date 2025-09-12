@@ -260,6 +260,15 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         .name.map(lambda c: "Unc_" + c + "_Measured")
                         )
                         
+                avg_t = (cal_plot_data.select(
+                    pl.col("UTC_DateTime")
+                    .sub(pl.col("UTC_DateTime").shift(1))
+                    .dt.total_seconds().cast(pl.String)
+                    ).filter(
+                        pl.col("UTC_DateTime").ne("0")
+                        )["UTC_DateTime"].mode().item() + "s")
+                date_cal_factors["AveragingTime"] = avg_t
+                        
                 # Identifies instrument temperature data
                 temp_data = cal_plot_data.select(
                     cs.contains("UTC", "CellTemp", "InternalTemp", "CavityTemp")
@@ -277,32 +286,40 @@ for inst, inst_cal_inputs in cal_inputs.items():
                             ).with_columns(
                                 pl.col("dTemp").truediv(pl.col("dt")).alias("d/dt")
                                 )
+                date_cal_factors[temp_col] = {
+                    "Min": temp_data[temp_col].min(),
+                    "Max": temp_data[temp_col].max(),
+                    "MedianDerivative": ddt_data["d/dt"].median()
+                    }
                 # Plots temperature data over the calibration
                 temp_fig, temp_ax = plt.subplots(figsize=(8, 6))
                 change_ax = temp_ax.twinx()
                 change_ax.scatter(
                     ddt_data[left_on],
                     ddt_data["d/dt"],
-                    **scatter_kwargs)
+                    s=25,
+                    color="#D9782D")
                 temp_ax.scatter(
                     temp_data[left_on],
                     temp_data[temp_col],
                     s=25,
                     color="#1E4D2B"
                     )
-                temp_data.with_columns(
-                    pl.col(temp_col).rle_id().alias("ID")
-                    )
+                temp_ax.set_zorder(change_ax.get_zorder() + 1)
+                temp_ax.patch.set_visible(False)
                 set_ax_ticks(temp_ax, ts=True)
                 temp_ax.set_title(date)
                 temp_ax.set_ylabel(temp_col.replace("_", " (") + ")", color="#1E4D2B")
-                change_ax.set_ylabel("d(" + temp_col.split("_")[0] + ")/dt (C/s)", color="#C8C372")
+                change_ax.set_ylabel("d(" + temp_col.split("_")[0] + ")/dt (C/s)", color="#D9782D")
                 temp_fig.suptitle(inst.replace("_", " ") + " Instrument Temperature Calibration Time Series",
                                   size=15)
-                
-                
+                temp_fig_name = inst + "_TemperatureCalibrationTimeSeries_" + date + ".png"
+                temp_fig.savefig(os.path.join(
+                    inst_cal_fig_dir,
+                    temp_fig_name
+                    ))
+                plt.close()
                         
-                #%%
                 for var in cal_vars:
                     if var == "NO_ppb":
                         odr_cal_data = cal_data.filter(
@@ -352,43 +369,41 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         pl.col(var).gt(-2000)
                         )
                     
-                    #%%
-                    # ts_fig, ts_ax = plt.subplots(figsize=(8, 6))
-                    # ts_ax.scatter(cal_plot_data[left_on],
-                    #               cal_plot_data[var],
-                    #               label="Measured [" + var_name + "]",
-                    #               **scatter_kwargs)
-                    # ts_ax.errorbar(odr_cal_data["Mid"],
-                    #                odr_cal_data[var + "_Delivered"],
-                    #                xerr=odr_cal_data["DeltaT"],
-                    #                yerr=odr_cal_data["Unc_" + var + "_Delivered"],
-                    #                label="Delivered [" + var_name + "]",
-                    #                color="#D9782D",
-                    #                **ebar_kwargs)
-                    # ts_ax.errorbar(odr_cal_data["Mid"],
-                    #                odr_cal_data[var + "_Measured"],
-                    #                xerr=odr_cal_data["DeltaT"],
-                    #                yerr=odr_cal_data["Unc_" + var + "_Measured"],
-                    #                label="Mean Measured [" + var_name + "]",
-                    #                color="#1E4D2B",
-                    #                **ebar_kwargs)
+                    ts_fig, ts_ax = plt.subplots(figsize=(8, 6))
+                    ts_ax.scatter(cal_plot_data[left_on],
+                                  cal_plot_data[var],
+                                  label="Measured [" + var_name + "]",
+                                  **scatter_kwargs)
+                    ts_ax.errorbar(odr_cal_data["Mid"],
+                                   odr_cal_data[var + "_Delivered"],
+                                   xerr=odr_cal_data["DeltaT"],
+                                   yerr=odr_cal_data["Unc_" + var + "_Delivered"],
+                                   label="Delivered [" + var_name + "]",
+                                   color="#D9782D",
+                                   **ebar_kwargs)
+                    ts_ax.errorbar(odr_cal_data["Mid"],
+                                   odr_cal_data[var + "_Measured"],
+                                   xerr=odr_cal_data["DeltaT"],
+                                   yerr=odr_cal_data["Unc_" + var + "_Measured"],
+                                   label="Mean Measured [" + var_name + "]",
+                                   color="#1E4D2B",
+                                   **ebar_kwargs)
                     
-                    # set_ax_ticks(ts_ax, ts=True)
-                    # ts_ax.legend(framealpha=1, edgecolor='black')
-                    # ts_ax.set_title(date)
-                    # ts_ax.set_ylabel('[' + var_name + '] (' + var_units + ")")
+                    set_ax_ticks(ts_ax, ts=True)
+                    ts_ax.legend(framealpha=1, edgecolor='black')
+                    ts_ax.set_title(date)
+                    ts_ax.set_ylabel('[' + var_name + '] (' + var_units + ")")
 
-                    # ts_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Time Series",
-                    #                 size=15)
-                    # ts_fig_name = inst + "_" + var_nounits + "_CalibrationTimeSeries_" + date + ".png"
+                    ts_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Time Series",
+                                    size=15)
+                    ts_fig_name = inst + "_" + var_nounits + "_CalibrationTimeSeries_" + date + ".png"
 
-                    # ts_fig.savefig(os.path.join(
-                    #     inst_cal_fig_dir,
-                    #     ts_fig_name
-                    #     ))
+                    ts_fig.savefig(os.path.join(
+                        inst_cal_fig_dir,
+                        ts_fig_name
+                        ))
                     
-                    # plt.close()
-#%%
+                    plt.close()
                     sens, off, unc_sens, unc_off = perform_odr(
                         odr_cal_data[var + "_Delivered"],
                         odr_cal_data[var + "_Measured"],
@@ -408,46 +423,45 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         "Offset_Uncertainty": unc_off,
                         "R2": r2
                         }
-                    #%%
-                    # fit_label = ('['
-                    #  + var_name
-                    #  + ']$_{measured}$ = '
-                    #  + f'{sens:.3f}'
-                    #  + r'$\cdot$ ['
-                    #  + var_name
-                    #  + ']$_{delivered}$ ')
-                    # if off > 0: # Add zero
-                    #     fit_label += f'+ {off:.3f}\nR' + '$^2$ = ' + f'{r2:.4f}'
-                    # else: # Subtract negative zero
-                    #     fit_label += f'\u2212 {-off:.3f}\nR' + '$^2$ = ' + f'{r2:.4f}'
-                    # fit_fig, fit_ax = plt.subplots(figsize=(6, 6))
-                    # fit_ax.errorbar(
-                    #     odr_cal_data[var + "_Delivered"],
-                    #     odr_cal_data[var + "_Measured"],
-                    #     xerr=odr_cal_data["Unc_" + var + "_Delivered"],
-                    #     yerr=odr_cal_data["Unc_" + var + "_Measured"],
-                    #     color=csu_colors['csu_green'],
-                    #     **ebar_kwargs)
-                    # fit_ax.plot(odr_cal_data[var + "_Delivered"], odr_cal_data[var + "_Delivered"] * sens + off,
-                    #             **line_kwargs)
+                    fit_label = ('['
+                     + var_name
+                     + ']$_{measured}$ = '
+                     + f'{sens:.3f}'
+                     + r'$\cdot$ ['
+                     + var_name
+                     + ']$_{delivered}$ ')
+                    if off > 0: # Add zero
+                        fit_label += f'+ {off:.3f}\nR' + '$^2$ = ' + f'{r2:.4f}'
+                    else: # Subtract negative zero
+                        fit_label += f'\u2212 {-off:.3f}\nR' + '$^2$ = ' + f'{r2:.4f}'
+                    fit_fig, fit_ax = plt.subplots(figsize=(6, 6))
+                    fit_ax.errorbar(
+                        odr_cal_data[var + "_Delivered"],
+                        odr_cal_data[var + "_Measured"],
+                        xerr=odr_cal_data["Unc_" + var + "_Delivered"],
+                        yerr=odr_cal_data["Unc_" + var + "_Measured"],
+                        color=csu_colors['csu_green'],
+                        **ebar_kwargs)
+                    fit_ax.plot(odr_cal_data[var + "_Delivered"], odr_cal_data[var + "_Delivered"] * sens + off,
+                                **line_kwargs)
                     
-                    # fit_ax.text(0.05, 0.95, fit_label, va='top',
-                    #             transform=fit_ax.transAxes, bbox={'facecolor': 'white',
-                    #                                               'alpha': 1})
-                    # set_ax_ticks(fit_ax)
-                    # fit_ax.set_xlabel('[' + var_name + '] Delivered (' + var_units + ")")
-                    # fit_ax.set_ylabel('[' + var_name + '] Measured (' + var_units + ")")
-                    # fit_ax.set_title(date)
-                    # fit_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Fit",
-                    #                 size=15)
+                    fit_ax.text(0.05, 0.95, fit_label, va='top',
+                                transform=fit_ax.transAxes, bbox={'facecolor': 'white',
+                                                                  'alpha': 1})
+                    set_ax_ticks(fit_ax)
+                    fit_ax.set_xlabel('[' + var_name + '] Delivered (' + var_units + ")")
+                    fit_ax.set_ylabel('[' + var_name + '] Measured (' + var_units + ")")
+                    fit_ax.set_title(date)
+                    fit_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Fit",
+                                    size=15)
                     
-                    # fit_fig.savefig(os.path.join(
-                    #     inst_cal_fig_dir,
-                    #     inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
-                    #     ))
+                    fit_fig.savefig(os.path.join(
+                        inst_cal_fig_dir,
+                        inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
+                        ))
                     
-                    # plt.close()
-#%%
+                    plt.close()
+
                     model = sp.odr.Model(linear)
                     data = sp.odr.RealData(
                         odr_cal_data[var + "_Measured"],
@@ -469,75 +483,77 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     date_cal_factors[var]["NoiseSignal_Slope_Uncertainty"] = ns_slope_unc
                     date_cal_factors[var]["NoiseSignal_Offset_Uncertainty"] = ns_off_unc
                     date_cal_factors[var]["NoiseSignal_R2"] = ns_r2
-#%%
-                    # fit_label = (var_name
-                    #              + " Noise = "
-                    #              + f'{ns_slope:.5f}'
-                    #              + r' $\cdot$ ('
-                    #              + var_name
-                    #              + " Signal)"
-                    #              )
-                    # if ns_off > 0: # Add zero
-                    #     fit_label += f'+ {ns_off:.3f}\nR' + '$^2$ = ' + f'{ns_r2:.4f}'
-                    # else: # Subtract negative zero
-                    #     fit_label += f'\u2212 {-ns_off:.3f}\nR' + '$^2$ = ' + f'{ns_r2:.4f}'
+
+                    fit_label = (var_name
+                                 + " Noise = "
+                                 + f'{ns_slope:.5f}'
+                                 + r' $\cdot$ ('
+                                 + var_name
+                                 + " Signal)"
+                                 )
+                    if ns_off > 0: # Add zero
+                        fit_label += f'+ {ns_off:.3f}\nR' + '$^2$ = ' + f'{ns_r2:.4f}'
+                    else: # Subtract negative zero
+                        fit_label += f'\u2212 {-ns_off:.3f}\nR' + '$^2$ = ' + f'{ns_r2:.4f}'
                     
-                    # if var.find("NO") != -1:
-                    #     odr_cal_data = odr_cal_data.filter(
-                    #         odr_cal_data[var + "_Delivered"].lt(70)
-                    #         )
+                    if var.find("NO") != -1:
+                        odr_cal_data = odr_cal_data.filter(
+                            odr_cal_data[var + "_Delivered"].lt(70)
+                            )
                     
-                    # ns_fig, ns_ax = plt.subplots(figsize=(6, 6))
-                    # ns_ax.errorbar(
-                    #     odr_cal_data[var + "_Measured"],
-                    #     odr_cal_data["Unc_" + var + "_Measured"],
-                    #     color=csu_colors['csu_green'],
-                    #     **ebar_kwargs)
-                    # ns_ax.plot(odr_cal_data[var + "_Measured"], odr_cal_data[var + "_Measured"] * ns_slope + ns_off,
-                    #             **line_kwargs)
-                    # ns_ax.text(0.01, 1.06, fit_label, va='top', ha="left",
-                    #             transform=ns_ax.transAxes, bbox={'facecolor': 'white',
-                    #                                               'alpha': 1})
-                    # set_ax_ticks(ns_ax)
-                    # ns_ax.set_xlabel(var_name + ' Signal (' + var_units + ")")
-                    # ns_ax.set_ylabel(var_name + ' Noise (' + var_units + ")")
-                    # ns_ax.set_title(date, loc="right")
-                    # ns_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Signal to Noise Fit",
-                    #                 size=15)
+                    ns_fig, ns_ax = plt.subplots(figsize=(6, 6))
+                    ns_ax.errorbar(
+                        odr_cal_data[var + "_Measured"],
+                        odr_cal_data["Unc_" + var + "_Measured"],
+                        color=csu_colors['csu_green'],
+                        **ebar_kwargs)
+                    ns_ax.plot(odr_cal_data[var + "_Measured"], odr_cal_data[var + "_Measured"] * ns_slope + ns_off,
+                                **line_kwargs)
+                    ns_ax.text(0.01, 1.06, fit_label, va='top', ha="left",
+                                transform=ns_ax.transAxes, bbox={'facecolor': 'white',
+                                                                  'alpha': 1})
+                    set_ax_ticks(ns_ax)
+                    ns_ax.set_xlabel(var_name + ' Signal (' + var_units + ")")
+                    ns_ax.set_ylabel(var_name + ' Noise (' + var_units + ")")
+                    ns_ax.set_title(date, loc="right")
+                    ns_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Signal to Noise Fit",
+                                    size=15)
                     
-                    # ns_fig.savefig(os.path.join(
-                    #     inst_cal_fig_dir,
-                    #     inst + "_" + var_nounits + "_CalibrationSNR_" + date + ".png"
-                    #     ))
-                    # plt.close()
-                    #%%
-                    avg_t = (cal_plot_data.select(
-                        pl.col("UTC_DateTime")
-                        .sub(pl.col("UTC_DateTime").shift(1))
-                        .dt.total_seconds().cast(pl.String)
-                        ).filter(
-                            pl.col("UTC_DateTime").ne("0")
-                            )["UTC_DateTime"].mode().item() + "s")
-                    date_cal_factors[var]["AveragingTime"] = avg_t
-                    
+                    ns_fig.savefig(os.path.join(
+                        inst_cal_fig_dir,
+                        inst + "_" + var_nounits + "_CalibrationSNR_" + date + ".png"
+                        ))
+                    plt.close()
+              
                 inst_cal_factors[date] = date_cal_factors
     cal_factors[inst] = inst_cal_factors
 #%%
-# for inst, factors in cal_factors.items():
-#     inst_cal_results = []
-#     for date, results in factors.items():
-#         date_results = []
-#         for species, result in results.items():
-#             date_results.append(
-#                 pl.DataFrame(result).select(
-#                     pl.lit(date).alias("CalDate"),
-#                     pl.all().name.prefix(species + "_")
-#                     )
-#                 )
-#         inst_cal_results.append(pl.concat(date_results, how="align"))
-#     inst_cal_results = pl.concat(inst_cal_results, how="diagonal").sort(by="CalDate")
-#     inst_cal_results.write_csv(os.path.join(CAL_DIR,
-#                                             inst + "_Calibrations",
-#                                             inst + "_CalibrationResults.txt"),
-#                                float_precision=6)
+for inst, factors in cal_factors.items():
+    inst_cal_results = []
+    for date, results in factors.items():
+        date_results = []
+        for species, result in results.items():
+            if type(result) is str:
+                date_results.append(
+                    pl.DataFrame([result], schema=[species]).with_columns(
+                        pl.lit(date).alias("CalDate")
+                        )
+                    )
+                continue
+            date_results.append(
+                pl.DataFrame(result).select(
+                    pl.lit(date).alias("CalDate"),
+                    pl.all().name.prefix(species + "_")
+                    )
+                )
+        inst_cal_results.append(pl.concat(date_results, how="align"))
+    inst_cal_results = pl.concat(inst_cal_results, how="diagonal").sort(by="CalDate").select(
+        pl.col("CalDate"),
+        cs.contains("pp", "perc"),
+        ~cs.contains("pp", "perc", "CalDate")
+        )
+    inst_cal_results.write_csv(os.path.join(CAL_DIR,
+                                            inst + "_Calibrations",
+                                            inst + "_CalibrationResults.txt"),
+                               float_precision=6)
           
