@@ -85,8 +85,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 break
         if path.find(inst) == -1:
             continue
-        if inst != "ThermoScientific_42i-TL": continue
-        # if inst != "2BTech_205_A": continue
+        # if inst != "ThermoScientific_42i-TL": continue
+        if inst != "2BTech_205_B": continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -128,12 +128,12 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         for var in cal_vars:
             sens = inst_cal_factors[var + "_Sensitivity"].item()
             off = inst_cal_factors[var + "_Offset"].item()
-            lf = lf.with_columns(
-                pl.lit(off).alias(var + "_Fixed"))
-            lf = lf.with_columns(
-                pl.col(var).sub(pl.col(var + "_Mean")).truediv(sens).alias(var + "_TrueOffset"),
-                pl.col(var).sub(off).truediv(sens).alias(var +"_FixedOffset")
-                )
+            # lf = lf.with_columns(
+            #     pl.lit(off).alias(var + "_Fixed"))
+            # lf = lf.with_columns(
+            #     pl.col(var).sub(pl.col(var + "_Mean")).truediv(sens).alias(var + "_TrueOffset"),
+            #     pl.col(var).sub(off).truediv(sens).alias(var +"_FixedOffset")
+            #     )
             # if (var + "_Mean") not in lf.collect_schema().names():
             #     lf = lf.with_columns(
             #         pl.lit(off).alias(var + "_Mean"),
@@ -171,41 +171,48 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             #     pl.col(var).truediv(sens)
             #     )
 
-            if file[-12:-6] == "202501":
-                lf = lf.with_columns(
-                    (pl.col(var + "_TempOffset").sub(pl.col(var + "_TrueOffset"))).alias(var + "_AbsDiff"),
-                    (pl.col(var + "_TempOffset").add(pl.col(var + "_TrueOffset"))).truediv(2).alias(var + "_Avg")
-                    ).with_columns(
-                        pl.col(var + "_AbsDiff").truediv(pl.col(var + "_Avg")).alias(var + "_RelDiff")
-                        ).filter(
-                            pl.col("SamplingLocation").str.contains("C200")
-                            )
-                df = lf.collect()
-                cols = [var + "_TrueOffset", var + "_TempOffset"]#, var + "_FixedOffset"]
-                cols = [col for col in cols if col in df.columns]
-                hvplot.show(
-                    (df.hvplot.scatter(
-                        x=left_on,
-                        y=cols,
-                        title=inst + " Offsets Comparison: " + file[-12:-4]
-                        )
-                    + (df.hvplot.scatter(
-                        x=left_on,
-                        y=var + "_AbsDiff"
-                        ) * (
-                            df.hvplot.scatter(
-                                x=left_on,
-                                y=var + "_RelDiff"
-                                )
-                            )
-                            ).opts(multi_y=True)
-                    ).cols(1)
+            # if file[-12:-6] == "202501":
+            #     lf = lf.with_columns(
+            #         (pl.col(var + "_TempOffset").sub(pl.col(var + "_TrueOffset"))).alias(var + "_AbsDiff"),
+            #         (pl.col(var + "_TempOffset").add(pl.col(var + "_TrueOffset"))).truediv(2).alias(var + "_Avg")
+            #         ).with_columns(
+            #             pl.col(var + "_AbsDiff").truediv(pl.col(var + "_Avg")).alias(var + "_RelDiff")
+            #             ).filter(
+            #                 pl.col("SamplingLocation").str.contains("C200")
+            #                 )
+            #     df = lf.collect()
+            #     cols = [var + "_TrueOffset", var + "_TempOffset"]#, var + "_FixedOffset"]
+            #     cols = [col for col in cols if col in df.columns]
+            #     hvplot.show(
+            #         (df.hvplot.scatter(
+            #             x=left_on,
+            #             y=cols,
+            #             title=inst + " Offsets Comparison: " + file[-12:-4]
+            #             )
+            #         + (df.hvplot.scatter(
+            #             x=left_on,
+            #             y=var + "_AbsDiff"
+            #             ) * (
+            #                 df.hvplot.scatter(
+            #                     x=left_on,
+            #                     y=var + "_RelDiff"
+            #                     )
+            #                 )
+            #                 ).opts(multi_y=True)
+            #         ).cols(1)
                     
-                    )
-
-            
-        df = lf.collect()
+            #         )
+            if file[-12:-8] != "2025": continue
         
+            df = lf.collect()
+            hvplot.show(
+                df.hvplot.scatter(
+                    x=left_on,
+                    y="CellTemp_C",
+                    by="SamplingLocation",
+                    title=inst + " Instrument Temperature: " + file[-12:-4])
+                )
+            
         
 #%%
         f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)

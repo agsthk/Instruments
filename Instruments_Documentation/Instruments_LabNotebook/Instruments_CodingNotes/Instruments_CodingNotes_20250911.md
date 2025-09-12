@@ -39,3 +39,13 @@
 				- January, up to 0.5 ppb, mostly lower
 		- I think I've convinced myself that the temperature correlation works well!
 			- Do need some better figures to actually save and show Megan, though
+	- Checking instrument temperatures during calibrations
+		- Thermo - during 20241216 calibration, instrument temperature was 30.3 - 32.7 C, stabilizing around 32.5 C
+			- In April - May, temp is reasonably close to this range, but before, always hotter during Phase II
+		- O3 - during 20250115 calibration, temperature 37 - 38 C, steadily ramping up even after calibration stopped
+			- Same as Thermo - in April-May, temperature reasonably close, but before always hotter
+		- How rapidly are temperatures changing?
+		- What about instruments not on TG line? (vent O3)
+			- 20250115 calibration, temperature ~36 - 38
+			- Out of this range until April
+			- Don't have zeros for this, so I have to use the fixed offset even though it is likely inaccurate :(
