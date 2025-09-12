@@ -132,7 +132,7 @@ for inst, dfs in uza_stats.items():
 temps = ["CellTemp_C", "CavityTemp_C", "InternalTemp_C", "ChamberTemp_C"]
 
 temp_corr = {}
-
+lod_corr = {}
 for inst, df in uza_stats.items():
     inst_temp_corr = {}
     df = df.filter(
@@ -213,6 +213,15 @@ for inst, df in uza_stats.items():
         lodsens, lodoff, unc_lodsens, lodunc_off = perform_odr(x, lod, x_unc, None, [lodreg.slope, lodreg.intercept])
         lodr2 = calc_r2(x, lod, lodsens, lodoff)
         
+        if inst not in lod_corr.keys():
+            lod_corr[inst] = {}
+        
+        lod_corr[inst][var] = {"Slope": lodsens,
+                               "Intercept": lodoff,
+                               "Slope_Uncertainty": unc_lodsens,
+                               "Intercept_Uncertainty": lodunc_off,
+                               "R2": lodr2}
+        
         fit_label = ('['
                      + yname
                      + ']$_{LOD}$ = '
@@ -238,7 +247,7 @@ for inst, df in uza_stats.items():
         lod_ax.legend()
         lod_ax.set_xlabel(xname + " (" + xunit + ")")
         lod_ax.set_ylabel(yname + " LOD (" + yunit + ")")
-        lod_ax.set_title(inst + " LOD vs. Temperature")
+        lod_ax.set_title(inst + " " + yname + " LOD vs. Temperature")
         lod_ax.xaxis.set_major_locator(ticker.AutoLocator())
         lod_ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
         lod_ax.yaxis.set_major_locator(ticker.AutoLocator())
@@ -270,7 +279,21 @@ for inst, df in uza_stats.items():
                     )
                 )
         inst_corrs = pl.concat(inst_corrs)
-        file = inst + "_UZATemperatureCorrelation.csv"
+        file = inst + "_OffsetTemperatureCorrelation.csv"
+        path = os.path.join(direct, file)
+        inst_corrs.write_csv(path,
+                             float_precision=6)
+    if inst in lod_corr.keys():
+        inst_corrs = []
+        for var, corr in lod_corr[inst].items():
+            inst_corrs.append(
+                pl.DataFrame(corr).select(
+                    pl.lit(var.split("_")[0]).alias("Species"),
+                    pl.all()
+                    )
+                )
+        inst_corrs = pl.concat(inst_corrs)
+        file = inst + "_LODTemperatureCorrelation.csv"
         path = os.path.join(direct, file)
         inst_corrs.write_csv(path,
                              float_precision=6)
