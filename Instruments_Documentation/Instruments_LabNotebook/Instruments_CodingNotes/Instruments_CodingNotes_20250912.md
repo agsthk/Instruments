@@ -49,3 +49,11 @@
 				- Adding a line to not write the new file if it already exists, so hopefully it'll just do the new ones and then I can delete that
 				- It ran! With no error! Let's see if it even worked
 					- It did! Picarro has the stupid dumb repeating times tho :/
+- Revising sampling locations to be calibration source between the end of Phase II and the calibration for the respective instruments
+	- Not running any additional scripts at this time because I don't have any calibration inputs!
+# calibrate_cleandata.py
+- Transitioning back to comparing the different offsets - fixed, true/interpolated, and predicted from temperature correlation
+	- First, just visually examining the different offsets (which I did last time - what am I doing?)
+	- I actually think this should be its own script
+		- Will do similar things to calibrate_cleandata.py, but will have an easier time if I can read in all the data
+		- I have a headache :( and it's 5:40, so come back to this another day

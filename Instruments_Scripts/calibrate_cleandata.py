@@ -87,7 +87,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         if path.find(inst) == -1:
             continue
         # if inst != "ThermoScientific_42i-TL": continue
-        # if inst != "2BTech_205_A": continue
+        if inst != "2BTech_205_A": continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -138,8 +138,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         for var in cal_vars:
             sens = inst_cal_factors[var + "_Sensitivity"].item()
             off = inst_cal_factors[var + "_Offset"].item()
-            # lf = lf.with_columns(
-            #     pl.lit(off).alias(var + "_Fixed"))
+            lf = lf.with_columns(
+                pl.lit(off).alias(var + "_Fixed"))
             # lf = lf.with_columns(
             #     pl.col(var).sub(pl.col(var + "_Mean")).truediv(sens).alias(var + "_TrueOffset"),
             #     pl.col(var).sub(off).truediv(sens).alias(var +"_FixedOffset")
@@ -171,8 +171,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                     lf = lf.with_columns(
                         pl.col(temp).mul(m).add(b).alias(var + "_Predicted")
                         )
-                    lf = lf.with_columns(
-                        pl.col(var).sub(pl.col(var + "_Predicted")).truediv(sens).alias(var + "_TempOffset"))
+                    # lf = lf.with_columns(
+                    #     pl.col(var).sub(pl.col(var + "_Predicted")).truediv(sens).alias(var + "_TempOffset"))
             
             # lf = lf.select(
             #     ~cs.contains("Mean", "STD")
@@ -181,95 +181,83 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             #     pl.col(var).truediv(sens)
             #     )
 
-            # if file[-12:-6] == "202501":
-            #     lf = lf.with_columns(
-            #         (pl.col(var + "_TempOffset").sub(pl.col(var + "_TrueOffset"))).alias(var + "_AbsDiff"),
-            #         (pl.col(var + "_TempOffset").add(pl.col(var + "_TrueOffset"))).truediv(2).alias(var + "_Avg")
-            #         ).with_columns(
-            #             pl.col(var + "_AbsDiff").truediv(pl.col(var + "_Avg")).alias(var + "_RelDiff")
-            #             ).filter(
-            #                 pl.col("SamplingLocation").str.contains("C200")
-            #                 )
-            #     df = lf.collect()
-            #     cols = [var + "_TrueOffset", var + "_TempOffset"]#, var + "_FixedOffset"]
-            #     cols = [col for col in cols if col in df.columns]
-            #     hvplot.show(
-            #         (df.hvplot.scatter(
-            #             x=left_on,
-            #             y=cols,
-            #             title=inst + " Offsets Comparison: " + file[-12:-4]
-            #             )
-            #         + (df.hvplot.scatter(
-            #             x=left_on,
-            #             y=var + "_AbsDiff"
-            #             ) * (
-            #                 df.hvplot.scatter(
-            #                     x=left_on,
-            #                     y=var + "_RelDiff"
-            #                     )
-            #                 )
-            #                 ).opts(multi_y=True)
-            #         ).cols(1)
-                    
-            #         )
-            if file[-12:-8] != "2025": continue
+            if file[-12:-6] == "202501":
+                # lf = lf.with_columns(
+                #     (pl.col(var + "_TempOffset").sub(pl.col(var + "_TrueOffset"))).alias(var + "_AbsDiff"),
+                #     (pl.col(var + "_TempOffset").add(pl.col(var + "_TrueOffset"))).truediv(2).alias(var + "_Avg")
+                #     ).with_columns(
+                #         pl.col(var + "_AbsDiff").truediv(pl.col(var + "_Avg")).alias(var + "_RelDiff")
+                #         ).filter(
+                #             pl.col("SamplingLocation").str.contains("C200")
+                #             )
+                df = lf.collect()
+                cols = [var + "_Mean", var + "_Predicted", var + "_Fixed"]
+                cols = [col for col in cols if col in df.columns]
+                hvplot.show(
+                    df.hvplot.scatter(
+                        x=left_on,
+                        y=cols,
+                        title=inst + " Offsets Comparison: " + file[-12:-4]
+                        )
+                    )
+            # if file[-12:-8] != "2025": continue
         
-            df = lf.collect()
+            # df = lf.collect()
             
-            # Identifies instrument temperature data
-            temp_data = df.select(
-                cs.contains("UTC", "CellTemp", "InternalTemp", "CavityTemp")
-                )
-            # Identifies the column name for temperature data
-            temp_col = temp_data.columns[-1]
-            # Assigns unique ID every time instrument temperature changes
-            temp_data = temp_data.with_columns(
-                pl.col(temp_col).rle_id().alias("ID")
-                )
-            # Calculates d(Temp)/dt
-            ddt_data = temp_data.filter(
-                    pl.col("ID").is_first_distinct()
-                    ).with_columns(
-                        pl.col(temp_col).shift(-1).sub(pl.col(temp_col)).alias("dTemp"),
-                        pl.col(left_on).shift(-1).sub(pl.col(left_on)).dt.total_microseconds().truediv(1e6).alias("dt")
-                        ).select(
-                            pl.col("ID"),
-                            pl.col("dTemp").truediv(pl.col("dt")).alias("d/dt")
-                            )
-            temp_data = temp_data.join(ddt_data, on="ID", how="left")
+            # # Identifies instrument temperature data
+            # temp_data = df.select(
+            #     cs.contains("UTC", "CellTemp", "InternalTemp", "CavityTemp")
+            #     )
+            # # Identifies the column name for temperature data
+            # temp_col = temp_data.columns[-1]
+            # # Assigns unique ID every time instrument temperature changes
+            # temp_data = temp_data.with_columns(
+            #     pl.col(temp_col).rle_id().alias("ID")
+            #     )
+            # # Calculates d(Temp)/dt
+            # ddt_data = temp_data.filter(
+            #         pl.col("ID").is_first_distinct()
+            #         ).with_columns(
+            #             pl.col(temp_col).shift(-1).sub(pl.col(temp_col)).alias("dTemp"),
+            #             pl.col(left_on).shift(-1).sub(pl.col(left_on)).dt.total_microseconds().truediv(1e6).alias("dt")
+            #             ).select(
+            #                 pl.col("ID"),
+            #                 pl.col("dTemp").truediv(pl.col("dt")).alias("d/dt")
+            #                 )
+            # temp_data = temp_data.join(ddt_data, on="ID", how="left")
 
-            # Plots temperature data over the calibration
-            temp_fig, temp_ax = plt.subplots(figsize=(8, 6))
-            change_ax = temp_ax.twinx()
-            change_ax.scatter(
-                temp_data[left_on],
-                temp_data["d/dt"],
-                s=25,
-                color="#D9782D")
-            temp_ax.scatter(
-                temp_data[left_on],
-                temp_data[temp_col],
-                s=25,
-                color="#1E4D2B"
-                )
-            temp_ax.set_xlim(temp_data[left_on].min(), temp_data[left_on].max())
-            temp_ax.axhline(mintemp, color="#1E4D2B", lw=3, ls="-.")
-            temp_ax.axhline(maxtemp, color="#1E4D2B", lw=3, ls="-.")
-            temp_ax.text(temp_data[left_on].min(), mintemp, "Min. Cal. Temp.", va="center", ha="right", color="#1E4D2B")
-            temp_ax.text(temp_data[left_on].min(), maxtemp, "Max. Cal. Temp.", va="center", ha="right", color="#1E4D2B")
+            # # Plots temperature data over the calibration
+            # temp_fig, temp_ax = plt.subplots(figsize=(8, 6))
+            # change_ax = temp_ax.twinx()
+            # change_ax.scatter(
+            #     temp_data[left_on],
+            #     temp_data["d/dt"],
+            #     s=25,
+            #     color="#D9782D")
+            # temp_ax.scatter(
+            #     temp_data[left_on],
+            #     temp_data[temp_col],
+            #     s=25,
+            #     color="#1E4D2B"
+            #     )
+            # temp_ax.set_xlim(temp_data[left_on].min(), temp_data[left_on].max())
+            # temp_ax.axhline(mintemp, color="#1E4D2B", lw=3, ls="-.")
+            # temp_ax.axhline(maxtemp, color="#1E4D2B", lw=3, ls="-.")
+            # temp_ax.text(temp_data[left_on].min(), mintemp, "Min. Cal. Temp.", va="center", ha="right", color="#1E4D2B")
+            # temp_ax.text(temp_data[left_on].min(), maxtemp, "Max. Cal. Temp.", va="center", ha="right", color="#1E4D2B")
             
-            change_ax.axhline(meddt, color="#D9782D", lw=3, ls="--")
-            change_ax.text(temp_data[left_on].max(), meddt, "Med. Cal. d/dt", va="center", ha="left", color="#D9782D")
-            temp_ax.set_zorder(change_ax.get_zorder() + 1)
-            temp_ax.patch.set_visible(False)
-            set_ax_ticks(temp_ax, ts=True)
-            temp_ax.set_title(file[-12:-4])
-            temp_ax.set_ylabel(temp_col.replace("_", " (") + ")", color="#1E4D2B")
-            change_ax.set_ylabel("d(" + temp_col.split("_")[0] + ")/dt (C/s)", color="#D9782D")
-            temp_fig.suptitle(inst.replace("_", " ") + " Instrument Temperature Time Series",
-                              size=15)
-            temp_fig.savefig(inst + "_TemperatureTimeSeries_" + cal_dates[inst] + "Calibration_" + file[-12:-4] + ".png")
-            plt.close()
+            # change_ax.axhline(meddt, color="#D9782D", lw=3, ls="--")
+            # change_ax.text(temp_data[left_on].max(), meddt, "Med. Cal. d/dt", va="center", ha="left", color="#D9782D")
+            # temp_ax.set_zorder(change_ax.get_zorder() + 1)
+            # temp_ax.patch.set_visible(False)
+            # set_ax_ticks(temp_ax, ts=True)
+            # temp_ax.set_title(file[-12:-4])
+            # temp_ax.set_ylabel(temp_col.replace("_", " (") + ")", color="#1E4D2B")
+            # change_ax.set_ylabel("d(" + temp_col.split("_")[0] + ")/dt (C/s)", color="#D9782D")
+            # temp_fig.suptitle(inst.replace("_", " ") + " Instrument Temperature Time Series",
+            #                   size=15)
+            # temp_fig.savefig(inst + "_TemperatureTimeSeries_" + cal_dates[inst] + "Calibration_" + file[-12:-4] + ".png")
+            # plt.close()
             # hvplot.show(
             #     df.hvplot.scatter(
             #         x=left_on,
@@ -280,12 +268,12 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             
         
 #%%
-        f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
-        f_name = f_name[0] + "_" + cal_dates[inst] + "Calibration_" + f_name[1]
-        f_dir = root.replace("Clean", "Calibrated")
-        if not os.path.exists(f_dir):
-            os.makedirs(f_dir)
-        path = os.path.join(f_dir,
-                            f_name)
-        df.write_csv(path)
+        # f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
+        # f_name = f_name[0] + "_" + cal_dates[inst] + "Calibration_" + f_name[1]
+        # f_dir = root.replace("Clean", "Calibrated")
+        # if not os.path.exists(f_dir):
+        #     os.makedirs(f_dir)
+        # path = os.path.join(f_dir,
+        #                     f_name)
+        # df.write_csv(path)
         
