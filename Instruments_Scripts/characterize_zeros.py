@@ -30,10 +30,12 @@ def linear(B, x):
 
 def perform_odr(x, y, unc_x, unc_y, beta0):
     model = sp.odr.Model(linear)
-    unc_x = unc_x.replace(0, 1e-15)
-    unc_x = unc_x.replace(None, 1e-15)
-    unc_y = unc_y.replace(0, 1e-15)
-    unc_y = unc_y.replace(None, 1e-15)
+    if unc_x is not None:
+        unc_x = unc_x.replace(0, 1e-15)
+        unc_x = unc_x.replace(None, 1e-15)
+    if unc_y is not None:
+        unc_y = unc_y.replace(0, 1e-15)
+        unc_y = unc_y.replace(None, 1e-15)
     data = sp.odr.RealData(x,
                            y,
                            sx=unc_x,
@@ -196,7 +198,7 @@ for inst, df in uza_stats.items():
         
         fit_ax.legend()
         fit_ax.set_xlabel(xname + " (" + xunit + ")")
-        fit_ax.set_ylabel("UZA " + yname + " (" + yunit + ")")
+        fit_ax.set_ylabel(yname + " Offset (" + yunit + ")")
         fit_ax.set_title(inst + " Mean UZA measurement vs. Temperature")
         fit_ax.xaxis.set_major_locator(ticker.AutoLocator())
         fit_ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
@@ -205,6 +207,45 @@ for inst, df in uza_stats.items():
         # Turns on major and minor gridlines
         fit_ax.grid(which='major')
         fit_ax.grid(which='minor', linestyle=':')
+        
+        lod = y_unc * 3
+        lodreg = sp.stats.linregress(x, lod)
+        lodsens, lodoff, unc_lodsens, lodunc_off = perform_odr(x, lod, x_unc, None, [lodreg.slope, lodreg.intercept])
+        lodr2 = calc_r2(x, lod, lodsens, lodoff)
+        
+        fit_label = ('['
+                     + yname
+                     + ']$_{LOD}$ = '
+                     + f'{lodsens:.3f}'
+                     + r'$\cdot$ '
+                     + xname)
+        if lodoff > 0: # Add zero
+            fit_label += f' + {lodoff:.3f}\nR' + '$^2$ = ' + f'{lodr2:.4f}'
+        else: # Subtract negative zero
+            fit_label += f' \u2212 {-lodoff:.3f}\nR' + '$^2$ = ' + f'{lodr2:.4f}'
+        
+        lod_fig, lod_ax = plt.subplots(figsize=(8, 8))
+        lod_ax.errorbar(
+            x,
+            lod,
+            xerr=x_unc,
+            color="#1E4D2B",
+            **ebar_kwargs)
+        lod_ax.plot(x, x * lodreg.slope + lodreg.intercept,
+                    **line_kwargs,
+                    zorder=10,
+                    label=fit_label)
+        lod_ax.legend()
+        lod_ax.set_xlabel(xname + " (" + xunit + ")")
+        lod_ax.set_ylabel(yname + " LOD (" + yunit + ")")
+        lod_ax.set_title(inst + " LOD vs. Temperature")
+        lod_ax.xaxis.set_major_locator(ticker.AutoLocator())
+        lod_ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
+        lod_ax.yaxis.set_major_locator(ticker.AutoLocator())
+        lod_ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())
+        # Turns on major and minor gridlines
+        lod_ax.grid(which='major')
+        lod_ax.grid(which='minor', linestyle=':')
 
 for inst, df in uza_stats.items():
     if isinstance(df, list):
