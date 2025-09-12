@@ -32,3 +32,7 @@
 - Calling script complete for now, moving on
 # calibrate_instruments.py
 - Thought of a way to get a more representative median d(Temp)/dt - fill the ones that would be zero with the one after, that way if it's maintaining that rate of change for a while, a representative number of points are contributed to the median
+# calibrate_cleandata.py
+- First things first, want to visualize cell temperature and rates of change, see what we get
+	- Adding the calibration minimum and maximum temperatures and median dTemp/dT to figures as horizontal lines to visualize difference between calibration conditions and measurement conditions
+	- Saving figures in here, but not necessarily long term - depends on how useful they end up being
