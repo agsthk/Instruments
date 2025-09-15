@@ -7,3 +7,15 @@
 	- Running script and checking outputs to make sure they look reasonable
 		- They do! There's a temperature concern with the Picarro, so changing the first zero to start a little later
 - Now I have updated calibrations :)
+# evaluate_offsets.py
+- New script designed to assess different methods of determining offset
+- Pulling code from calibrate_cleandata.py to get started
+- Only evaluating offset for instruments that were on the trace gas line, and right now only doing 2025
+	- Thermo, Picarro, O3, (later 2B NOx)
+- Reading all data as lazyframes, that way it won't take too long because I won't collect until I'm using that particular data
+- Going to concatenate all dates
+- For all dates/sources, going to define offsets based on:
+	- calibrations (fixed)
+	- UZA measurements (interpolated)
+	- Instrument temperature (estimated by correlation)
+	- (All where available)
