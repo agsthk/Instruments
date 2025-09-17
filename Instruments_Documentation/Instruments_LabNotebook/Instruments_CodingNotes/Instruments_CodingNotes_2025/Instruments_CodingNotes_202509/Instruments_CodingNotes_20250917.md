@@ -11,3 +11,27 @@
 	- Even with this, plotting is taking a very long time - perhaps split by week?
 		- Did that, and wrote script to plot both with matplotlib and hvplot - comment out the one that isn't desired
 		- Also added skipping some instruments to make it faster to look at only one at a time
+	- Fixed offsets
+		- 2BTech_205_A
+			- 20240119 calibration is a bit higher, but still only by ~0.8 ppb - within uncertainty
+				- Other cals are closer together - almost on top of each other
+					- Noteable that first cal was done with Farmer group cal source, all the other ones with Willis group cal source
+				- Will be using 2025 cals anyway for this particular data
+			- All basically the same within uncertainty, I believe differences are more likely due to difference in offset rather than sensitivity - more pronounced here than it will be using other methods of offset correction
+		- 2BTech_205_B
+			- Varies by ~0.8 ppb, again mostly consistent
+		- Picarro_G2307
+			- Varies by ~0.5 ppb at lower concentrations, when high by up to ~5 ppb
+				- Again, may be more due to different offsets, although sensitivity was also quite different between the two cals
+					- 2026-06-25 cal is more consistent with what would be expected, so probably going to chose that one
+		- ThermoScientific_42i-TL
+			- February 2024 cals are WAY different than July/December, unsurprising given first was SDC cal and second was with low N2O flow
+			- Reliable cals are within ~1 ppb
+				- I suspect other offset corrections will bring them closer together also
+	- From examining fixed offset, determined that most cals are generally consistent with one another
+		- 2BTech_205_A: Use 20250115
+		- 2BTech_205_B: Use 20250115
+		- Picarro_G2307: Use 20250625
+		- ThermoScientific_42i-TL: Use 20241216
+			- Need cal data for the cals Emma ran - later problem
+	- Now, using the calibration date I have settled on looking at the different offsets

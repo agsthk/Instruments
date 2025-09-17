@@ -216,15 +216,23 @@ for inst, sources in data.items():
                     .alias(corrected_col + "_" + cal)
                     )
         data[inst][source] = lf.collect()
-#%%    
+#%%
+
+inst_caldates = {"2BTech_205_A": "20250115",
+                 "2BTech_205_B": "20250115",
+                 "ThermoScientific_42i-TL": "20241216",
+                 "Picarro_G2307": "20250625"}
+
 for inst, sources in data.items():
+    if inst not in inst_caldates.keys():
+        continue
     if inst != "2BTech_205_A": continue
     # if inst != "2BTech_205_B": continue
     # if inst != "Picarro_G2307": continue
     # if inst != "ThermoScientific_42i-TL": continue
     for source, df in sources.items():
         tcol = [col for col in df.columns if col.find("FTC") != -1][0]
-        fixed = [col for col in df.columns if col.find("FixedOffset") != -1]
+        fixed = [col for col in df.columns if col.find(inst_caldates[inst]) != -1 and col.find("_Offset") == -1 and col.find("Sensitivity") == -1]
         species = {col.rsplit("_", 2)[0] for col in fixed}
         dfs = df.filter(
             pl.col("SamplingLocation").str.contains("C200")
@@ -245,7 +253,7 @@ for inst, sources in data.items():
             for spec in species:
                 spec_cols = [col for col in fixed if col.find(spec) != -1]
                 hvplot.show(
-                    df.hvplot.line(
+                    df.hvplot.scatter(
                         x=tcol,
                         y=spec_cols,
                         title=inst + " " + source + " Week " + str(df["Week"][0]),
