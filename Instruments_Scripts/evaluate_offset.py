@@ -255,16 +255,33 @@ for inst, sources in data.items():
                     pl.col(uza_col).sub(pl.col(temp_col)).alias(spec + "_TemperatureOffsetDifference")
                     )
             spec_cols = [col for col in df.columns if col.find(spec) != -1 and col.find("Diff") != -1]
-            hvplot.show(
-                df.hvplot.scatter(
-                    x=tcol,
-                    y=spec_cols,
-                    title=inst + " " + source,
-                    width=1200,
-                    height=400,
-                    ylabel="Difference in calibrated [" + name + "] Relative to UZA Offset (" + unit + ")",
-                    )
+            
+            off_plot = df.hvplot.scatter(
+                x=tcol,
+                y=spec_cols,
+                title=inst,
+                width=1200,
+                height=400,
+                ylabel="Difference in calibrated [" + name + "] Relative to UZA Offset (" + unit + ")",
                 )
+            uza_plot = df.filter(
+                pl.col("SamplingLocation").eq("UZA")
+                ).hvplot.scatter(
+                    x=tcol,
+                    y=spec,
+                    ylabel=spec,
+                    width=1200,
+                    height=400)
+            hvplot.show(
+                (off_plot + uza_plot).cols(1)
+                )
+            for col in spec_cols:
+                med = df[col].median()
+                lq = df[col].quantile(0.25)
+                uq = df[col].quantile(0.75)
+                low = df[col].min()
+                up = df[col].max()
+                print(inst + " " + col + f": {med:.4f} ({lq:.4f} - {uq:.4f}), ({low:.4f} - {up:.4f})")
         # dfs = df.filter(
         #     pl.col("SamplingLocation").str.contains("C200")
         #     ).with_columns(

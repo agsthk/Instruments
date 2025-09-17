@@ -60,3 +60,24 @@
 		- Statistics on differences
 			- Switching plots to do the full timeseries for visualization - good plots to show Megan!
 				- Doing some renaming to make the figures more clear
+			- Calculated median and lower and upper quantiles of differences
+				- 2BTech_205_A
+					- Fixed: 1.5985 (0.8942 - 2.0031)
+						- min to max (0.1377 - 5.3477)
+					- Temperature: -0.1094 (-0.3548 - 0.1841)
+						- min to max (-2.0813 - 3.7675)
+				- Picarro_G2307
+					- Fixed: 0.4503 (0.3418 - 0.6773)
+						- min to max (0.0834 - 1.2294)
+				- ThermoScientific_42i-TL
+					- NO
+						- Fixed: 0.6040 (0.5649 - 0.6777)
+							- min to max (0.3215 - 0.7833)
+						- Temperature: -0.0043 (-0.0381 - 0.0322)
+							- min to max (-0.5463 - 0.2401)
+					- NO2
+						- Fixed: -0.8549 (-0.9691 - -0.7650)
+							- min to max (-1.6178 - -0.2691)
+						- Temperature: 0.0017 (-0.0600 - 0.0680)
+							- min to max (-1.2081 - 0.5919)
+			- Decided to plot with the UZA data because I want to see if that gives any insight as to the cause of the "large" deviations
