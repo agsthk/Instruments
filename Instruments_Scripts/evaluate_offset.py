@@ -105,12 +105,26 @@ for inst, df in cal_factors.items():
             named=True,
             unique=True
             )
+    # Transforms calibration sensitivies into dictionary for easier calling
+    cal_sens = df.select(
+        pl.col("CalDate"),
+        cs.contains("Sensitivity") & ~cs.contains("NoiseSignal", "Uncertainty")
+        ).rows_by_key(
+            "CalDate", 
+            named=True,
+            unique=True
+            )
     # Adds columns containing fixed offsets determined from calibrations
     for source, lf in data[inst].items():
         for caldate, offsets in cal_offsets.items():
             for var, offset in offsets.items():
                 lf = lf.with_columns(
                     pl.lit(offset).alias(var + "_" + caldate + "Calibration")
+                    )
+        for caldate, sens in cal_sens.items():
+            for var, sen in sens.items():
+                lf = lf.with_columns(
+                    pl.lit(sen).alias(var + "_" + caldate + "Calibration")
                     )
         # Adds columns containing interpolated measured offsets
         if inst in zeros.keys():
@@ -161,4 +175,44 @@ for inst, df in cal_factors.items():
                     .alias(species + "_ppb_Offset_TemperatureCorrelation")
                     )
         # Replaces original LazyFrame with one containing offset columns 
+        data[inst][source] = lf
+
+for inst, sources in data.items():
+    for source, lf in sources.items():
+        # LazyFrame columns
+        cols = lf.collect_schema().names()
+        # Names of columns with offsets
+        offset_cols = [col for col in cols if col.find("Offset") != -1]
+        # Names of columns with sensitivities
+        sens_cols = [col for col in cols if col.find("Sensitivity") != -1]
+        # Names of columns with fixed offsets from calibrations
+        fixed_offset_cols = [col for col in offset_cols if col.find("Calibration") != -1]
+        # Names of columns with variable offsets
+        var_offset_cols = [col for col in offset_cols if col not in fixed_offset_cols]
+        # Calibrates data using fixed calibration offsets
+        for off_col in fixed_offset_cols:
+            species, _, cal = off_col.rsplit("_", 2)
+            sens_col = species + "_Sensitivity_" + cal
+            lf = lf.with_columns(
+                (pl.col(species).sub(pl.col(off_col)))
+                .truediv(pl.col(sens_col))
+                .alias(species + "_FixedOffset_" + cal)
+                )
+        # Calibrates data using variable calibration offsets
+        for off_col in var_offset_cols:
+            species, _, by = off_col.rsplit("_", 2)
+            corrected_col = species + "_" + by + "Offset"
+            lf = lf.with_columns(
+                pl.col(species).sub(pl.col(off_col))
+                .alias(corrected_col)
+                )
+            for sens_col in sens_cols:
+                if sens_col.find(species) == -1:
+                    continue
+                *_, cal = sens_col.rsplit("_")
+                lf = lf.with_columns(
+                    pl.col(corrected_col)
+                    .truediv(pl.col(sens_col))
+                    .alias(corrected_col + "_" + cal)
+                    )
         data[inst][source] = lf
