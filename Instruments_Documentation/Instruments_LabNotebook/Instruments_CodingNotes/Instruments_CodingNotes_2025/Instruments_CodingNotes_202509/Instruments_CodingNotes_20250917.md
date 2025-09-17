@@ -59,3 +59,4 @@
 				- Through ~Jan 27, the difference between UZA and Temp offset is more pronounced (pre zeroing implementation), so temperature based offset likely better during this time
 		- Statistics on differences
 			- Switching plots to do the full timeseries for visualization - good plots to show Megan!
+				- Doing some renaming to make the figures more clear
