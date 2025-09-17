@@ -215,4 +215,20 @@ for inst, sources in data.items():
                     .truediv(pl.col(sens_col))
                     .alias(corrected_col + "_" + cal)
                     )
-        data[inst][source] = lf
+        data[inst][source] = lf.collect()
+#%%    
+for inst, sources in data.items():
+    for source, df in sources.items():
+        tcol = [col for col in df.columns if col.find("FTC") != -1][0]
+        fixed = [col for col in df.columns if col.find("FixedOffset") != -1]
+        hvplot.show(
+            df.hvplot.line(
+                x=tcol,
+                y=fixed,
+                title=inst + " " + source,
+                width=800,
+                height=400
+                )
+            )
+        
+        

@@ -6,3 +6,5 @@
 - Added sensitivity columns to make it easier to calculate without having to go back into the calibration data
 - First, uses fixed calibration offsets to calibrate data
 - Then, for each calibration date, uses the UZA and Temperature correlation offsets to calibrate
+- Now, will plot
+	- A lot of data, so going to take this slowly and start by comparing the different fixed offsets
