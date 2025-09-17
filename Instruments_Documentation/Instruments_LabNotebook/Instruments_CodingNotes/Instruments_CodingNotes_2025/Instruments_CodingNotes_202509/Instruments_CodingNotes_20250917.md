@@ -47,3 +47,15 @@
 				- Temperature correlation offset is pretty incredible for this instrument, almost exactly follows UZA offset
 		- Now actually calculating the differences
 			- Using UZA measurements as the "correct" ones, going to calculate absolute difference relative to Fixed and temperature based offsets after sensitivity factors applied
+			- 2BTech_205_A
+				- Temperature correlation not nearly as good as it is for Thermo sadly
+					- Still improved relative to fixed offset which overestimates by ~2 ppb
+			- Picarro_G2307
+				- Not so worried about this one given zero ~ always running when it's on
+				- Fixed offset overestimates by <1.2 ppb, reasonably close
+			- ThermoScientific_42i-TL
+				- UZA and Temp difference is pretty consistently centered ~0 for both NO and NO2
+				- Fixed offset overestimates NO and underestimates NO2 relative to UZA offset
+				- Through ~Jan 27, the difference between UZA and Temp offset is more pronounced (pre zeroing implementation), so temperature based offset likely better during this time
+		- Statistics on differences
+			- Switching plots to do the full timeseries for visualization - good plots to show Megan!

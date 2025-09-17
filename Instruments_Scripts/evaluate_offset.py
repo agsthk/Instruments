@@ -228,8 +228,8 @@ for inst, sources in data.items():
         continue
     # if inst != "2BTech_205_A": continue
     # if inst != "2BTech_205_B": continue
-    # if inst != "Picarro_G2307": continue
-    if inst != "ThermoScientific_42i-TL": continue
+    if inst != "Picarro_G2307": continue
+    # if inst != "ThermoScientific_42i-TL": continue
     for source, df in sources.items():
         tcol = [col for col in df.columns if col.find("FTC") != -1][0]
         fixed = [col for col in df.columns if col.find(inst_caldates[inst]) != -1 and col.find("_Offset") == -1 and col.find("Sensitivity") == -1]
@@ -251,30 +251,40 @@ for inst, sources in data.items():
                 df = df.with_columns(
                     pl.col(uza_col).sub(pl.col(temp_col)).alias(spec + "_TempUZADiff")
                     )
-        dfs = df.filter(
-            pl.col("SamplingLocation").str.contains("C200")
-            ).with_columns(
-                pl.col(tcol).dt.week().alias("Week")
-                ).partition_by("Week")
-        for df in dfs:
-            # # Plotting with matplotlib
-            # for spec in species:
-            #     fig, ax = plt.subplots()
-            #     for col in fixed:
-            #         if col.find(spec) == -1:
-            #             continue
-            #         ax.plot(df[tcol], df[col], label=col)
-            # ax.legend()
-            # ax.set_title(inst + " " + source + " Week " + str(df["Week"][0]))
-            # Plotting with hvplot
-            for spec in species:
-                spec_cols = [col for col in df.columns if col.find(spec) != -1 and col.find("Diff") != -1]
-                hvplot.show(
-                    df.hvplot.scatter(
-                        x=tcol,
-                        y=spec_cols,
-                        title=inst + " " + source + " Week " + str(df["Week"][0]),
-                        width=800,
-                        height=400
-                        )
+            spec_cols = [col for col in df.columns if col.find(spec) != -1 and col.find("Diff") != -1]
+            hvplot.show(
+                df.hvplot.line(
+                    x=tcol,
+                    y=spec_cols,
+                    title=inst + " " + source,
+                    width=1200,
+                    height=400
                     )
+                )
+        # dfs = df.filter(
+        #     pl.col("SamplingLocation").str.contains("C200")
+        #     ).with_columns(
+        #         pl.col(tcol).dt.week().alias("Week")
+        #         ).partition_by("Week")
+        # for df in dfs:
+        #     # # Plotting with matplotlib
+        #     # for spec in species:
+        #     #     fig, ax = plt.subplots()
+        #     #     for col in fixed:
+        #     #         if col.find(spec) == -1:
+        #     #             continue
+        #     #         ax.plot(df[tcol], df[col], label=col)
+        #     # ax.legend()
+        #     # ax.set_title(inst + " " + source + " Week " + str(df["Week"][0]))
+        #     # Plotting with hvplot
+        #     for spec in species:
+        #         spec_cols = [col for col in df.columns if col.find(spec) != -1 and col.find("Diff") != -1]
+        #         hvplot.show(
+        #             df.hvplot.scatter(
+        #                 x=tcol,
+        #                 y=spec_cols,
+        #                 title=inst + " " + source + " Week " + str(df["Week"][0]),
+        #                 width=800,
+        #                 height=400
+        #                 )
+        #             )
