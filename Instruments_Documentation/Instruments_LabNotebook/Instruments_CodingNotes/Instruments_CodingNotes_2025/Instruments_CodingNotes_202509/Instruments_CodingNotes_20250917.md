@@ -8,3 +8,6 @@
 - Then, for each calibration date, uses the UZA and Temperature correlation offsets to calibrate
 - Now, will plot
 	- A lot of data, so going to take this slowly and start by comparing the different fixed offsets
+	- Even with this, plotting is taking a very long time - perhaps split by week?
+		- Did that, and wrote script to plot both with matplotlib and hvplot - comment out the one that isn't desired
+		- Also added skipping some instruments to make it faster to look at only one at a time

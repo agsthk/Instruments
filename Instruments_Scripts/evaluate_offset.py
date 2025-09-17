@@ -218,17 +218,38 @@ for inst, sources in data.items():
         data[inst][source] = lf.collect()
 #%%    
 for inst, sources in data.items():
+    if inst != "2BTech_205_A": continue
+    # if inst != "2BTech_205_B": continue
+    # if inst != "Picarro_G2307": continue
+    # if inst != "ThermoScientific_42i-TL": continue
     for source, df in sources.items():
         tcol = [col for col in df.columns if col.find("FTC") != -1][0]
         fixed = [col for col in df.columns if col.find("FixedOffset") != -1]
-        hvplot.show(
-            df.hvplot.line(
-                x=tcol,
-                y=fixed,
-                title=inst + " " + source,
-                width=800,
-                height=400
-                )
-            )
-        
-        
+        species = {col.rsplit("_", 2)[0] for col in fixed}
+        dfs = df.filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).with_columns(
+                pl.col(tcol).dt.week().alias("Week")
+                ).partition_by("Week")
+        for df in dfs:
+            # # Plotting with matplotlib
+            # for spec in species:
+            #     fig, ax = plt.subplots()
+            #     for col in fixed:
+            #         if col.find(spec) == -1:
+            #             continue
+            #         ax.plot(df[tcol], df[col], label=col)
+            # ax.legend()
+            # ax.set_title(inst + " " + source + " Week " + str(df["Week"][0]))
+            # Plotting with hvplot
+            for spec in species:
+                spec_cols = [col for col in fixed if col.find(spec) != -1]
+                hvplot.show(
+                    df.hvplot.line(
+                        x=tcol,
+                        y=spec_cols,
+                        title=inst + " " + source + " Week " + str(df["Week"][0]),
+                        width=800,
+                        height=400
+                        )
+                    )
