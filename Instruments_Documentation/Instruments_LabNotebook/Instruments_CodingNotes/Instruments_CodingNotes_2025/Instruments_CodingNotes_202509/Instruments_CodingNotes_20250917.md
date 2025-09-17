@@ -35,3 +35,15 @@
 		- ThermoScientific_42i-TL: Use 20241216
 			- Need cal data for the cals Emma ran - later problem
 	- Now, using the calibration date I have settled on looking at the different offsets
+		- Visually
+			- 2BTech_205_A
+				- UZA and temperature correlation offset are very close together and generally are higher than the fixed offset
+				- Fixed offset does become more reasonable moving into late March (as expected)
+			- Picarro_G2307
+				- No temperature correlation one, but fixed offset seems to be close in general
+					- Expected, UZA measurements don't drift all that much
+					- Within 1 ppb it seems
+			- ThermoScientific_42i-TL
+				- Temperature correlation offset is pretty incredible for this instrument, almost exactly follows UZA offset
+		- Now actually calculating the differences
+			- Using UZA measurements as the "correct" ones, going to calculate absolute difference relative to Fixed and temperature based offsets after sensitivity factors applied

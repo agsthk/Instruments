@@ -226,14 +226,31 @@ inst_caldates = {"2BTech_205_A": "20250115",
 for inst, sources in data.items():
     if inst not in inst_caldates.keys():
         continue
-    if inst != "2BTech_205_A": continue
+    # if inst != "2BTech_205_A": continue
     # if inst != "2BTech_205_B": continue
     # if inst != "Picarro_G2307": continue
-    # if inst != "ThermoScientific_42i-TL": continue
+    if inst != "ThermoScientific_42i-TL": continue
     for source, df in sources.items():
         tcol = [col for col in df.columns if col.find("FTC") != -1][0]
         fixed = [col for col in df.columns if col.find(inst_caldates[inst]) != -1 and col.find("_Offset") == -1 and col.find("Sensitivity") == -1]
         species = {col.rsplit("_", 2)[0] for col in fixed}
+        for spec in species:
+            spec_cols = [col for col in fixed if col.find(spec) != -1]
+            uza_col = [col for col in spec_cols if col.find("UZA") != -1]
+            if len(uza_col) != 0:
+                uza_col = uza_col[0]
+            fixed_col = [col for col in spec_cols if col.find("Fixed") != -1]
+            if len(fixed_col) != 0:
+                fixed_col = fixed_col[0]
+                df = df.with_columns(
+                    pl.col(uza_col).sub(pl.col(fixed_col)).alias(spec + "_FixedUZADiff")
+                    )
+            temp_col = [col for col in spec_cols if col.find("Temperature") != -1]
+            if len(temp_col) != 0:
+                temp_col = temp_col[0]
+                df = df.with_columns(
+                    pl.col(uza_col).sub(pl.col(temp_col)).alias(spec + "_TempUZADiff")
+                    )
         dfs = df.filter(
             pl.col("SamplingLocation").str.contains("C200")
             ).with_columns(
@@ -251,7 +268,7 @@ for inst, sources in data.items():
             # ax.set_title(inst + " " + source + " Week " + str(df["Week"][0]))
             # Plotting with hvplot
             for spec in species:
-                spec_cols = [col for col in fixed if col.find(spec) != -1]
+                spec_cols = [col for col in df.columns if col.find(spec) != -1 and col.find("Diff") != -1]
                 hvplot.show(
                     df.hvplot.scatter(
                         x=tcol,
