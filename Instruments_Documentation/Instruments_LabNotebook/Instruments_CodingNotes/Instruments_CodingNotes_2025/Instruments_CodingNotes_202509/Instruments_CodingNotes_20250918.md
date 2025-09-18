@@ -12,3 +12,6 @@
 		- In general, appears to work - main issue is missing or unstopped UZA periods
 	- Identifying several gaps where zeroing is actively happening
 		- I think my next step needs to be addressing whatever is causing the issues in identifying zeros
+			- Actually no - can do this later and just work with the incorrect stuff now to make sure the process is correct
+- With zeroing active data identified, modifying zero determination
+	- When active, using the same interpolation method as before, but leaving as null when inactive
