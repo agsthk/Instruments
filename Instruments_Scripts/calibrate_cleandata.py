@@ -36,7 +36,7 @@ cal_dates = {"2BTech_202": "20240118",
              "2BTech_205_A": "20250115",
              "2BTech_205_B": "20250115",
              "2BTech_405nm": "20241216",
-             "Picarro_G2307": "20250109",
+             "Picarro_G2307": "20250625",
              "ThermoScientific_42i-TL": "20241216"}
 
 cal_factors = {}

@@ -18,3 +18,6 @@
 	- Where zeroing not active, calculating temperature based offset for Thermo and O3 instruments
 		- Note that column name changes broke the next code block
 	- Where temperature correlation not available (Picarro), filling where zeroing inactive with median offset
+# calibrate_cleandata.py
+- Decided edits previously made in evaluate_offset.py should not have been made in that script, but instead in this one
+- First, changed Picarro calibration date to use
