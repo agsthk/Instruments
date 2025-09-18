@@ -15,3 +15,5 @@
 			- Actually no - can do this later and just work with the incorrect stuff now to make sure the process is correct
 - With zeroing active data identified, modifying zero determination
 	- When active, using the same interpolation method as before, but leaving as null when inactive
+	- Where zeroing not active, calculating temperature based offset for Thermo and O3 instruments
+		- Note that column name changes broke the next code block

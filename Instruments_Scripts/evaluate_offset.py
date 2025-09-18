@@ -204,32 +204,35 @@ for inst, df in cal_factors.items():
                             )
             lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])
             
-            
-
-        if inst in correlations.keys():
-            # Transforms correlation information into dictionary for easier calling
-            inst_corr = correlations[inst].select(
-                pl.col("Species", "Slope", "Intercept")
-                ).rows_by_key(
-                    "Species", 
-                    named=True,
-                    unique=True
-                    )
-            if inst.find("2BTech") != -1:
-                temp = "CellTemp_C"
-            else:
-                temp = "InternalTemp_C"
-                
-            for species, factors in inst_corr.items():
-                lf = lf.with_columns(
-                    pl.col(temp)
-                    .mul(factors["Slope"])
-                    .add(factors["Intercept"])
-                    .alias(species + "_ppb_Offset_TemperatureCorrelation")
-                    )
+            if inst in correlations.keys():
+                # Transforms correlation information into dictionary for easier calling
+                inst_corr = correlations[inst].select(
+                    pl.col("Species", "Slope", "Intercept")
+                    ).rows_by_key(
+                        "Species", 
+                        named=True,
+                        unique=True
+                        )
+                if inst.find("2BTech") != -1:
+                    temp = "CellTemp_C"
+                else:
+                    temp = "InternalTemp_C"
+                    
+                for name, factors in inst_corr.items():
+                    lf = lf.with_columns(
+                        pl.when(pl.col("ZeroingActive"))
+                        .then(pl.col(name + "_ppb_Offset"))
+                        .otherwise(
+                            pl.col(temp)
+                            .mul(factors["Slope"])
+                            .add(factors["Intercept"])
+                            )
+                        .alias(name + "_ppb_Offset")
+                            )
         # Replaces original LazyFrame with one containing offset columns 
         data[inst][source] = lf
 
+#%%
 for inst, sources in data.items():
     for source, lf in sources.items():
         # LazyFrame columns
