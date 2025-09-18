@@ -152,7 +152,50 @@ for inst, df in cal_factors.items():
                             lambda name: name.replace("Mean", "Offset_UZA")
                             )
             lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])
-    
+            
+            z_active_starts = inst_zeros.filter(
+                pl.col("UTC_Start").sub(pl.col("UTC_Stop").shift(1)).gt(pl.duration(hours=6))
+                | pl.col("UTC_Start").sub(pl.col("UTC_Stop").shift(1)).is_null()
+                ).select(
+                    pl.col("UTC_Start")
+                    )
+            z_active_stops = inst_zeros.filter(
+                pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Stop")).gt(pl.duration(hours=6))
+                | pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Stop")).is_null()
+                ).select(
+                    pl.col("UTC_Stop")
+                    )
+            z_active = pl.concat(
+                [z_active_starts, z_active_stops],
+                how="horizontal"
+                ).rename(
+                    {"UTC_Start": "Active_Start",
+                     "UTC_Stop": "Active_Stop"}
+                    )
+            if "UTC_DateTime" in lf.collect_schema().names():
+                t_start = t_stop = "UTC_DateTime"
+            else:
+                t_start = "UTC_Start"
+                t_stop = "UTC_Stop"
+            lf = lf.join_asof(
+                z_active.lazy(),
+                left_on=t_start,
+                right_on="Active_Start",
+                strategy="backward",
+                coalesce=False
+                ).with_columns(
+                    pl.when(
+                        pl.col(t_start).is_between(pl.col("Active_Start"),
+                                                   pl.col("Active_Stop"))
+                        | pl.col(t_stop).is_between(pl.col("Active_Start"),
+                                                   pl.col("Active_Stop"))
+                        )
+                    .then(pl.lit(True))
+                    .otherwise(pl.lit(False))
+                    .alias("ZeroingActive")
+                    ).select(
+                        ~cs.contains("Active_")
+                        )
         if inst in correlations.keys():
             # Transforms correlation information into dictionary for easier calling
             inst_corr = correlations[inst].select(
@@ -216,8 +259,8 @@ for inst, sources in data.items():
                     .alias(corrected_col + "_" + cal)
                     )
         data[inst][source] = lf.collect()
-#%%
 
+#%%
 inst_caldates = {"2BTech_205_A": "20250115",
                  "2BTech_205_B": "20250115",
                  "ThermoScientific_42i-TL": "20241216",

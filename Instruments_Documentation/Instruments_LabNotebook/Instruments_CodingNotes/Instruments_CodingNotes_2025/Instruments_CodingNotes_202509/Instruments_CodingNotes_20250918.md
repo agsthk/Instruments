@@ -1,0 +1,14 @@
+# evaluate_offset.py
+- Want to identify gaps in active zeroing
+	- To begin with, considering gaps longer than 6 hours as gaps
+	- Considering how to do this - identify within the zeroing itself?
+	- Going to identify in the zeroing where the gaps are longer than 6 hours
+	- Able to identify active zeroing interval starts and stops based on gaps
+	- By combining interval starts and stops, have a DataFrame of the times that zeroing was active
+	- There is a problem with the zeros for 2BTech_205_A!
+		- Last 2024 zero is reported as not ending until 2025 - is this an issue with sampling locations?
+	- Switching to work with Picarro until I figure out what's going on with 2BTech_205_A
+		- Missing UZA on Jan 28 ~00:00 UTC
+		- In general, appears to work - main issue is missing or unstopped UZA periods
+	- Identifying several gaps where zeroing is actively happening
+		- I think my next step needs to be addressing whatever is causing the issues in identifying zeros
