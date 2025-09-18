@@ -131,54 +131,6 @@ for inst, df in cal_factors.items():
             inst_zeros = zeros[inst].select(
                 ~cs.contains("STD")
                 )
-            # Identifies gaps in zeroing greater than 6 hours
-            z_active_starts = inst_zeros.filter(
-                pl.col("UTC_Start").sub(pl.col("UTC_Stop").shift(1)).gt(pl.duration(hours=6))
-                | pl.col("UTC_Start").sub(pl.col("UTC_Stop").shift(1)).is_null()
-                ).select(
-                    pl.col("UTC_Start")
-                    )
-            z_active_stops = inst_zeros.filter(
-                pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Stop")).gt(pl.duration(hours=6))
-                | pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Stop")).is_null()
-                ).select(
-                    pl.col("UTC_Stop")
-                    )
-            z_active = pl.concat(
-                [z_active_starts, z_active_stops],
-                how="horizontal"
-                ).rename(
-                    {"UTC_Start": "Active_Start",
-                     "UTC_Stop": "Active_Stop"}
-                    )
-            # Labels data as "ZeroingActive" when collected during active
-            # zeroing periods
-            if "UTC_DateTime" in lf.collect_schema().names():
-                t_start = t_stop = "UTC_DateTime"
-            else:
-                t_start = "UTC_Start"
-                t_stop = "UTC_Stop"
-            lf = lf.join_asof(
-                z_active.lazy(),
-                left_on=t_start,
-                right_on="Active_Start",
-                strategy="backward",
-                coalesce=False
-                ).with_columns(
-                    pl.when(
-                        pl.col(t_start).is_between(pl.col("Active_Start"),
-                                                   pl.col("Active_Stop"))
-                        | pl.col(t_stop).is_between(pl.col("Active_Start"),
-                                                   pl.col("Active_Stop"))
-                        )
-                    .then(pl.lit(True))
-                    .otherwise(pl.lit(False))
-                    .alias("ZeroingActive")
-                    ).select(
-                        ~cs.contains("Active_")
-                        )
-            # Determines offset by interpolation between measured zeros during
-            # zeroing active periods
             stats_cols = inst_zeros.select(
                 cs.contains("Mean")
                 ).columns
@@ -194,58 +146,37 @@ for inst, df in cal_factors.items():
                 ).sort(
                     by=lf.collect_schema().names()[0]
                     ).with_columns(
-                        pl.when(pl.col("ZeroingActive"))
-                        .then(
-                            pl.col(stats_cols)
-                            .interpolate_by(lf.collect_schema().names()[0])
-                            )
+                        pl.col(stats_cols)
+                        .interpolate_by(lf.collect_schema().names()[0])
                         ).rename(
-                            lambda name: name.replace("Mean", "Offset")
+                            lambda name: name.replace("Mean", "Offset_UZA")
                             )
             lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])
-            # Applies temperature-based offset calculation where zeroing inactive
-            if inst in correlations.keys():
-                # Transforms correlation information into dictionary for easier calling
-                inst_corr = correlations[inst].select(
-                    pl.col("Species", "Slope", "Intercept")
-                    ).rows_by_key(
-                        "Species", 
-                        named=True,
-                        unique=True
-                        )
-                if inst.find("2BTech") != -1:
-                    temp = "CellTemp_C"
-                else:
-                    temp = "InternalTemp_C"
-                    
-                for name, factors in inst_corr.items():
-                    lf = lf.with_columns(
-                        pl.when(pl.col("ZeroingActive"))
-                        .then(pl.col(name + "_ppb_Offset"))
-                        .otherwise(
-                            pl.col(temp)
-                            .mul(factors["Slope"])
-                            .add(factors["Intercept"])
-                            )
-                        .alias(name + "_ppb_Offset")
-                            )
-            # Applies median offset where zeroing inactive and no temperature
-            # correlation exists
+    
+        if inst in correlations.keys():
+            # Transforms correlation information into dictionary for easier calling
+            inst_corr = correlations[inst].select(
+                pl.col("Species", "Slope", "Intercept")
+                ).rows_by_key(
+                    "Species", 
+                    named=True,
+                    unique=True
+                    )
+            if inst.find("2BTech") != -1:
+                temp = "CellTemp_C"
             else:
-                for col in stats_cols:
-                    spec_off = col.replace("Mean", "Offset")
-                    spec_med = lf.select(spec_off).median().collect().item()
-                    lf = lf.with_columns(
-                        pl.when(pl.col("ZeroingActive"))
-                        .then(pl.col(spec_off))
-                        .otherwise(spec_med)
-                        .alias(spec_off)
-                        )
+                temp = "InternalTemp_C"
                 
+            for species, factors in inst_corr.items():
+                lf = lf.with_columns(
+                    pl.col(temp)
+                    .mul(factors["Slope"])
+                    .add(factors["Intercept"])
+                    .alias(species + "_ppb_Offset_TemperatureCorrelation")
+                    )
         # Replaces original LazyFrame with one containing offset columns 
         data[inst][source] = lf
 
-#%%
 for inst, sources in data.items():
     for source, lf in sources.items():
         # LazyFrame columns
@@ -286,72 +217,7 @@ for inst, sources in data.items():
                     )
         data[inst][source] = lf.collect()
 #%%
-inst = "2BTech_205_A"
-data[inst]["DAQ"].columns
-hvplot.show(
-    data[inst]["DAQ"].hvplot.scatter(
-        x="UTC_Start",
-        y=["O3_ppb", "O3_ppb_Offset_UZA"],
-        by="ZeroingActive")
-    )
 
-# z = zeros[inst].with_columns(
-#     pl.col("UTC_Start").sub(pl.col("UTC_Stop").shift(1)).alias("PrevGap"),
-#     pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Stop")).alias("NextGap")
-#     )
-
-# z.filter(
-#     pl.col("UTC_Start").dt.year().eq(2025)
-#     & pl.col("UTC_Start").dt.month().eq(1)
-#     )
-
-# hvplot.show(
-#     z.hvplot.scatter(
-#         x="UTC_Start",
-#         y=["PrevGap", "NextGap"]
-#         )
-#     )
-
-# zeroing_starts = zeros[inst].filter(
-#     pl.col("UTC_Start").sub(pl.col("UTC_Stop").shift(1)).gt(pl.duration(hours=6))
-#     | pl.col("UTC_Start").sub(pl.col("UTC_Stop").shift(1)).is_null()
-#     ).select(
-#         pl.col("UTC_Start")
-#         )
-# zeroing_stops = zeros[inst].filter(
-#     pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Stop")).gt(pl.duration(hours=6))
-#     | pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Stop")).is_null()
-#     ).select(
-#         pl.col("UTC_Stop")
-#         )
-# zeroing_active = pl.concat([zeroing_starts, zeroing_stops], how="horizontal")
-
-
-
-# x = data[inst]["DAQ"].join_asof(
-#     zeroing_active,
-#     left_on="UTC_Start",
-#     right_on="UTC_Start",
-#     strategy="backward",
-#     coalesce=False
-#     ).with_columns(
-#         pl.when(pl.col("UTC_Start").is_between(pl.col("UTC_Start_right"), pl.col("UTC_Stop_right")))
-#         .then(pl.lit(True))
-#         .otherwise(pl.lit(False))
-#         .alias("ZeroingActive")
-#         ).select(
-#             pl.exclude("UTC_Start_right", "UTC_Stop_right")
-#             )
-
-# hvplot.show(
-#     x.hvplot.scatter(
-#         x="UTC_Start",
-#         y="NOx_ppb",
-#         by="ZeroingActive"
-#         )
-#     )
-            
-#%%
 inst_caldates = {"2BTech_205_A": "20250115",
                  "2BTech_205_B": "20250115",
                  "ThermoScientific_42i-TL": "20241216",
