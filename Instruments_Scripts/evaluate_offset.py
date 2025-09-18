@@ -203,7 +203,7 @@ for inst, df in cal_factors.items():
                             lambda name: name.replace("Mean", "Offset")
                             )
             lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])
-            
+            # Applies temperature-based offset calculation where zeroing inactive
             if inst in correlations.keys():
                 # Transforms correlation information into dictionary for easier calling
                 inst_corr = correlations[inst].select(
@@ -229,6 +229,19 @@ for inst, df in cal_factors.items():
                             )
                         .alias(name + "_ppb_Offset")
                             )
+            # Applies median offset where zeroing inactive and no temperature
+            # correlation exists
+            else:
+                for col in stats_cols:
+                    spec_off = col.replace("Mean", "Offset")
+                    spec_med = lf.select(spec_off).median().collect().item()
+                    lf = lf.with_columns(
+                        pl.when(pl.col("ZeroingActive"))
+                        .then(pl.col(spec_off))
+                        .otherwise(spec_med)
+                        .alias(spec_off)
+                        )
+                
         # Replaces original LazyFrame with one containing offset columns 
         data[inst][source] = lf
 

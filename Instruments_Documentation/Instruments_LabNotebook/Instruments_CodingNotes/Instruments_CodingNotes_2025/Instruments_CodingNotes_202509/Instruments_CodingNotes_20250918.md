@@ -17,3 +17,4 @@
 	- When active, using the same interpolation method as before, but leaving as null when inactive
 	- Where zeroing not active, calculating temperature based offset for Thermo and O3 instruments
 		- Note that column name changes broke the next code block
+	- Where temperature correlation not available (Picarro), filling where zeroing inactive with median offset
