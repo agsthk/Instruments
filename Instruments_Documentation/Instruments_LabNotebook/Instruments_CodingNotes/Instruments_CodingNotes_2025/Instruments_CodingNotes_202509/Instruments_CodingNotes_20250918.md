@@ -21,3 +21,4 @@
 # calibrate_cleandata.py
 - Decided edits previously made in evaluate_offset.py should not have been made in that script, but instead in this one
 - First, changed Picarro calibration date to use
+- Implemented determination of active zeroing periods and use of interpolation to determine offset

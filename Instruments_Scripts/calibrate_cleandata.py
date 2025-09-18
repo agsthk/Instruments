@@ -11,7 +11,7 @@ import polars.selectors as cs
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import hvplot.polars
-from calibrate_instruments import set_ax_ticks
+# from calibrate_instruments import set_ax_ticks
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
 # Starts in Instruments/ directory
@@ -96,8 +96,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC")
             )
         inst_cal_factors = cal_factors[inst]
-        if inst in zeros.keys():
-            inst_uza_stats = zeros[inst]
+
         cal_vars = {"_".join(col.split("_", 2)[:2])
                     for col in inst_cal_factors.columns
                     if col != "CalDate" and col != "AveragingTime" and col.find("Temp") == -1}
@@ -106,6 +105,53 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         else:
             left_on = "UTC_Start"
         if inst in zeros.keys():
+            inst_uza_stats = zeros[inst]
+            # Identifies gaps in zeroing greater than 6 hours
+            z_active_starts = inst_uza_stats.filter(
+                pl.col("UTC_Start").sub(pl.col("UTC_Stop").shift(1)).gt(pl.duration(hours=6))
+                | pl.col("UTC_Start").sub(pl.col("UTC_Stop").shift(1)).is_null()
+                ).select(
+                    pl.col("UTC_Start")
+                    )
+            z_active_stops = inst_uza_stats.filter(
+                pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Stop")).gt(pl.duration(hours=6))
+                | pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Stop")).is_null()
+                ).select(
+                    pl.col("UTC_Stop")
+                    )
+            z_active = pl.concat(
+                [z_active_starts, z_active_stops],
+                how="horizontal"
+                ).rename(
+                    {"UTC_Start": "Active_Start",
+                     "UTC_Stop": "Active_Stop"}
+                    )
+            # Labels data as "ZeroingActive" when collected during active
+            # zeroing periods
+            if "UTC_DateTime" in lf.collect_schema().names():
+                t_start = t_stop = "UTC_DateTime"
+            else:
+                t_start = "UTC_Start"
+                t_stop = "UTC_Stop"
+            lf = lf.join_asof(
+                z_active.lazy(),
+                left_on=t_start,
+                right_on="Active_Start",
+                strategy="backward",
+                coalesce=False
+                ).with_columns(
+                    pl.when(
+                        pl.col(t_start).is_between(pl.col("Active_Start"),
+                                                   pl.col("Active_Stop"))
+                        | pl.col(t_stop).is_between(pl.col("Active_Start"),
+                                                   pl.col("Active_Stop"))
+                        )
+                    .then(pl.lit(True))
+                    .otherwise(pl.lit(False))
+                    .alias("ZeroingActive")
+                    ).select(
+                        ~cs.contains("Active_")
+                        )
             stats_cols = inst_uza_stats.select(
                 cs.contains("Mean", "STD")
                 ).columns
@@ -122,9 +168,14 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 ).sort(
                     by=left_on
                     ).with_columns(
-                        pl.col(stats_cols)
-                        .interpolate_by(left_on)
-                        )
+                        pl.when(pl.col("ZeroingActive"))
+                        .then(
+                            pl.col(stats_cols)
+                            .interpolate_by(left_on)
+                            )
+                        ).rename(
+                            lambda name: name.replace("Mean", "Offset")
+                            )
             lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])
         mintemp = inst_cal_factors.select(
             cs.contains("C_Min")
