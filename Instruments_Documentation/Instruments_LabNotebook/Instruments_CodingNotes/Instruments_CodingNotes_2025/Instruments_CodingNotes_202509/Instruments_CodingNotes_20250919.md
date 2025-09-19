@@ -26,3 +26,13 @@
 			- Keeping figure, that way I can confirm there is no correlation
 - Revising correlation read in to read the current correlations as off_corr and added a new dictionary lod_corr for the std temperature correlations
 	- Repeat the way I used off_corr, but with lod_corr for STD
+- Quickly, looking to plot the standard deviation to ensure it looks reasonable
+	- It is for sure using the offset correlation to calculate standard deviation - fixing
+		- Was because when I copied the code from the offset determination, I didn't change it to pull from lod_corr, so it was just the offset again but labeled as STD
+	- Fixed, but doesn't look super nice and continuous - that's fine, just makes me a little nervous (may need to return and check again sometime)
+		- WRONG - this is because the calculation is to get LOD from temperature, NOT STD - need to convert the STD I have elsewhere to LOD before I do the temperature calculation
+- Converting STD to LOD
+	- Multiplying by 3 and renaming in interpolation
+	- Directly going to LOD for temperature correlation
+	- Multiplying median LOD by 3 and adding as that
+	- Looks much better now!

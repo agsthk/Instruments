@@ -93,10 +93,10 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 break
         if path.find(inst) == -1:
             continue
-        # if inst != "ThermoScientific_42i-TL": continue
+        if inst != "ThermoScientific_42i-TL": continue
         # if inst != "2BTech_205_A": continue
         # if inst != "2BTech_205_B": continue
-        if inst != "Picarro_G2307": continue
+        # if inst != "Picarro_G2307": continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -185,7 +185,11 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                             )
                         ).rename(
                             lambda name: name.replace("Mean", "Offset")
-                            )
+                            ).with_columns(
+                                cs.contains("STD").mul(3)
+                                ).rename(
+                                    lambda name: name.replace("STD", "LOD")
+                                    )
             lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])
             # Applies temperature correlation where available to estimate zero
             # offset outside of zeroing active periods
@@ -232,7 +236,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                         .alias(spec))
             # Repeats correlation for LOD determination
             if inst in lod_corr.keys():
-                inst_corr = off_corr[inst].select(
+                inst_corr = lod_corr[inst].select(
                     pl.col("Species", "Slope", "Intercept")
                     ).rows_by_key(
                         "Species", 
@@ -247,28 +251,29 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 for name, factors in inst_corr.items():
                     lf = lf.with_columns(
                         pl.when(pl.col("ZeroingActive"))
-                        .then(pl.col(name + "_ppb_STD"))
+                        .then(pl.col(name + "_ppb_LOD"))
                         .otherwise(
                             pl.col(temp)
                             .mul(factors["Slope"])
                             .add(factors["Intercept"])
                             )
-                        .alias(name + "_ppb_STD")
+                        .alias(name + "_ppb_LOD")
                             )
             else:
                 for col in stats_cols:
                     if col.find("STD") == -1:
                         continue
+                    spec = col.replace("STD", "LOD")
                     year_stats = inst_uza_stats.filter(
                         pl.col("UTC_Start").dt.year().eq(2025)
                         )
-                    med_val = year_stats[col].median()
+                    med_val = year_stats[col].median() * 3
                     
                     lf = lf.with_columns(
                         pl.when(pl.col("ZeroingActive"))
-                        .then(pl.col(col))
+                        .then(pl.col(spec))
                         .otherwise(med_val)
-                        .alias(col))
+                        .alias(spec))
         # Applies offset from calibration as constant zero offset for
         # instruments never zeroed
         else:
@@ -287,13 +292,14 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         df = lf.collect()
         if file.find("2025") == -1:
             continue
-        # for var in cal_vars:
-        #     hvplot.show(
-        #         df.hvplot.scatter(
-        #             x=t_start,
-        #             y=[var + "_Calibrated", var + "_STD"],
-        #             title=inst)
-        #         )
+        for var in cal_vars:
+            hvplot.show(
+                df.hvplot.scatter(
+                    x=t_start,
+                    y=var + "_LOD",
+                    by="ZeroingActive",
+                    title=inst)
+                )
         
 #%%
         # f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
