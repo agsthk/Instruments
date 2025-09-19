@@ -330,6 +330,17 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 pl.col(var).sub(pl.col(var + "_Offset")).truediv(sens)
                 .alias(var + "_Calibrated")
                 )
+            
+        if inst in sn_selected.keys():
+            if len(sn_selected[inst]) == 1:
+                inst_sn_facts = list(sn_selected[inst].values())[0]
+                for var in cal_vars:
+                    lf = lf.with_columns(
+                        (pl.col(var)
+                         .mul(inst_sn_facts[var + "_Slope"]))
+                        .add(inst_sn_facts[var + "_Offset"])
+                        .alias(var + "_Uncertainty")
+                        )
         df = lf.collect()
         # if file.find("2025") == -1:
         #     continue
@@ -342,9 +353,16 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         #             title=inst)
         #         )
 #%%
-sn_selected["ThermoScientific_42i-TL"]
-df
-
+if len(sn_selected["ThermoScientific_42i-TL"]) == 1:
+    inst_sn_factors = list(sn_selected["ThermoScientific_42i-TL"].values())[0]
+    species = {key.rsplit("_", 1)[0] for key in inst_sn_factors.keys()}
+    for spec in species:
+        df = df.with_columns(
+            (pl.col(spec)
+             .mul(inst_sn_factors[spec + "_Slope"]))
+            .add(inst_sn_factors[spec + "_Offset"])
+            .alias(spec + "_Uncertainty")
+            )
 #%%
         # f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
         # f_name = f_name[0] + "_" + cal_dates[inst] + "Calibration_" + f_name[1]

@@ -46,3 +46,8 @@
 - Now the challenge is to actually apply those regressions to calculate uncertainty
 	- Made some edits that I suspect will make this easier - changes from DataFrame to dictionary
 	- Revised again (hopefully this actually works)
+- Going to try to apply, although I am now recognizing the uncertainty should be calculated on the uncalibrated data
+	- Does it matter? Probably not much, but keep it in mind
+	- ACTUALLY! I have the calibrated data separate from the uncalibrated data currently, so this won't be a problem right this very second
+		- Will need to consider order that I apply this stuff in later on
+- I have successfully calculated uncertainty when there is only one possible averaging time - next step is to apply it when there's more than that
