@@ -51,3 +51,7 @@
 	- ACTUALLY! I have the calibrated data separate from the uncalibrated data currently, so this won't be a problem right this very second
 		- Will need to consider order that I apply this stuff in later on
 - I have successfully calculated uncertainty when there is only one possible averaging time - next step is to apply it when there's more than that
+- Working with 2BTech_205_A for this
+	- Used join_asof after converting averaging times to integers to get the correct slope and offset added to the LazyFrame
+		- Required sorting both dataframes by averaging time, which I then un-did to sort by UTC_Start after joining was complete
+	- Calculated uncertainty based on slope and offset in the row, then removed all the extra columns that weren't needed

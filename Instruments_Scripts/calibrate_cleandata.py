@@ -134,8 +134,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 break
         if path.find(inst) == -1:
             continue
-        if inst != "ThermoScientific_42i-TL": continue
-        # if inst != "2BTech_205_A": continue
+        # if inst != "ThermoScientific_42i-TL": continue
+        if inst != "2BTech_205_A": continue
         # if inst != "2BTech_205_B": continue
         # if inst != "Picarro_G2307": continue
         if inst == "2BTech_405nm":
@@ -341,6 +341,32 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                         .add(inst_sn_facts[var + "_Offset"])
                         .alias(var + "_Uncertainty")
                         )
+            else:
+                inst_sn_facts = pl.DataFrame(
+                    sn_selected[inst]
+                    ).transpose(
+                        include_header=True, header_name="AvgT"
+                        ).unnest("column_0").with_columns(
+                            pl.col("AvgT").str.extract(r"(\d+?)s", 1).cast(pl.Int64)
+                            ).lazy()
+                lf = lf.with_columns(
+                    pl.col("UTC_Stop").sub(pl.col("UTC_Start")).dt.total_seconds().alias("AvgT")
+                    ).sort(by="AvgT").join_asof(
+                        inst_sn_facts.sort(by="AvgT"),
+                        on="AvgT",
+                        strategy="backward",
+                        coalesce=True
+                        ).sort(by="UTC_Start")
+                for var in cal_vars:
+                    lf = lf.with_columns(
+                        (pl.col(var)
+                         .mul(pl.col(var + "_Slope")))
+                        .add(pl.col(var + "_Offset_right"))
+                        .alias(var + "_Uncertainty")
+                        )
+                lf = lf.select(
+                    ~cs.contains("right", "Slope", "AvgT")
+                    )
         df = lf.collect()
         # if file.find("2025") == -1:
         #     continue
@@ -352,17 +378,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         #             # by="ZeroingActive",
         #             title=inst)
         #         )
-#%%
-if len(sn_selected["ThermoScientific_42i-TL"]) == 1:
-    inst_sn_factors = list(sn_selected["ThermoScientific_42i-TL"].values())[0]
-    species = {key.rsplit("_", 1)[0] for key in inst_sn_factors.keys()}
-    for spec in species:
-        df = df.with_columns(
-            (pl.col(spec)
-             .mul(inst_sn_factors[spec + "_Slope"]))
-            .add(inst_sn_factors[spec + "_Offset"])
-            .alias(spec + "_Uncertainty")
-            )
+
 #%%
         # f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
         # f_name = f_name[0] + "_" + cal_dates[inst] + "Calibration_" + f_name[1]
