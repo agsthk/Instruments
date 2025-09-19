@@ -210,14 +210,17 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             # zeroing active periods if no temperature correlation available
             else:
                 for col in stats_cols:
-                    spec_off = col.replace("Mean", "Offset")
-                    spec_med = lf.select(spec_off).median().collect().item()
+                    spec = col.replace("Mean", "Offset")
+                    year_stats = inst_uza_stats.filter(
+                        pl.col("UTC_Start").dt.year().eq(2025)
+                        )
+                    med_val = year_stats[col].median()
+                    
                     lf = lf.with_columns(
                         pl.when(pl.col("ZeroingActive"))
-                        .then(pl.col(spec_off))
-                        .otherwise(spec_med)
-                        .alias(spec_off)
-                        )
+                        .then(pl.col(spec))
+                        .otherwise(med_val)
+                        .alias(spec))
         # Applies offset from calibration as constant zero offset for
         # instruments never zeroed
         else:
@@ -242,7 +245,6 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                     y=[var, var + "_Calibrated"],
                     title=inst)
                 )
-            
         
 #%%
         # f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)

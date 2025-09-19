@@ -13,4 +13,8 @@
 		- Through Jan 28, there is no calibrated data - maybe the median didn't apply?
 		- Where calibrated data was, worked well
 	- ThermoScientific_42i-TL gets shifted down a little, NO background generally 0 ppb which is pretty much expected
-	- 
+- Discovered the problem with the median application
+	- In this script, working with one day at a time, not with the whole time period as in evaluate_offset.py - median gives a null value
+- Revising median application to take the median offset from the zero statistics instead of from the other values
+	- While this doesn't take the interpolated values into account, I suspect that won't matter much
+		- Will confirm in evaluation script
