@@ -39,6 +39,8 @@ cal_dates = {"2BTech_202": "20240118",
              "Picarro_G2307": "20250625",
              "ThermoScientific_42i-TL": "20241216"}
 
+mfr_lod = {"2BTech_205_B": 2}
+
 cal_factors = {}
 sn_factors = {}
 for root, dirs, files in os.walk(CAL_RESULTS_DIR):
@@ -93,9 +95,9 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 break
         if path.find(inst) == -1:
             continue
-        if inst != "ThermoScientific_42i-TL": continue
+        # if inst != "ThermoScientific_42i-TL": continue
         # if inst != "2BTech_205_A": continue
-        # if inst != "2BTech_205_B": continue
+        if inst != "2BTech_205_B": continue
         # if inst != "Picarro_G2307": continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
@@ -280,7 +282,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             for var in cal_vars:
                 lf = lf.with_columns(
                     pl.lit(inst_cal_factors[var + "_Offset"].item())
-                    .alias(var + "_Offset")
+                    .alias(var + "_Offset"),
+                    pl.lit(mfr_lod[inst]).alias(var + "_LOD")
                     )
         # NEED TO ADD CONSTANT LOD HERE!!
         for var in cal_vars:
@@ -297,7 +300,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 df.hvplot.scatter(
                     x=t_start,
                     y=var + "_LOD",
-                    by="ZeroingActive",
+                    # by="ZeroingActive",
                     title=inst)
                 )
         

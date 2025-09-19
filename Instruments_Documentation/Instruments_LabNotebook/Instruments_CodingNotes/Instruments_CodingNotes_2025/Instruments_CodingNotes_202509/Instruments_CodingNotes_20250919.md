@@ -36,3 +36,4 @@
 	- Directly going to LOD for temperature correlation
 	- Multiplying median LOD by 3 and adding as that
 	- Looks much better now!
+- Added manufacturer LOD for vent O3
