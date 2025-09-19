@@ -92,8 +92,12 @@ for inst, factors in sn_factors.items():
                         ).select(
                             ~cs.contains("R2")
                             ).to_dict(as_series=False)
-            sn_selected[inst][avt][spec] = {key.split("_")[-1]: val[0] for key, val in spec_avt_factors.items()}
             
+            sn_selected[inst][avt] = (
+                sn_selected[inst][avt] |
+                {key.replace("NoiseSignal_", ""): val[0]
+                 for key, val in spec_avt_factors.items()}
+                )
 
                 #%%
 zeros = {}
@@ -130,9 +134,9 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 break
         if path.find(inst) == -1:
             continue
-        # if inst != "ThermoScientific_42i-TL": continue
+        if inst != "ThermoScientific_42i-TL": continue
         # if inst != "2BTech_205_A": continue
-        if inst != "2BTech_205_B": continue
+        # if inst != "2BTech_205_B": continue
         # if inst != "Picarro_G2307": continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
@@ -327,17 +331,20 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 .alias(var + "_Calibrated")
                 )
         df = lf.collect()
-        if file.find("2025") == -1:
-            continue
-        for var in cal_vars:
-            hvplot.show(
-                df.hvplot.scatter(
-                    x=t_start,
-                    y=var + "_LOD",
-                    # by="ZeroingActive",
-                    title=inst)
-                )
-        
+        # if file.find("2025") == -1:
+        #     continue
+        # for var in cal_vars:
+        #     hvplot.show(
+        #         df.hvplot.scatter(
+        #             x=t_start,
+        #             y=var + "_LOD",
+        #             # by="ZeroingActive",
+        #             title=inst)
+        #         )
+#%%
+sn_selected["ThermoScientific_42i-TL"]
+df
+
 #%%
         # f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
         # f_name = f_name[0] + "_" + cal_dates[inst] + "Calibration_" + f_name[1]

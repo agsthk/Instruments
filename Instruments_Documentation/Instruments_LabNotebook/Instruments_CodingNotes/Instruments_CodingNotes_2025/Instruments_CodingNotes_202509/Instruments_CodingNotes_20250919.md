@@ -45,3 +45,4 @@
 	- Wrote code to accomplish this
 - Now the challenge is to actually apply those regressions to calculate uncertainty
 	- Made some edits that I suspect will make this easier - changes from DataFrame to dictionary
+	- Revised again (hopefully this actually works)
