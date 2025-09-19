@@ -95,8 +95,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             continue
         # if inst != "ThermoScientific_42i-TL": continue
         # if inst != "2BTech_205_A": continue
-        if inst != "2BTech_205_B": continue
-        # if inst != "Picarro_G2307": continue
+        # if inst != "2BTech_205_B": continue
+        if inst != "Picarro_G2307": continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -217,6 +217,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             # zeroing active periods if no temperature correlation available
             else:
                 for col in stats_cols:
+                    if col.find("STD") != -1:
+                        continue
                     spec = col.replace("Mean", "Offset")
                     year_stats = inst_uza_stats.filter(
                         pl.col("UTC_Start").dt.year().eq(2025)
@@ -228,6 +230,45 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                         .then(pl.col(spec))
                         .otherwise(med_val)
                         .alias(spec))
+            # Repeats correlation for LOD determination
+            if inst in lod_corr.keys():
+                inst_corr = off_corr[inst].select(
+                    pl.col("Species", "Slope", "Intercept")
+                    ).rows_by_key(
+                        "Species", 
+                        named=True,
+                        unique=True
+                        )
+                if inst.find("2BTech") != -1:
+                    temp = "CellTemp_C"
+                else:
+                    temp = "InternalTemp_C"
+
+                for name, factors in inst_corr.items():
+                    lf = lf.with_columns(
+                        pl.when(pl.col("ZeroingActive"))
+                        .then(pl.col(name + "_ppb_STD"))
+                        .otherwise(
+                            pl.col(temp)
+                            .mul(factors["Slope"])
+                            .add(factors["Intercept"])
+                            )
+                        .alias(name + "_ppb_STD")
+                            )
+            else:
+                for col in stats_cols:
+                    if col.find("STD") == -1:
+                        continue
+                    year_stats = inst_uza_stats.filter(
+                        pl.col("UTC_Start").dt.year().eq(2025)
+                        )
+                    med_val = year_stats[col].median()
+                    
+                    lf = lf.with_columns(
+                        pl.when(pl.col("ZeroingActive"))
+                        .then(pl.col(col))
+                        .otherwise(med_val)
+                        .alias(col))
         # Applies offset from calibration as constant zero offset for
         # instruments never zeroed
         else:

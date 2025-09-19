@@ -25,3 +25,4 @@
 		- For now! going to delete the O3 ~~figure and~~ data for temperature-noise correlation so it doesn't get read in
 			- Keeping figure, that way I can confirm there is no correlation
 - Revising correlation read in to read the current correlations as off_corr and added a new dictionary lod_corr for the std temperature correlations
+	- Repeat the way I used off_corr, but with lod_corr for STD
