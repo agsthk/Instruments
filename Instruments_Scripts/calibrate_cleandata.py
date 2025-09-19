@@ -152,6 +152,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                     ).select(
                         ~cs.contains("Active_")
                         )
+            # Uses interpolation between zero periods to determine zero offset
+            # during zeroing active periods
             stats_cols = inst_uza_stats.select(
                 cs.contains("Mean", "STD")
                 ).columns
@@ -161,7 +163,6 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             z_stops = inst_uza_stats.select(
                 pl.exclude("UTC_Start")
                 ).rename({"UTC_Stop": left_on})
-            
             lf = pl.concat(
                 [lf, z_starts.lazy(), z_stops.lazy()],
                 how="diagonal_relaxed"
@@ -177,20 +178,69 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                             lambda name: name.replace("Mean", "Offset")
                             )
             lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])
-        mintemp = inst_cal_factors.select(
-            cs.contains("C_Min")
-            ).item()
-        maxtemp = inst_cal_factors.select(
-            cs.contains("C_Max")
-            ).item()
-        meddt = inst_cal_factors.select(
-            cs.contains("Derivative")
-            ).item()
+            # Applies temperature correlation where available to estimate zero
+            # offset outside of zeroing active periods
+            if inst in correlations.keys():
+                inst_corr = correlations[inst].select(
+                    pl.col("Species", "Slope", "Intercept")
+                    ).rows_by_key(
+                        "Species", 
+                        named=True,
+                        unique=True
+                        )
+                if inst.find("2BTech") != -1:
+                    temp = "CellTemp_C"
+                else:
+                    temp = "InternalTemp_C"
+
+                for name, factors in inst_corr.items():
+                    lf = lf.with_columns(
+                        pl.when(pl.col("ZeroingActive"))
+                        .then(pl.col(name + "_ppb_Offset"))
+                        .otherwise(
+                            pl.col(temp)
+                            .mul(factors["Slope"])
+                            .add(factors["Intercept"])
+                            )
+                        .alias(name + "_ppb_Offset")
+                            )
+            # Calculates median offset and applies as zero offset outside of
+            # zeroing active periods if no temperature correlation available
+            else:
+                for col in stats_cols:
+                    spec_off = col.replace("Mean", "Offset")
+                    spec_med = lf.select(spec_off).median().collect().item()
+                    lf = lf.with_columns(
+                        pl.when(pl.col("ZeroingActive"))
+                        .then(pl.col(spec_off))
+                        .otherwise(spec_med)
+                        .alias(spec_off)
+                        )
+        # Applies offset from calibration as constant zero offset for
+        # instruments never zeroed
+        else:
+            for var in cal_vars:
+                lf = lf.with_columns(
+                    pl.lit(inst_cal_factors[var + "_Offset"].item())
+                    .alias(var + "_Offset")
+                    )
+                    
+        # mintemp = inst_cal_factors.select(
+        #     cs.contains("C_Min")
+        #     ).item()
+        # maxtemp = inst_cal_factors.select(
+        #     cs.contains("C_Max")
+        #     ).item()
+        # meddt = inst_cal_factors.select(
+        #     cs.contains("Derivative")
+        #     ).item()
         for var in cal_vars:
             sens = inst_cal_factors[var + "_Sensitivity"].item()
-            off = inst_cal_factors[var + "_Offset"].item()
             lf = lf.with_columns(
-                pl.lit(off).alias(var + "_Fixed"))
+                pl.col(var).sub(pl.col(var + "_Offset")).truediv(sens)
+                .alias(var + "_Calibrated")
+                )
+        df = lf.collect()
             # lf = lf.with_columns(
             #     pl.col(var).sub(pl.col(var + "_Mean")).truediv(sens).alias(var + "_TrueOffset"),
             #     pl.col(var).sub(off).truediv(sens).alias(var +"_FixedOffset")
@@ -208,49 +258,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             #     pl.col(var).sub(pl.col(var + "_Mean")),
             #     pl.col(var + "_STD").mul(3).alias(var + "_LOD")
             #     )
-            if inst in correlations.keys():
-                if var.split("_")[0] in correlations[inst]["Species"]:
-                    if inst == "2BTech_205_A":
-                        temp = "CellTemp_C"
-                    else:
-                        temp = "InternalTemp_C"
-                    corr = correlations[inst].filter(
-                        pl.col("Species").eq(var.split("_")[0])
-                        )
-                    m = corr["Slope"].item()
-                    b = corr["Intercept"].item()
-                    lf = lf.with_columns(
-                        pl.col(temp).mul(m).add(b).alias(var + "_Predicted")
-                        )
-                    # lf = lf.with_columns(
-                    #     pl.col(var).sub(pl.col(var + "_Predicted")).truediv(sens).alias(var + "_TempOffset"))
-            
-            # lf = lf.select(
-            #     ~cs.contains("Mean", "STD")
-            #     )
-            # lf = lf.with_columns(
-            #     pl.col(var).truediv(sens)
-            #     )
 
-            if file[-12:-6] == "202501":
-                # lf = lf.with_columns(
-                #     (pl.col(var + "_TempOffset").sub(pl.col(var + "_TrueOffset"))).alias(var + "_AbsDiff"),
-                #     (pl.col(var + "_TempOffset").add(pl.col(var + "_TrueOffset"))).truediv(2).alias(var + "_Avg")
-                #     ).with_columns(
-                #         pl.col(var + "_AbsDiff").truediv(pl.col(var + "_Avg")).alias(var + "_RelDiff")
-                #         ).filter(
-                #             pl.col("SamplingLocation").str.contains("C200")
-                #             )
-                df = lf.collect()
-                cols = [var + "_Mean", var + "_Predicted", var + "_Fixed"]
-                cols = [col for col in cols if col in df.columns]
-                hvplot.show(
-                    df.hvplot.scatter(
-                        x=left_on,
-                        y=cols,
-                        title=inst + " Offsets Comparison: " + file[-12:-4]
-                        )
-                    )
+
             # if file[-12:-8] != "2025": continue
         
             # df = lf.collect()
