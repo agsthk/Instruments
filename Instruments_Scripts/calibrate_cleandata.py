@@ -60,7 +60,37 @@ for root, dirs, files in os.walk(CAL_RESULTS_DIR):
             ).select(
                 pl.exclude("CalDate")
                 )
-        
+
+sn_selected = {inst: {} for inst in sn_factors.keys()}
+for inst, factors in sn_factors.items():
+    species = {col.split("_NoiseSignal")[0] for col in factors.select(
+        pl.exclude("CalDate", "AveragingTime")
+        ).columns}
+    if inst == "Picarro_G2307":
+        by_avt = {"1s": factors.select(pl.exclude("AveragingTime"))}
+    else:
+        by_avt = {key[0]: value for key, value in 
+                  factors.partition_by(
+                      "AveragingTime", as_dict=True, include_key=False
+                      ).items()
+                  }
+    for avt, facts in by_avt.items():
+        if avt not in sn_selected[inst].keys():
+            sn_selected[inst][avt] = {}
+        for spec in species:
+            spec_avt_factors = facts.select(
+                cs.contains(spec)
+                ).filter(
+                    pl.col(spec + "_NoiseSignal_R2")
+                    .eq(pl.max(spec + "_NoiseSignal_R2"))
+                    ).with_columns(
+                        pl.when(pl.col(spec + "_NoiseSignal_Slope").lt(0))
+                        .then(0)
+                        .otherwise(pl.col(spec + "_NoiseSignal_Slope"))
+                        .alias(spec + "_NoiseSignal_Slope")
+                        )
+            sn_selected[inst][avt][spec] = spec_avt_factors
+                #%%
 zeros = {}
 off_corr = {}
 lod_corr = {}
@@ -285,7 +315,6 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                     .alias(var + "_Offset"),
                     pl.lit(mfr_lod[inst]).alias(var + "_LOD")
                     )
-        # NEED TO ADD CONSTANT LOD HERE!!
         for var in cal_vars:
             sens = inst_cal_factors[var + "_Sensitivity"].item()
             lf = lf.with_columns(

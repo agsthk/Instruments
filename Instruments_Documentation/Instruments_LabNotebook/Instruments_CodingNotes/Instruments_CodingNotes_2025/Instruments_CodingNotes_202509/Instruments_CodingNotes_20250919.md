@@ -37,3 +37,9 @@
 	- Multiplying median LOD by 3 and adding as that
 	- Looks much better now!
 - Added manufacturer LOD for vent O3
+- A couple remaining questions on LODs, but going to move on to uncertainties and come back to address those
+- How do I select the uncertainty regression to use?
+	- Closest averaging time with the highest R2?
+- To identify the appropriate uncertainty regression, I will pick from each averaging time the one with the greatest R2 value
+	- If the slope is negative, make it zero and use a constant uncertainty
+	- Wrote code to accomplish this
