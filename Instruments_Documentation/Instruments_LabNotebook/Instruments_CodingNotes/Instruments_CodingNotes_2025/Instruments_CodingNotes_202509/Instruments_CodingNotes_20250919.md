@@ -55,3 +55,5 @@
 	- Used join_asof after converting averaging times to integers to get the correct slope and offset added to the LazyFrame
 		- Required sorting both dataframes by averaging time, which I then un-did to sort by UTC_Start after joining was complete
 	- Calculated uncertainty based on slope and offset in the row, then removed all the extra columns that weren't needed
+- Quickly, going to plot the calibrated data with its uncertainty and overlayed LOD to see what I have ended up with here
+	- From a quick visual scan, it looks pretty good! Still have some work to do to check but I think it's alright

@@ -39,7 +39,8 @@ cal_dates = {"2BTech_202": "20240118",
              "Picarro_G2307": "20250625",
              "ThermoScientific_42i-TL": "20241216"}
 
-mfr_lod = {"2BTech_205_B": 2}
+mfr_lod = {"2BTech_202": 3,
+           "2BTech_205_B": 3}
 
 cal_factors = {}
 sn_factors = {}
@@ -135,10 +136,11 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         if path.find(inst) == -1:
             continue
         # if inst != "ThermoScientific_42i-TL": continue
-        if inst != "2BTech_205_A": continue
+        # if inst != "2BTech_205_A": continue
         # if inst != "2BTech_205_B": continue
         # if inst != "Picarro_G2307": continue
         if inst == "2BTech_405nm":
+            continue
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
             lf = pl.scan_csv(path)
@@ -368,16 +370,26 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                     ~cs.contains("right", "Slope", "AvgT")
                     )
         df = lf.collect()
-        # if file.find("2025") == -1:
-        #     continue
-        # for var in cal_vars:
-        #     hvplot.show(
-        #         df.hvplot.scatter(
-        #             x=t_start,
-        #             y=var + "_LOD",
-        #             # by="ZeroingActive",
-        #             title=inst)
-        #         )
+        if file.find("2025020") == -1:
+            continue
+        for var in cal_vars:
+            hvplot.show(
+                df.hvplot.scatter(
+                    x=t_start,
+                    y=var + "_Calibrated",
+                    by="SamplingLocation",
+                    title=inst) * (
+                        df.hvplot.errorbars(
+                            x=t_start,
+                            y=var + "_Calibrated",
+                            yerr1=var + "_Uncertainty")
+                        ) * (
+                            df.hvplot.line(
+                                x=t_start,
+                                y=var + "_LOD"
+                                )
+                            )
+                )
 
 #%%
         # f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
