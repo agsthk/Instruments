@@ -5,3 +5,4 @@
 - Added temperature correlation determination
 - Added median determination
 - Added fixed offset determination
+- Removed temperature plotting code

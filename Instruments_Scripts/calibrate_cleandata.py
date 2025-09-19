@@ -224,16 +224,6 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                     pl.lit(inst_cal_factors[var + "_Offset"].item())
                     .alias(var + "_Offset")
                     )
-                    
-        # mintemp = inst_cal_factors.select(
-        #     cs.contains("C_Min")
-        #     ).item()
-        # maxtemp = inst_cal_factors.select(
-        #     cs.contains("C_Max")
-        #     ).item()
-        # meddt = inst_cal_factors.select(
-        #     cs.contains("Derivative")
-        #     ).item()
         for var in cal_vars:
             sens = inst_cal_factors[var + "_Sensitivity"].item()
             lf = lf.with_columns(
@@ -241,90 +231,6 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 .alias(var + "_Calibrated")
                 )
         df = lf.collect()
-            # lf = lf.with_columns(
-            #     pl.col(var).sub(pl.col(var + "_Mean")).truediv(sens).alias(var + "_TrueOffset"),
-            #     pl.col(var).sub(off).truediv(sens).alias(var +"_FixedOffset")
-            #     )
-            # if (var + "_Mean") not in lf.collect_schema().names():
-            #     lf = lf.with_columns(
-            #         pl.lit(off).alias(var + "_Mean"),
-            #         pl.lit(0).alias(var + "_STD")
-            #         )
-            # lf = lf.with_columns(
-            #     pl.col(var + "_Mean").fill_null(off),
-            #     pl.col(var + "_STD").fill_null(0)
-            #     )
-            # lf = lf.with_columns(
-            #     pl.col(var).sub(pl.col(var + "_Mean")),
-            #     pl.col(var + "_STD").mul(3).alias(var + "_LOD")
-            #     )
-
-
-            # if file[-12:-8] != "2025": continue
-        
-            # df = lf.collect()
-            
-            # # Identifies instrument temperature data
-            # temp_data = df.select(
-            #     cs.contains("UTC", "CellTemp", "InternalTemp", "CavityTemp")
-            #     )
-            # # Identifies the column name for temperature data
-            # temp_col = temp_data.columns[-1]
-            # # Assigns unique ID every time instrument temperature changes
-            # temp_data = temp_data.with_columns(
-            #     pl.col(temp_col).rle_id().alias("ID")
-            #     )
-            # # Calculates d(Temp)/dt
-            # ddt_data = temp_data.filter(
-            #         pl.col("ID").is_first_distinct()
-            #         ).with_columns(
-            #             pl.col(temp_col).shift(-1).sub(pl.col(temp_col)).alias("dTemp"),
-            #             pl.col(left_on).shift(-1).sub(pl.col(left_on)).dt.total_microseconds().truediv(1e6).alias("dt")
-            #             ).select(
-            #                 pl.col("ID"),
-            #                 pl.col("dTemp").truediv(pl.col("dt")).alias("d/dt")
-            #                 )
-            # temp_data = temp_data.join(ddt_data, on="ID", how="left")
-
-            # # Plots temperature data over the calibration
-            # temp_fig, temp_ax = plt.subplots(figsize=(8, 6))
-            # change_ax = temp_ax.twinx()
-            # change_ax.scatter(
-            #     temp_data[left_on],
-            #     temp_data["d/dt"],
-            #     s=25,
-            #     color="#D9782D")
-            # temp_ax.scatter(
-            #     temp_data[left_on],
-            #     temp_data[temp_col],
-            #     s=25,
-            #     color="#1E4D2B"
-            #     )
-            # temp_ax.set_xlim(temp_data[left_on].min(), temp_data[left_on].max())
-            # temp_ax.axhline(mintemp, color="#1E4D2B", lw=3, ls="-.")
-            # temp_ax.axhline(maxtemp, color="#1E4D2B", lw=3, ls="-.")
-            # temp_ax.text(temp_data[left_on].min(), mintemp, "Min. Cal. Temp.", va="center", ha="right", color="#1E4D2B")
-            # temp_ax.text(temp_data[left_on].min(), maxtemp, "Max. Cal. Temp.", va="center", ha="right", color="#1E4D2B")
-            
-            # change_ax.axhline(meddt, color="#D9782D", lw=3, ls="--")
-            # change_ax.text(temp_data[left_on].max(), meddt, "Med. Cal. d/dt", va="center", ha="left", color="#D9782D")
-            # temp_ax.set_zorder(change_ax.get_zorder() + 1)
-            # temp_ax.patch.set_visible(False)
-            # set_ax_ticks(temp_ax, ts=True)
-            # temp_ax.set_title(file[-12:-4])
-            # temp_ax.set_ylabel(temp_col.replace("_", " (") + ")", color="#1E4D2B")
-            # change_ax.set_ylabel("d(" + temp_col.split("_")[0] + ")/dt (C/s)", color="#D9782D")
-            # temp_fig.suptitle(inst.replace("_", " ") + " Instrument Temperature Time Series",
-            #                   size=15)
-            # temp_fig.savefig(inst + "_TemperatureTimeSeries_" + cal_dates[inst] + "Calibration_" + file[-12:-4] + ".png")
-            # plt.close()
-            # hvplot.show(
-            #     df.hvplot.scatter(
-            #         x=left_on,
-            #         y="CellTemp_C",
-            #         by="SamplingLocation",
-            #         title=inst + " Instrument Temperature: " + file[-12:-4])
-            #     )
             
         
 #%%
