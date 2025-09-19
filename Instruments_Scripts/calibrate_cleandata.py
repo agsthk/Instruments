@@ -80,6 +80,7 @@ for inst, factors in sn_factors.items():
         for spec in species:
             spec_avt_factors = facts.select(
                 cs.contains(spec)
+                & ~cs.contains("Uncertainty")
                 ).filter(
                     pl.col(spec + "_NoiseSignal_R2")
                     .eq(pl.max(spec + "_NoiseSignal_R2"))
@@ -88,8 +89,12 @@ for inst, factors in sn_factors.items():
                         .then(0)
                         .otherwise(pl.col(spec + "_NoiseSignal_Slope"))
                         .alias(spec + "_NoiseSignal_Slope")
-                        )
-            sn_selected[inst][avt][spec] = spec_avt_factors
+                        ).select(
+                            ~cs.contains("R2")
+                            ).to_dict(as_series=False)
+            sn_selected[inst][avt][spec] = {key.split("_")[-1]: val[0] for key, val in spec_avt_factors.items()}
+            
+
                 #%%
 zeros = {}
 off_corr = {}

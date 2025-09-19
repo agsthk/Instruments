@@ -43,3 +43,5 @@
 - To identify the appropriate uncertainty regression, I will pick from each averaging time the one with the greatest R2 value
 	- If the slope is negative, make it zero and use a constant uncertainty
 	- Wrote code to accomplish this
+- Now the challenge is to actually apply those regressions to calculate uncertainty
+	- Made some edits that I suspect will make this easier - changes from DataFrame to dictionary
