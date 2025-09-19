@@ -18,3 +18,10 @@
 - Revising median application to take the median offset from the zero statistics instead of from the other values
 	- While this doesn't take the interpolated values into account, I suspect that won't matter much
 		- Will confirm in evaluation script
+- The way I have this script structured, I have already applied interpolation and median filling of the standard deviation, so I just need to handle the temperature based one and the constant ones
+	- Temperature based is straightforward-ish, just need a way to ensure I'm not applying non-existent correlation for O3 (R2 = 0.0093, maybe use a filter of R2 > 0.05?)
+		- That's still a bad correlation but should take out the absolute worst ones?
+		- This is something to look at in the characterize_zeros.py script - going to deal with later
+		- For now! going to delete the O3 ~~figure and~~ data for temperature-noise correlation so it doesn't get read in
+			- Keeping figure, that way I can confirm there is no correlation
+- Revising correlation read in to read the current correlations as off_corr and added a new dictionary lod_corr for the std temperature correlations

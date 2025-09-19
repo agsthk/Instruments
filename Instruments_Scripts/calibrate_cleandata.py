@@ -60,9 +60,12 @@ for root, dirs, files in os.walk(CAL_RESULTS_DIR):
                 )
         
 zeros = {}
-correlations = {}
+off_corr = {}
+lod_corr = {}
 for root, dirs, files in os.walk(ZERO_RESULTS_DIR):
     for file in files:
+        if file.find(".png") != -1:
+            continue
         if file.find("UZAStatistics") != -1:
             inst = file.rsplit("_", 1)[0]
             path = os.path.join(root, file)
@@ -70,10 +73,14 @@ for root, dirs, files in os.walk(ZERO_RESULTS_DIR):
             zeros[inst] = inst_zeros.with_columns(
                 cs.contains("UTC").str.to_datetime()
                 )
-        if file.find("UZATemperatureCorrelation") != -1:
+        if file.find("OffsetTemperatureCorrelation") != -1:
             inst = file.rsplit("_", 1)[0]
             path = os.path.join(root, file)
-            correlations[inst] = pl.read_csv(path)
+            off_corr[inst] = pl.read_csv(path)
+        if file.find("LODTemperatureCorrelation") != -1:
+            inst = file.rsplit("_", 1)[0]
+            path = os.path.join(root, file)
+            lod_corr[inst] = pl.read_csv(path)
         
 
 for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
@@ -88,8 +95,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             continue
         # if inst != "ThermoScientific_42i-TL": continue
         # if inst != "2BTech_205_A": continue
-        # if inst != "2BTech_205_B": continue
-        if inst != "Picarro_G2307": continue
+        if inst != "2BTech_205_B": continue
+        # if inst != "Picarro_G2307": continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -182,8 +189,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])
             # Applies temperature correlation where available to estimate zero
             # offset outside of zeroing active periods
-            if inst in correlations.keys():
-                inst_corr = correlations[inst].select(
+            if inst in off_corr.keys():
+                inst_corr = off_corr[inst].select(
                     pl.col("Species", "Slope", "Intercept")
                     ).rows_by_key(
                         "Species", 
@@ -229,6 +236,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                     pl.lit(inst_cal_factors[var + "_Offset"].item())
                     .alias(var + "_Offset")
                     )
+        # NEED TO ADD CONSTANT LOD HERE!!
         for var in cal_vars:
             sens = inst_cal_factors[var + "_Sensitivity"].item()
             lf = lf.with_columns(
@@ -238,13 +246,13 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         df = lf.collect()
         if file.find("2025") == -1:
             continue
-        for var in cal_vars:
-            hvplot.show(
-                df.hvplot.scatter(
-                    x=t_start,
-                    y=[var, var + "_Calibrated"],
-                    title=inst)
-                )
+        # for var in cal_vars:
+        #     hvplot.show(
+        #         df.hvplot.scatter(
+        #             x=t_start,
+        #             y=[var + "_Calibrated", var + "_STD"],
+        #             title=inst)
+        #         )
         
 #%%
         # f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
