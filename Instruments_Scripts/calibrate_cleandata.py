@@ -87,7 +87,9 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         if path.find(inst) == -1:
             continue
         # if inst != "ThermoScientific_42i-TL": continue
-        if inst != "2BTech_205_A": continue
+        # if inst != "2BTech_205_A": continue
+        # if inst != "2BTech_205_B": continue
+        if inst != "Picarro_G2307": continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -231,6 +233,15 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 .alias(var + "_Calibrated")
                 )
         df = lf.collect()
+        if file.find("2025") == -1:
+            continue
+        for var in cal_vars:
+            hvplot.show(
+                df.hvplot.scatter(
+                    x=t_start,
+                    y=[var, var + "_Calibrated"],
+                    title=inst)
+                )
             
         
 #%%

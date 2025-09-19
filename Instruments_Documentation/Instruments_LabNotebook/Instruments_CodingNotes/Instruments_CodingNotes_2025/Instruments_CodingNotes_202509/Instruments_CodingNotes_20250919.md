@@ -6,3 +6,11 @@
 - Added median determination
 - Added fixed offset determination
 - Removed temperature plotting code
+- Plotting calibrated and uncalibrated data together to confirm it looks reasonable
+	- 2BTech_205_A gets shifted up quite a bit, reasonable based on zeros always being ~0
+	- 2BTech_205_B gets shifted down a little, looks fine I think
+	- Picarro_G2307
+		- Through Jan 28, there is no calibrated data - maybe the median didn't apply?
+		- Where calibrated data was, worked well
+	- ThermoScientific_42i-TL gets shifted down a little, NO background generally 0 ppb which is pretty much expected
+	- 
