@@ -320,10 +320,10 @@ for inst, inst_cal_inputs in cal_inputs.items():
                 temp_fig.suptitle(inst.replace("_", " ") + " Instrument Temperature Calibration Time Series",
                                   size=15)
                 temp_fig_name = inst + "_TemperatureCalibrationTimeSeries_" + date + ".png"
-                # temp_fig.savefig(os.path.join(
-                #     inst_cal_fig_dir,
-                #     temp_fig_name
-                #     ))
+                temp_fig.savefig(os.path.join(
+                    inst_cal_fig_dir,
+                    temp_fig_name
+                    ))
                 plt.close()
                         
                 for var in cal_vars:
@@ -404,10 +404,10 @@ for inst, inst_cal_inputs in cal_inputs.items():
                                     size=15)
                     ts_fig_name = inst + "_" + var_nounits + "_CalibrationTimeSeries_" + date + ".png"
 
-                    # ts_fig.savefig(os.path.join(
-                    #     inst_cal_fig_dir,
-                    #     ts_fig_name
-                    #     ))
+                    ts_fig.savefig(os.path.join(
+                        inst_cal_fig_dir,
+                        ts_fig_name
+                        ))
                     
                     plt.close()
                     
@@ -505,10 +505,10 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     fit_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Fit",
                                     size=15)
                     
-                    # fit_fig.savefig(os.path.join(
-                    #     inst_cal_fig_dir,
-                    #     inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
-                    #     ))
+                    fit_fig.savefig(os.path.join(
+                        inst_cal_fig_dir,
+                        inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
+                        ))
                     
                     plt.close()
 
@@ -569,11 +569,11 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     ns_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Signal to Noise Fit",
                                     size=15)
                     
-                    # ns_fig.savefig(os.path.join(
-                    #     inst_cal_fig_dir,
-                    #     inst + "_" + var_nounits + "_CalibrationSNR_" + date + ".png"
-                    #     ))
-                    # plt.close()
+                    ns_fig.savefig(os.path.join(
+                        inst_cal_fig_dir,
+                        inst + "_" + var_nounits + "_CalibrationSNR_" + date + ".png"
+                        ))
+                    plt.close()
                     
                     # Uses the standard deviation of the zero measurements to
                     # calculate a "default" limit of detection
