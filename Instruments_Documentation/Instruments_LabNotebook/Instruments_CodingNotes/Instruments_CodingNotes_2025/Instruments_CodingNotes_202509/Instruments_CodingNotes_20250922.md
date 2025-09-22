@@ -18,3 +18,9 @@
 	- Identifying the row where delivery concentration is zero
 		- Combined if multiple zero periods
 	- Selecting the standard deviation (uncertainty) in the measured concentration and multiplying by 3 to determine a LOD
+- Final thing I want to do with this script is fix the averaging time calculation for Picarro - it's always 1 second
+	- Issue because sometimes the reported date/time is set to fixed values 100 seconds apart for some unknown reason
+	- Where I calculate averaging time, just stating that it is 1s for Picarro instrument
+- Quickly checked new ODR figs against saved figs, slope doesn't change significantly, sometimes R2 does and intercept kind of does, but both of those make sense and aren't very important
+- Checking SNR figs
+	- Look fine in general

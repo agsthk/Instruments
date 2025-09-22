@@ -267,6 +267,8 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     ).filter(
                         pl.col("UTC_DateTime").ne("0")
                         )["UTC_DateTime"].mode().item() + "s")
+                if inst == "Picarro_G2307":
+                    avg_t = "1s"
                 date_cal_factors["AveragingTime"] = avg_t
                         
                 # Identifies instrument temperature data
@@ -508,7 +510,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     #     inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
                     #     ))
                     
-                    # plt.close()
+                    plt.close()
 
                     model = sp.odr.Model(linear)
                     data = sp.odr.RealData(
@@ -571,7 +573,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     #     inst_cal_fig_dir,
                     #     inst + "_" + var_nounits + "_CalibrationSNR_" + date + ".png"
                     #     ))
-                    plt.close()
+                    # plt.close()
                     
                     # Uses the standard deviation of the zero measurements to
                     # calculate a "default" limit of detection
