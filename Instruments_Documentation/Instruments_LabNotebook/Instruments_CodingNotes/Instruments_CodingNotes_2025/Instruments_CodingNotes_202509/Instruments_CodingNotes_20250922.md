@@ -24,3 +24,6 @@
 - Quickly checked new ODR figs against saved figs, slope doesn't change significantly, sometimes R2 does and intercept kind of does, but both of those make sense and aren't very important
 - Checking SNR figs
 	- Look fine in general
+# calibrate_cleandata.py
+- Going in to change the default LOD to the one calculated from the calibration where a fixed LOD is needed (2BTech_205_B)
+	- Just a change from using the "mfr_lod" dict to pulling from the calibration results

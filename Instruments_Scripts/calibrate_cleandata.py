@@ -99,7 +99,6 @@ for inst, factors in sn_factors.items():
                 {key.replace("NoiseSignal_", ""): val[0]
                  for key, val in spec_avt_factors.items()}
                 )
-
                 #%%
 zeros = {}
 off_corr = {}
@@ -137,7 +136,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             continue
         # if inst != "ThermoScientific_42i-TL": continue
         # if inst != "2BTech_205_A": continue
-        # if inst != "2BTech_205_B": continue
+        if inst != "2BTech_205_B": continue
         # if inst != "Picarro_G2307": continue
         if inst == "2BTech_405nm":
             continue
@@ -324,7 +323,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                 lf = lf.with_columns(
                     pl.lit(inst_cal_factors[var + "_Offset"].item())
                     .alias(var + "_Offset"),
-                    pl.lit(mfr_lod[inst]).alias(var + "_LOD")
+                    pl.lit(inst_cal_factors[var + "_LOD"].item()).alias(var + "_LOD")
                     )
         for var in cal_vars:
             sens = inst_cal_factors[var + "_Sensitivity"].item()
@@ -375,17 +374,17 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         for var in cal_vars:
             hvplot.show(
                 df.hvplot.scatter(
-                    x=t_start,
+                    x=df.columns[0],
                     y=var + "_Calibrated",
                     by="SamplingLocation",
                     title=inst) * (
                         df.hvplot.errorbars(
-                            x=t_start,
+                            x=df.columns[0],
                             y=var + "_Calibrated",
                             yerr1=var + "_Uncertainty")
                         ) * (
                             df.hvplot.line(
-                                x=t_start,
+                                x=df.columns[0],
                                 y=var + "_LOD"
                                 )
                             )
