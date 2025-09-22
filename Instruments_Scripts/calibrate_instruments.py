@@ -257,9 +257,9 @@ for inst, inst_cal_inputs in cal_inputs.items():
                         cs.by_name(cal_vars).mean()
                         .name.suffix("_Measured"),
                         cs.by_name(cal_vars).std()
-                        .name.map(lambda c: "Unc_" + c + "_Measured")
+                        .name.map(lambda c: "Unc_" + c + "_Measured"),
+                        pl.len().alias("N")
                         )
-                        
                 avg_t = (cal_plot_data.select(
                     pl.col("UTC_DateTime")
                     .sub(pl.col("UTC_DateTime").shift(1))
@@ -318,10 +318,10 @@ for inst, inst_cal_inputs in cal_inputs.items():
                 temp_fig.suptitle(inst.replace("_", " ") + " Instrument Temperature Calibration Time Series",
                                   size=15)
                 temp_fig_name = inst + "_TemperatureCalibrationTimeSeries_" + date + ".png"
-                temp_fig.savefig(os.path.join(
-                    inst_cal_fig_dir,
-                    temp_fig_name
-                    ))
+                # temp_fig.savefig(os.path.join(
+                #     inst_cal_fig_dir,
+                #     temp_fig_name
+                #     ))
                 plt.close()
                         
                 for var in cal_vars:
@@ -368,7 +368,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     for i, char in enumerate(var_name):
                         if char.isnumeric():
                             var_name = var_name[:i] + "$_" + char + "$" + var_name[i + 1:]
-                        
+                            
                     cal_plot_data = cal_plot_data.filter(
                         pl.col(var).gt(-2000)
                         )
@@ -402,12 +402,40 @@ for inst, inst_cal_inputs in cal_inputs.items():
                                     size=15)
                     ts_fig_name = inst + "_" + var_nounits + "_CalibrationTimeSeries_" + date + ".png"
 
-                    ts_fig.savefig(os.path.join(
-                        inst_cal_fig_dir,
-                        ts_fig_name
-                        ))
+                    # ts_fig.savefig(os.path.join(
+                    #     inst_cal_fig_dir,
+                    #     ts_fig_name
+                    #     ))
                     
                     plt.close()
+                    
+                    zero_data = odr_cal_data.filter(
+                        pl.col(var + "_Delivered").eq(0)
+                        )
+                    # Does not combine the zeros if there is only one zero
+                    if len(zero_data) > 1:
+                        zero_data = zero_data.select(
+                                cs.contains("Measured", "Delivered"),
+                                pl.col("N"),
+                                pl.col("N").sub(1).alias("DOF")
+                                ).with_columns(
+                                    (cs.contains("Unc").pow(2)).mul(pl.col("DOF")),
+                                    (cs.contains("Measured", "Delivered") & ~cs.contains("Unc")).mul(pl.col("N"))
+                                    ).with_columns(
+                                        pl.all().sum(),
+                                        ).with_columns(
+                                            (cs.contains("Unc").truediv(pl.col("DOF"))).sqrt(),
+                                            (cs.contains("Measured", "Delivered") & ~cs.contains("Unc")).truediv(pl.col("N"))
+                                            ).select(
+                                                pl.exclude("DOF")
+                                                )[0]
+                        odr_cal_data = pl.concat(
+                            [odr_cal_data.filter(
+                                pl.col(var + "_Delivered").ne(0)
+                                ),
+                            zero_data],
+                            how="diagonal_relaxed"
+                            )
                     sens, off, unc_sens, unc_off = perform_odr(
                         odr_cal_data[var + "_Delivered"],
                         odr_cal_data[var + "_Measured"],
@@ -459,12 +487,12 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     fit_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Calibration Fit",
                                     size=15)
                     
-                    fit_fig.savefig(os.path.join(
-                        inst_cal_fig_dir,
-                        inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
-                        ))
+                    # fit_fig.savefig(os.path.join(
+                    #     inst_cal_fig_dir,
+                    #     inst + "_" + var_nounits + "_CalibrationODR_" + date + ".png"
+                    #     ))
                     
-                    plt.close()
+                    # plt.close()
 
                     model = sp.odr.Model(linear)
                     data = sp.odr.RealData(
@@ -523,14 +551,16 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     ns_fig.suptitle(inst.replace("_", " ") + " " + var_name + " Signal to Noise Fit",
                                     size=15)
                     
-                    ns_fig.savefig(os.path.join(
-                        inst_cal_fig_dir,
-                        inst + "_" + var_nounits + "_CalibrationSNR_" + date + ".png"
-                        ))
+                    # ns_fig.savefig(os.path.join(
+                    #     inst_cal_fig_dir,
+                    #     inst + "_" + var_nounits + "_CalibrationSNR_" + date + ".png"
+                    #     ))
                     plt.close()
               
                 inst_cal_factors[date] = date_cal_factors
     cal_factors[inst] = inst_cal_factors
+#%%
+
 #%%
 for inst, factors in cal_factors.items():
     inst_cal_results = []

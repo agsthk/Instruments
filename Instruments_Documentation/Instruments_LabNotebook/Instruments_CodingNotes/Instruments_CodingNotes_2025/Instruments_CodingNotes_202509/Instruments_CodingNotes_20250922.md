@@ -1,0 +1,13 @@
+# calibrate_instruments.py
+- Want to modify output to include a "default" LOD which is the standard deviation of the zero measurements during calibration
+- Initially, just identifying the measured STD from zero measurements
+- There are some calibrations with multiple zero periods and thus multiple standard deviations
+	- For these, I want to do a pooled standard deviation
+		- Requires that I know the number of sample points - need to add this to the ODR data
+		- Added a "N" column to cal_data to carry forward this information
+	- I actually think it would be best to combine all the zeroing periods - mean and standard deviation
+		- Calculating the grand mean and pooled STD, then will replace all the zero rows in odr_cal_data with the pooled data
+			- Not the time series - just the regression
+		- Successfully calculated the pooled mean and standard deviation of the zero measurements, now working to recombine that with the other measurements in the original odr_cal_data DataFrame
+		- Had to move the calculation to be after the time series as that one requires the multiple intervals to be separated
+	- Successfully combined all multiple zeros into one zero with properly calculated pooled statistics
