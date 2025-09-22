@@ -409,33 +409,51 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     
                     plt.close()
                     
-                    zero_data = odr_cal_data.filter(
-                        pl.col(var + "_Delivered").eq(0)
-                        )
-                    # Does not combine the zeros if there is only one zero
-                    if len(zero_data) > 1:
-                        zero_data = zero_data.select(
+                    # Identifies delivery concentrations that were repeated
+                    duplicates = odr_cal_data.filter(
+                        pl.col(var + "_Delivered").is_duplicated()
+                        ).unique(
+                            subset=var + "_Delivered"
+                            )[var + "_Delivered"]
+                    # For repeated delivery concentrations, calculates pooled
+                    # statistics and replaces original rows with one combined
+                    # row
+                    for conc in duplicates:
+                        conc_data = odr_cal_data.filter(
+                            pl.col(var + "_Delivered").eq(conc)
+                            ).select(
                                 cs.contains("Measured", "Delivered"),
                                 pl.col("N"),
                                 pl.col("N").sub(1).alias("DOF")
                                 ).with_columns(
-                                    (cs.contains("Unc").pow(2)).mul(pl.col("DOF")),
-                                    (cs.contains("Measured", "Delivered") & ~cs.contains("Unc")).mul(pl.col("N"))
+                                    (cs.contains("Unc").pow(2))
+                                    .mul(pl.col("DOF")),
+                                    (cs.contains("Measured", "Delivered")
+                                     & ~cs.contains("Unc")).mul(pl.col("N"))
                                     ).with_columns(
                                         pl.all().sum(),
                                         ).with_columns(
-                                            (cs.contains("Unc").truediv(pl.col("DOF"))).sqrt(),
-                                            (cs.contains("Measured", "Delivered") & ~cs.contains("Unc")).truediv(pl.col("N"))
+                                            (cs.contains("Unc")
+                                             .truediv(pl.col("DOF"))).sqrt(),
+                                            (cs.contains("Measured",
+                                                         "Delivered")
+                                             & ~cs.contains("Unc"))
+                                            .truediv(pl.col("N"))
                                             ).select(
                                                 pl.exclude("DOF")
-                                                )[0]
+                                                ).unique()
+                        # Combines existing DataFrame with current delivery
+                        # concentrations excluded with combined row for current
+                        # delivery concentration
                         odr_cal_data = pl.concat(
                             [odr_cal_data.filter(
-                                pl.col(var + "_Delivered").ne(0)
+                                pl.col(var + "_Delivered").ne(conc)
                                 ),
-                            zero_data],
-                            how="diagonal_relaxed"
-                            )
+                            conc_data],
+                            how="diagonal_relaxed")
+                    zero_data = odr_cal_data.filter(
+                        pl.col(var + "_Delivered").eq(0)
+                        )
                     sens, off, unc_sens, unc_off = perform_odr(
                         odr_cal_data[var + "_Delivered"],
                         odr_cal_data[var + "_Measured"],

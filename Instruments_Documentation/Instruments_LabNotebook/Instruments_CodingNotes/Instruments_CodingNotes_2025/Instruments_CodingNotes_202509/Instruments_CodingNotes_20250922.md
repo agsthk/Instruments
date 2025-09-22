@@ -11,3 +11,6 @@
 		- Successfully calculated the pooled mean and standard deviation of the zero measurements, now working to recombine that with the other measurements in the original odr_cal_data DataFrame
 		- Had to move the calculation to be after the time series as that one requires the multiple intervals to be separated
 	- Successfully combined all multiple zeros into one zero with properly calculated pooled statistics
+- To expand on this - could I group all statistics when delivery concentration is the same?
+	- Relatively straightforward to do
+	- Just need to identify the delivery concentrations that were repeated, then run the same thing as with the zero but replace to concentration to match to with the repeat concentrations
