@@ -451,9 +451,7 @@ for inst, inst_cal_inputs in cal_inputs.items():
                                 ),
                             conc_data],
                             how="diagonal_relaxed")
-                    zero_data = odr_cal_data.filter(
-                        pl.col(var + "_Delivered").eq(0)
-                        )
+
                     sens, off, unc_sens, unc_off = perform_odr(
                         odr_cal_data[var + "_Delivered"],
                         odr_cal_data[var + "_Measured"],
@@ -574,10 +572,19 @@ for inst, inst_cal_inputs in cal_inputs.items():
                     #     inst + "_" + var_nounits + "_CalibrationSNR_" + date + ".png"
                     #     ))
                     plt.close()
+                    
+                    # Uses the standard deviation of the zero measurements to
+                    # calculate a "default" limit of detection
+                    zero_data = odr_cal_data.filter(
+                        pl.col(var + "_Delivered").eq(0)
+                        )
+                    if len(zero_data) == 0:
+                        continue
+                    lod = zero_data["Unc_" + var + "_Measured"].item() * 3
+                    date_cal_factors[var]["LOD"] = lod
               
                 inst_cal_factors[date] = date_cal_factors
     cal_factors[inst] = inst_cal_factors
-#%%
 
 #%%
 for inst, factors in cal_factors.items():

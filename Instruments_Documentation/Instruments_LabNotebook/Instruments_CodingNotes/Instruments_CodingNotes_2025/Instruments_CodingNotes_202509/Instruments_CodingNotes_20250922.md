@@ -14,3 +14,7 @@
 - To expand on this - could I group all statistics when delivery concentration is the same?
 	- Relatively straightforward to do
 	- Just need to identify the delivery concentrations that were repeated, then run the same thing as with the zero but replace to concentration to match to with the repeat concentrations
+- Now, adding the "default" LOD to the exported results when available
+	- Identifying the row where delivery concentration is zero
+		- Combined if multiple zero periods
+	- Selecting the standard deviation (uncertainty) in the measured concentration and multiplying by 3 to determine a LOD
