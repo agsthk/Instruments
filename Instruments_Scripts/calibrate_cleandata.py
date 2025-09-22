@@ -44,6 +44,7 @@ mfr_lod = {"2BTech_202": 3,
 
 cal_factors = {}
 sn_factors = {}
+cal_lods = {}
 for root, dirs, files in os.walk(CAL_RESULTS_DIR):
     for file in files:
         if file.find("CalibrationResults") == -1:
@@ -61,6 +62,10 @@ for root, dirs, files in os.walk(CAL_RESULTS_DIR):
             ).select(
                 pl.exclude("CalDate")
                 )
+        cal_lods[inst] = inst_cal_factors.select(
+            pl.col("CalDate"),
+            pl.selectors.contains("AveragingTime"),
+            pl.selectors.contains("LOD"))
 
 sn_selected = {inst: {} for inst in sn_factors.keys()}
 for inst, factors in sn_factors.items():
@@ -319,12 +324,65 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         # Applies offset from calibration as constant zero offset for
         # instruments never zeroed
         else:
+            inst_cal_lods = cal_lods[inst].sort(by="AveragingTime")
+            unique = inst_cal_lods.filter(
+                ~pl.col("AveragingTime").is_duplicated()
+                )
+            duplicated = inst_cal_lods.filter(
+                pl.col("AveragingTime").is_duplicated()
+                )
+            selected_list = []
+            for avg_t in duplicated["AveragingTime"].unique():
+                avg_t_lods = duplicated.filter(
+                    pl.col("AveragingTime").eq(avg_t)
+                    )
+                for var in cal_vars:
+                    var_lod = avg_t_lods.filter(
+                        pl.col("CalDate").cast(pl.String()).eq(cal_dates[inst])
+                        ).select(pl.col("AveragingTime", var + "_LOD"))
+                    
+                    if var_lod.height == 1:
+                        selected_list.append(var_lod)
+                        continue
+                    var_lod = avg_t_lods.filter(
+                        pl.col(var + "_LOD").eq(pl.max(var + "_LOD"))
+                        ).select(
+                            pl.col("AveragingTime", var + "_LOD")
+                            )
+                    selected_list.append(var_lod)
+            for i, lod_df in enumerate(selected_list):
+                if i == 0:
+                    selected = lod_df
+                else:
+                    selected = selected.join(lod_df, on="AveragingTime")
+                
+            unique = pl.concat(
+                [unique, selected],
+                how="diagonal_relaxed"
+                ).select(
+                    pl.exclude("CalDate")
+                    ).with_columns(
+                        pl.col("AveragingTime").str.extract(r"(\d+?)s", 1)
+                        .cast(pl.Int64)
+                        ).lazy()
+
+            lf = lf.with_columns(
+                pl.col("UTC_Stop").sub(pl.col("UTC_Start")).dt.total_seconds().alias("AveragingTime")
+                ).sort(by="AveragingTime").join_asof(
+                    unique.sort(by="AveragingTime"),
+                    on="AveragingTime",
+                    strategy="backward",
+                    coalesce=True
+                    ).sort(by="UTC_Start")
             for var in cal_vars:
                 lf = lf.with_columns(
                     pl.lit(inst_cal_factors[var + "_Offset"].item())
-                    .alias(var + "_Offset"),
-                    pl.lit(inst_cal_factors[var + "_LOD"].item()).alias(var + "_LOD")
-                    )
+                    .alias(var + "_Offset")
+                    ).select(
+                        ~cs.contains("AveragingTime")
+                        )
+
+                
         for var in cal_vars:
             sens = inst_cal_factors[var + "_Sensitivity"].item()
             lf = lf.with_columns(

@@ -27,3 +27,15 @@
 # calibrate_cleandata.py
 - Going in to change the default LOD to the one calculated from the calibration where a fixed LOD is needed (2BTech_205_B)
 	- Just a change from using the "mfr_lod" dict to pulling from the calibration results
+- Actually, needs to be a bit more complex
+	- Different averaging times will have different limits of detection - must account for that
+		- 2s averaging time for 2BTech_205_B is like 2x that of the 10s averaging time
+	- Creating a separate lod dictionary
+	- Going to use a similar joining technique as with the uncertainties, but need to modify to select the desired LOD
+		- If only one exists for given averaging time, use that one
+		- If more than one exists for given averaging time:
+			- First, use the caldate that is being used
+			- If that isn't possible, use the maximum LOD (be conservative)
+	- Figured out how to select the appropriate LOD for each variable - checking that it works for multiple variables
+		- It certainly seems to, although I'm not sure it's going to matter
+	- Joined on AveragingTime column to get appropriate LOD for each measured value
