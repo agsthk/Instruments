@@ -286,7 +286,8 @@ for inst, lfs in data.items():
     # Gets information on all noise-to-signal regressions from calibrations
     inst_cal_snrs = cal_factors[inst].select(
         pl.col("AveragingTime"),
-        cs.contains("NoiseSignal") & ~cs.contains("Uncertainty")
+        (cs.contains("NoiseSignal")
+         & ~cs.contains("Uncertainty")).name.suffix("_Cal")
         )
     # Gets information on all limits of detection from calibrations
     inst_cal_lods = cal_factors[inst].select(
@@ -294,7 +295,7 @@ for inst, lfs in data.items():
         cs.contains("LOD").name.suffix("_Cal")
         )
     # Identifies variables calibrated for
-    cal_vars = {col.rsplit("_", 2)[0] for col in inst_cal_snrs.columns
+    cal_vars = {col.rsplit("_", 3)[0] for col in inst_cal_snrs.columns
                 if col !="AveragingTime"}
     
     # Identifies averaging times with only one noise-to-signal regression
@@ -318,8 +319,8 @@ for inst, lfs in data.items():
                 pl.col("AveragingTime"),
                 cs.contains(var)
                 ).filter(
-                    pl.col(var + "_NoiseSignal_R2").eq(
-                        pl.max(var + "_NoiseSignal_R2")
+                    pl.col(var + "_NoiseSignal_R2_Cal").eq(
+                        pl.max(var + "_NoiseSignal_R2_Cal")
                         )
                     )
             if i == 0:
@@ -366,7 +367,7 @@ for inst, lfs in data.items():
                     pl.col("AveragingTime"),
                     cs.contains(var)
                     ).filter(
-                        pl.col(var + "_LOD").eq(pl.max(var + "_LOD"))
+                        pl.col(var + "_LOD_Cal").eq(pl.max(var + "_LOD_Cal"))
                         )
                 if i == 0:
                     max_lods = var_cal_lods
@@ -426,10 +427,37 @@ for inst, lfs in data.items():
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
 
-# %%
+# %% Manufacturer values
 
-
-
+for inst, lfs in data.items():
+    for source, lf in lfs.items():
+        if inst in mfr_lods.keys():
+            # Adds constant manufacturer LOD for each variable
+            for var, lod in mfr_lods[inst].items():
+                lf = lf.with_columns(
+                    pl.lit(lod).alias(var + "_LOD_MFR")
+                    )
+        if inst in eq_mfr_prec.keys():
+            # Adds manufacturer slope and intercept to calculate uncertainty
+            # for each variable
+            for var, factors in eq_mfr_prec[inst].items():
+                lf = lf.with_columns(
+                    pl.lit(factors[0]).alias(var + "_NoiseSignal_Slope_MFR"),
+                    pl.lit(factors[1]).alias(var + "_NoiseSignal_Offset_MFR")
+                    )
+        if inst in const_mfr_prec.keys():
+            # Adds constant manufacturer uncertainty for each variable
+            for var, unc in const_mfr_prec[inst].items():
+                lf = lf.with_columns(
+                    pl.lit(unc).alias(var + "_FixedUnc_MFR")
+                    )
+        if inst in perc_mfr_prec.keys():
+            # Adds percent manufacturer uncertainty for each variable
+            for var, unc in perc_mfr_prec[inst].items():
+                lf = lf.with_columns(
+                    pl.lit(unc).alias(var + "_PercUnc_MFR"))
+        # Replaces original LazyFrame with revised LazyFrame in data dictionary
+        data[inst][source] = lf
 # %%
 for inst, df in cal_factors.items():
     # If no 2025 data, skip instrument

@@ -8,3 +8,9 @@
 			- By caldate when available, otherwise by highest value
 			- Don't need to do LOD for ALL cals, can just use the date that I actually will use
 	- Finished selecting appropriate values
+- Adding manufacturer reported values
+	- Actually very straightforward
+	- Adding as "NoiseSignal_Slope/Offset_MFR" if equation given
+	- Adding as FixedUnc_MFR or PercUnc_MFR otherwise
+- Only thing remaining to add to the LazyFrames before comparison is the median values, which are based on the measured of the measured offset/LOD
+	- Going to go back into the Interpolated cell to add these
