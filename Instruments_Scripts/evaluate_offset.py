@@ -59,6 +59,14 @@ eq_mfr_prec = {
     "Picarro_G2307": {"CH2O_ppb": [1.2, 0.001]} #1.2 ppb + 0.1% of reading
     }
 
+# Date to use calibration factors from
+inst_cal_dates = {"2BTech_202": "20240118",
+                  "2BTech_205_A": "20250115",
+                  "2BTech_205_B": "20250115",
+                  "2BTech_405nm": "20241216",
+                  "Picarro_G2307": "20250625",
+                  "ThermoScientific_42i-TL": "20241216"}
+
 # %% Calibration and zero characterization results
 
 # Gets results of all performed calibrations
@@ -270,7 +278,157 @@ for inst, lfs in data.items():
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
 
+# %% Calibration LODs and noise-to-signal regression factors
+for inst, lfs in data.items():
+    # Skips instruments with no calibrations
+    if inst not in cal_factors.keys():
+        continue
+    # Gets information on all noise-to-signal regressions from calibrations
+    inst_cal_snrs = cal_factors[inst].select(
+        pl.col("AveragingTime"),
+        cs.contains("NoiseSignal") & ~cs.contains("Uncertainty")
+        )
+    # Gets information on all limits of detection from calibrations
+    inst_cal_lods = cal_factors[inst].select(
+        pl.col("AveragingTime", "CalDate"),
+        cs.contains("LOD").name.suffix("_Cal")
+        )
+    # Identifies variables calibrated for
+    cal_vars = {col.rsplit("_", 2)[0] for col in inst_cal_snrs.columns
+                if col !="AveragingTime"}
+    
+    # Identifies averaging times with only one noise-to-signal regression
+    unique_cal_snrs = inst_cal_snrs.filter(
+        ~pl.col("AveragingTime").is_duplicated()
+        )
+    # Identifies averaging times with multiple noise-to-signal regressions
+    dup_cal_snrs = inst_cal_snrs.filter(
+        pl.col("AveragingTime").is_duplicated()
+        )
+    # Identifies best noise-to-signal regression for each averaging time
+    for avg_t in dup_cal_snrs["AveragingTime"].unique():
+        # Selects noise-to-signal regressions corresponding to current
+        # averaging time
+        avgt_snrs = dup_cal_snrs.filter(
+            pl.col("AveragingTime").eq(avg_t)
+            )
+        # Identifies regressions with greatest R2 value for each variable
+        for i, var in enumerate(cal_vars):
+            var_cal_snrs = avgt_snrs.select(
+                pl.col("AveragingTime"),
+                cs.contains(var)
+                ).filter(
+                    pl.col(var + "_NoiseSignal_R2").eq(
+                        pl.max(var + "_NoiseSignal_R2")
+                        )
+                    )
+            if i == 0:
+                best_snr = var_cal_snrs
+            # Adds best SNR for subsequent variable to that for first
+            # variable
+            else:
+                best_snr = best_snr.join(var_cal_snrs, on="AveragingTime")
+        # Adds greatest SNRs to DataFrame with one selection per averaging time
+        unique_cal_snrs = pl.concat(
+            [unique_cal_snrs, best_snr],
+            how="diagonal_relaxed"
+            )
+    # Identifies the averaging times that only have one possible LOD
+    unique_cal_lods = inst_cal_lods.filter(
+        ~pl.col("AveragingTime").is_duplicated()
+        )
+    # Identifies averaging times with multiple possible LODs
+    dup_cal_lods = inst_cal_lods.filter(
+        pl.col("AveragingTime").is_duplicated()
+        )
+    # Identifies unique LOD for each duplicated averaging time
+    for avg_t in dup_cal_lods["AveragingTime"].unique():
+        # Selects LODs corresponding to current averaging time
+        avgt_lods = dup_cal_lods.filter(
+            pl.col("AveragingTime").eq(avg_t)
+            )
+        # Selects LODs from CalDate used to calibrate data when possible
+        if inst_cal_dates[inst] in avgt_lods["CalDate"]:
+            unique_cal_lods = pl.concat(
+                [
+                    unique_cal_lods,
+                    avgt_lods.filter(
+                        pl.col("CalDate").eq(inst_cal_dates[inst])
+                        )
+                    ]
+                )
+        # Selects greatest LODs if not LODs available for CalDate used
+        else:
+            for i, var in enumerate(cal_vars):
+                # Identifies greatest LOD for current variable and averaging
+                # time
+                var_cal_lods = avgt_lods.select(
+                    pl.col("AveragingTime"),
+                    cs.contains(var)
+                    ).filter(
+                        pl.col(var + "_LOD").eq(pl.max(var + "_LOD"))
+                        )
+                if i == 0:
+                    max_lods = var_cal_lods
+                # Adds maximum LOD for subsequent variable to that for first
+                # variable
+                else:
+                    max_lods = max_lods.join(var_cal_lods, on="AveragingTime")
+            # Adds greatest LODs to DataFrame with one selection per averaging
+            # time
+            unique_cal_lods = pl.concat(
+                [unique_cal_lods, max_lods],
+                how="diagonal_relaxed"
+                )
+    # Combines unique SNR and LOD DataFrames to make joining easier
+    inst_snr_lod = unique_cal_snrs.join(
+        unique_cal_lods,
+        on="AveragingTime"
+        ).select(
+            ~cs.contains("CalDate", "R2")
+            ).with_columns(
+                pl.col("AveragingTime").str.extract(r"(\d+?)s", 1)
+                .cast(pl.Int64)
+                ).sort(
+                    by="AveragingTime"
+                    )
+    for source, lf in lfs.items():
+        # Workaround for time issues in Picarro data
+        if inst == "Picarro_G2307":
+            for col in inst_snr_lod.columns:
+                if col == "AveragingTime":
+                    continue
+                lf = lf.with_columns(
+                    pl.lit(inst_snr_lod[col].item()).alias(col)
+                    )
+        else:
+            lf = lf.with_columns( # Creates "AveragingTime" column
+                pl.col("UTC_Stop")
+                .sub(pl.col("UTC_Start"))
+                .dt.total_seconds()
+                .alias("AveragingTime")
+                ).sort(
+                    by="AveragingTime" # Sorting required for join_asof
+                    ).join_asof(
+                        inst_snr_lod.lazy(),
+                        # Joins on "AveragingTime" column
+                        on="AveragingTime",
+                        # Shorter calibration AveragingTimes apply to larger
+                        # measurement AveragingTimes if exact match not
+                        # available
+                        strategy="backward",
+                        coalesce=True
+                        ).sort(
+                            by="UTC_Start"
+                            ).select(
+                                pl.exclude("AveragingTime")
+                                )
+        # Replaces original LazyFrame with revised LazyFrame in data dictionary
+        data[inst][source] = lf
+
 # %%
+
+
 
 # %%
 for inst, df in cal_factors.items():
