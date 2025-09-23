@@ -4,12 +4,12 @@ Created on Mon Sep 15 13:50:40 2025
 
 @author: agsthk
 """
-
+# %% Package imports, directory definitions, declarations of constants
 import os
 import polars as pl
 import polars.selectors as cs
 from tqdm import tqdm
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import hvplot.polars
 
 # Declares full path to Instruments_Data/ directory
@@ -18,13 +18,48 @@ data_dir = os.getcwd()
 if "Instruments" in os.path.dirname(data_dir):
     data_dir = os.path.dirname(data_dir)
 data_dir = os.path.join(data_dir, "Instruments_Data")
-
 # Full path to directory containing all clean raw data
 CLEAN_DATA_DIR = os.path.join(data_dir, "Instruments_CleanData")
 # Full path to directory containing calibration results
 CAL_RESULTS_DIR = os.path.join(data_dir, "Instruments_ManualData", "Instruments_Calibrations")
 # Full path to directory containing zero results
 ZERO_RESULTS_DIR = os.path.join(data_dir, "Instruments_DerivedData")
+
+# Limits of detection reported by the manufacturer in instrument manual/datasheet
+mfr_lods = {
+    "2BTech_202": {"O3_ppb": 4.5}, #ppb, 3 sigma, 10s measurement mode
+    "2BTech_205_A": {"O3_ppb": 3.0}, #ppb, 3 sigma, 10s averaging
+    "2BTech_205_B": {"O3_ppb": 3.0}, #ppb, 3 sigma, 10s averaging
+    "2BTech_405nm": {"NO_ppb": 1.5,
+                     "NO2_ppb": 1.5}, #ppb, given as <1 ppb at 2 sigma with adaptive filter
+    "Picarro_G2307": {"CH2O_ppb": 0.3}, #ppb, 3 sigma, given for 300s, typical performance as 0.18 ppb
+    "ThermoScientific_42i-TL": {"NO_ppb": 0.05,
+                                "NO2_ppb": 0.05}, # ppb, lower limit at 120 second averaging time
+    }
+# Constant precision reported by the manufacturer in instrument manual/datasheet
+const_mfr_prec = {
+    "2BTech_202": {"O3_ppb": 1.5}, #greater of 1.5 ppb or 2% of reading
+    "2BTech_205_A": {"O3_ppb": 1}, # greater of 1 ppb or 2% of reading
+    "2BTech_205_B": {"O3_ppb": 1}, # greater of 1 ppb or 2% of reading
+    "2BTech_405nm": {"NO_ppb": 0.5,
+                     "NO2_ppb": 0.5}, #greater of <0.5 ppb or 0.5% of reading
+    "ThermoScientific_42i-TL": {"NO_ppb": 0.4,
+                                "NO2_ppb": 0.4} # ppb, not sure of source or averaging time for this value
+    }
+# Precision as percent of measurement if it exceeds constant value
+perc_mfr_prec = {
+    "2BTech_202": {"O3_ppb": 0.02}, #greater of 1.5 ppb or 2% of reading
+    "2BTech_205_A": {"O3_ppb": 0.02}, # greater of 1 ppb or 2% of reading
+    "2BTech_205_B": {"O3_ppb": 0.02}, # greater of 1 ppb or 2% of reading
+    "2BTech_405nm": {"NO_ppb": 0.005,
+                     "NO2_ppb": 0.005}, #greater of <0.5 ppb or 0.5% of reading
+    }
+# Intercept, Slope of equation used to calculate precision from measurement
+eq_mfr_prec = {
+    "Picarro_G2307": {"CH2O_ppb": [1.2, 0.001]} #1.2 ppb + 0.1% of reading
+    }
+
+# %% Calibration and zero characterization results
 
 # Gets results of all performed calibrations
 cal_factors = {}
@@ -34,23 +69,35 @@ for root, dirs, files in os.walk(CAL_RESULTS_DIR):
             continue
         inst = file.rsplit("_", 1)[0]
         path = os.path.join(root, file)
-        cal_factors[inst] = pl.read_csv(path,
-                                        schema_overrides={"CalDate": pl.String})
+        cal_factors[inst] = pl.read_csv(
+            path,
+            schema_overrides={"CalDate": pl.String}
+            )
 
-# Gets statistics on instrument zeros and temperature-offset correlations
 zeros = {}
-correlations = {}
+off_corr = {}
+lod_corr = {}
 for root, dirs, files in os.walk(ZERO_RESULTS_DIR):
     for file in files:
-        inst = file.rsplit("_", 1)[0]
-        path = os.path.join(root, file)
+        if file.find(".png") != -1:
+            continue
         if file.find("UZAStatistics") != -1:
-            zeros[inst] = pl.read_csv(path).with_columns(
+            inst = file.rsplit("_", 1)[0]
+            path = os.path.join(root, file)
+            inst_zeros = pl.read_csv(path)
+            zeros[inst] = inst_zeros.with_columns(
                 cs.contains("UTC").str.to_datetime()
                 )
-        if file.find("UZATemperatureCorrelation") != -1:
-            correlations[inst] = pl.read_csv(path)
-            
+        if file.find("OffsetTemperatureCorrelation") != -1:
+            inst = file.rsplit("_", 1)[0]
+            path = os.path.join(root, file)
+            off_corr[inst] = pl.read_csv(path)
+        if file.find("LODTemperatureCorrelation") != -1:
+            inst = file.rsplit("_", 1)[0]
+            path = os.path.join(root, file)
+            lod_corr[inst] = pl.read_csv(path)
+# %% Reads and concatenates all clean data (from 2025)
+
 # Reads in all clean data    
 data = {}
 for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
@@ -82,6 +129,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             )
         # Adds to data dictionary
         data[inst][source].append(lf)
+
 # Concatenates all data from a given instrument source    
 for inst, sources in data.items():
     for source, lfs in sources.items():
@@ -91,7 +139,140 @@ for inst, sources in data.items():
             ).sort(
                 by=cs.contains("UTC")
                 )
+# %% Adds calibration offsets and sensitivities to LazyFrame
+for inst, lfs in data.items():
+    if inst not in cal_factors.keys():
+        continue
+    # Sensitivities from calibrations for each variable
+    cal_sensitivities = cal_factors[inst].select(
+        pl.col("CalDate"),
+        cs.contains("Sensitivity") & ~cs.contains("NoiseSignal", "Uncertainty")
+        ).rows_by_key(
+            "CalDate", 
+            named=True,
+            unique=True
+            )
+    # Offsets from calibrations for each variable
+    cal_offsets = cal_factors[inst].select(
+        pl.col("CalDate"),
+        cs.contains("Offset") & ~cs.contains("NoiseSignal", "Uncertainty")
+        ).rows_by_key(
+            "CalDate", 
+            named=True,
+            unique=True
+            )
+    for source, lf in lfs.items():
+        # Adds calibration sensitivities to LazyFrame
+        for cal_date, sensitivities in cal_sensitivities.items():
+            for label, sensitivity in sensitivities.items():
+                lf = lf.with_columns(
+                    pl.lit(sensitivity).alias(label + "_" + cal_date)
+                    )
+        # Adds calibration offsets to LazyFrame
+        for cal_date, offsets in cal_offsets.items():
+            for label, offset in offsets.items():
+                lf = lf.with_columns(
+                    pl.lit(offset).alias(label + "_" + cal_date)
+                    )
+        # Replaces original LazyFrame with revised LazyFrame in data dictionary
+        data[inst][source] = lf
+# %% Interpolated zero measurement offsets and limits of detection
 
+for inst, lfs in data.items():
+    if inst not in zeros.keys():
+        continue
+    for source, lf in lfs.items():
+        # Name of first column to sort by DateTime
+        sort_name = lf.collect_schema().names()[0]
+        # Name of second column to remove zero columns later
+        filter_name = lf.collect_schema().names()[1]
+        # Uses zero statistics to calculate LOD
+        inst_zeros = zeros[inst].with_columns(
+                cs.contains("STD").mul(3)
+                ).rename(
+                    lambda name: name.replace("Mean",
+                                              "Offset_UZA").replace("STD",
+                                                                    "LOD_UZA")
+                    )
+        # Times that zeroing interval begins (with mean zero and LOD during
+        # interval)
+        zero_starts = inst_zeros.select(
+            pl.exclude("UTC_Stop")
+            ).rename({
+                "UTC_Start": sort_name
+                }).lazy()
+        # Times that zeroing interval ends (with mean zero and LOD during
+        # interval)
+        zero_stops = inst_zeros.select(
+            pl.exclude("UTC_Start")
+            ).rename({
+                "UTC_Stop": sort_name
+                }).lazy()
+        # Interpolates between zero measurements to give estimated offset and
+        # LOD
+        lf = pl.concat(
+            [lf, zero_starts, zero_stops],
+            how="diagonal_relaxed"
+            ).sort(
+                by=sort_name
+                ).with_columns(
+                    cs.contains("Offset", "UZA").interpolate_by(sort_name)
+                    ).drop_nulls(filter_name)
+        # Replaces original LazyFrame with revised LazyFrame in data dictionary
+        data[inst][source] = lf
+# %% Temperature correlation-based offsets and limits of detection
+for inst, lfs in data.items():
+    for source, lf in lfs.items():
+        if inst in off_corr.keys():
+            for temp_col in ["CellTemp_C", "InternalTemp_C"]:
+                if temp_col in lf.collect_schema().names():
+                    break
+            if temp_col in lf.collect_schema().names():
+                # Offset vs. temperature correlation parameters
+                inst_off_corr = {key + "_ppb": value for key, value in
+                                 off_corr[inst].select(
+                                     pl.col("Species", "Slope", "Intercept")
+                                     ).rows_by_key(
+                                         "Species", 
+                                         named=True,
+                                         unique=True
+                                         ).items()}
+                # Estimates zero offset from temperatures
+                for species, factors in inst_off_corr.items():
+                    lf = lf.with_columns(
+                        pl.col(temp_col)
+                        .mul(factors["Slope"])
+                        .add(factors["Intercept"])
+                        .alias(species + "_Offset_TempCorr")
+                        )
+        if inst in lod_corr.keys():
+            for temp_col in ["CellTemp_C", "InternalTemp_C"]:
+                if temp_col in lf.collect_schema().names():
+                    break
+            if temp_col in lf.collect_schema().names():
+                # LOD vs. temperature correlation parameters
+                inst_lod_corr = {key + "_ppb": value for key, value in
+                                 lod_corr[inst].select(
+                                     pl.col("Species", "Slope", "Intercept")
+                                     ).rows_by_key(
+                                         "Species", 
+                                         named=True,
+                                         unique=True
+                                         ).items()}
+                # Estimates LOD from temperatures
+                for species, factors in inst_off_corr.items():
+                    lf = lf.with_columns(
+                        pl.col(temp_col)
+                        .mul(factors["Slope"])
+                        .add(factors["Intercept"])
+                        .alias(species + "_LOD_TempCorr")
+                        )
+        # Replaces original LazyFrame with revised LazyFrame in data dictionary
+        data[inst][source] = lf
+
+# %%
+
+# %%
 for inst, df in cal_factors.items():
     # If no 2025 data, skip instrument
     if inst not in data.keys():

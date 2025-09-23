@@ -39,3 +39,11 @@
 	- Figured out how to select the appropriate LOD for each variable - checking that it works for multiple variables
 		- It certainly seems to, although I'm not sure it's going to matter
 	- Joined on AveragingTime column to get appropriate LOD for each measured value
+# evaluate_offset.py
+- Transforming this script to compare more than just offsets - also limits of detection and uncertainties
+- First, adding dictionaries with manufacturer reported limits of detection and uncertainties
+	- Limits of detection, using/calculating 3 sigma level
+- Then, going through and adding offsets and sensitivities from all calibrations
+	- Adding as columns in LazyFrame even though they are constant values
+- Next, adding interpolated zero measurements and limits of detection
+- Next, calculating temperature-based offsets and limits of detection
