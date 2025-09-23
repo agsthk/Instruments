@@ -453,7 +453,6 @@ for inst, lfs in data.items():
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
 # %% Median offsets and LODs
-
 for inst, lfs in data.items():
     if inst not in zeros.keys():
         continue
@@ -462,57 +461,16 @@ for inst, lfs in data.items():
         start_name = lf.collect_schema().names()[0]
         # Name of column containing sampling interval stops
         stop_name = start_name.replace("Start", "Stop")
-        # Identifies gaps in zeroing greater than 6 hours
-        z_active_starts = zeros[inst].filter(
-            (pl.col("UTC_Start")
-            .sub(pl.col("UTC_Stop").shift(1))
-            .gt(pl.duration(hours=6)))
-            | (pl.col("UTC_Start")
-               .sub(pl.col("UTC_Stop").shift(1))
-               .is_null())
-            ).select(
-                pl.col("UTC_Start").alias("ZActive_Start")
-                )
-        z_active_stops = zeros[inst].filter(
-            (pl.col("UTC_Start").shift(-1)
-             .sub(pl.col("UTC_Stop"))
-             .gt(pl.duration(hours=6)))
-            | (pl.col("UTC_Start").shift(-1)
-               .sub(pl.col("UTC_Stop"))
-               .is_null())
-            ).select(
-                pl.col("UTC_Stop").alias("ZActive_Stop")
-                )
-        z_active = pl.concat(
-            [z_active_starts, z_active_stops],
-            how="horizontal"
-            )
-        # Labels data as "ZeroingActive" when collected during active
-        # zeroing periods
-        lf = lf.join_asof(
-            z_active.lazy(),
-            left_on=start_name,
-            right_on="ZActive_Start",
-            strategy="backward",
-            coalesce=False
-            ).with_columns(
-                pl.when(
-                    pl.col(start_name).is_between(pl.col("ZActive_Start"),
-                                                  pl.col("ZActive_Stop"))
-                    | pl.col(stop_name).is_between(pl.col("ZActive_Start"),
-                                                   pl.col("ZActive_Stop"))
-                    )
-                .then(pl.lit(True))
-                .otherwise(pl.lit(False))
-                .alias("ZeroingActive")
-                ).select(
-                    ~cs.contains("ZActive"))
+        # Adds index column to help with later join
         lf = lf.with_row_index()
+        # Identifies the beginning and end of the windows of time to take
+        # zero measurement medians
         windows = lf.select(
             pl.col("index"),
             pl.col(start_name).dt.offset_by("-2w").alias("WindowStart"),
             pl.col(stop_name).dt.offset_by("2w").alias("WindowStop")
             )
+        # Calculates the median offset and LOD during each window period
         windows = windows.join(
             zeros[inst].lazy(),
             how="cross"
@@ -527,7 +485,10 @@ for inst, lfs in data.items():
                     cs.contains("STD").mul(3).median()
                     .name.map(lambda c: c.replace("STD", "LOD_Median"))
                     )
+        # Adds median statistics to original LazyFrame
         lf = lf.join(windows, on="index", how="left").drop("index")
+        # Replaces original LazyFrame with revised LazyFrame in data dictionary
+        data[inst][source] = lf
 
 # %%
 for inst, df in cal_factors.items():

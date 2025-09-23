@@ -16,3 +16,4 @@
 	- Going to go back into the Interpolated cell to add these
 		- Actually no - needs to be its own cell
 	- Originally wrote a row iteration and then asked ChatGPT to fix it, so ended up with a cross join - going to check to ensure that it works on all LFs because the size is going to end up being VERY large
+	- Removed the determination of zeroing active times for the time being - may reimplement later on
