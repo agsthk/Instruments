@@ -452,67 +452,39 @@ for inst, lfs in data.items():
                     pl.lit(unc).alias(var + "_PercUnc_MFR"))
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
-#%%
-
-# Name of column containing sampling interval starts
-start_name = lf.collect_schema().names()[0]
-# Name of column containing sampling interval stops
-stop_name = start_name.replace("Start", "Stop")
-df = lf.collect()
-
-times = df.select(
-    pl.col(start_name).dt.offset_by("-2w"),
-    pl.col(stop_name).dt.offset_by("2w")
-    )
-for i, row in enumerate(times.rows(named=True)):
-    temp_zs = zeros[inst].filter(
-        pl.col("UTC_Start").is_between(row[start_name], row[stop_name])
-        | pl.col("UTC_Stop").is_between(row[start_name], row[stop_name])
-        ).select(
-            cs.contains("Mean").median()
-            .name.map(lambda c: c.replace("Mean", "Offset_Median")),
-            cs.contains("STD").mul(3).median()
-            .name.map(lambda c: c.replace("STD", "LOD_Median"))
-            )
-    if i == 0:
-        zs = temp_zs
-    else:
-        zs = pl.concat([zs, temp_zs])
-df = pl.concat([df, zs], how="horizontal")
-
 # %% Median offsets and LODs
-for inst, lfs in tqdm(data.items()):
-    if inst not in tqdm(zeros.keys()):
-        continue
-    for source, lf in lfs.items():
-        # Name of column containing sampling interval starts
-        start_name = lf.collect_schema().names()[0]
-        # Name of column containing sampling interval stops
-        stop_name = start_name.replace("Start", "Stop")
-        # Identifies the beginning and end of the windows of time to take zero
-        # measurement medians
-        times = lf.select(
-            pl.col(start_name).dt.offset_by("-2w"),
-            pl.col(stop_name).dt.offset_by("2w")
-            )
-        lf = lf.with_columns(
-            pl.struct([pl.col(start_name), pl.col(stop_name)]).map_elements(
-                lambda x: zeros[inst].filter(
-                    pl.col("UTC_Start").is_between(
-                        pl.lit(x[start_name]).dt.offset_by("-2w"),
-                        pl.lit(x[stop_name]).dt.offset_by("2w"))
-                    | pl.col("UTC_Stop").is_between(
-                        pl.lit(x[start_name]).dt.offset_by("-2w"),
-                        pl.lit(x[stop_name]).dt.offset_by("2w"))
-                    ).select(
-                        cs.contains("Mean").median()
-                        .name.map(lambda c: c.replace("Mean", "Offset_Median")),
-                        cs.contains("STD").mul(3).median()
-                        .name.map(lambda c: c.replace("STD", "LOD_Median"))
-                        ).to_struct()[0]
-                ).alias("Stats")
-            ).unnest("Stats")
-        data[inst][source] = lf
+# for inst, lfs in tqdm(data.items()):
+#     if inst not in zeros.keys():
+#         continue
+#     for source, lf in lfs.items():
+#         # Name of column containing sampling interval starts
+#         start_name = lf.collect_schema().names()[0]
+#         # Name of column containing sampling interval stops
+#         stop_name = start_name.replace("Start", "Stop")
+#         # Identifies the beginning and end of the windows of time to take zero
+#         # measurement medians
+#         times = lf.select(
+#             pl.col(start_name).dt.offset_by("-2w"),
+#             pl.col(stop_name).dt.offset_by("2w")
+#             )
+#         lf = lf.with_columns(
+#             pl.struct([pl.col(start_name), pl.col(stop_name)]).map_elements(
+#                 lambda x: zeros[inst].filter(
+#                     pl.col("UTC_Start").is_between(
+#                         pl.lit(x[start_name]).dt.offset_by("-2w"),
+#                         pl.lit(x[stop_name]).dt.offset_by("2w"))
+#                     | pl.col("UTC_Stop").is_between(
+#                         pl.lit(x[start_name]).dt.offset_by("-2w"),
+#                         pl.lit(x[stop_name]).dt.offset_by("2w"))
+#                     ).select(
+#                         cs.contains("Mean").median()
+#                         .name.map(lambda c: c.replace("Mean", "Offset_Median")),
+#                         cs.contains("STD").mul(3).median()
+#                         .name.map(lambda c: c.replace("STD", "LOD_Median"))
+#                         ).to_struct()[0]
+#                 ).alias("Stats")
+#             ).unnest("Stats")
+#         data[inst][source] = lf
 
 # %% LazyFrames to DataFrames
 for inst, lfs in tqdm(data.items()):

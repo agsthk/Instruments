@@ -22,3 +22,6 @@
 		- Yes, doesn't take as long otherwise
 		- Killed the kernel trying to run it this way
 - Changed it to a vectorized approach and EVENTUALLY got it to work
+	- Wrong - still not working
+	- Can't figure this out
+	- Maybe not worth it
