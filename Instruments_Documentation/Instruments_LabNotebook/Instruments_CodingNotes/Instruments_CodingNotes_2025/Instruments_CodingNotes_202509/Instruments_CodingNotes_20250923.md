@@ -14,3 +14,5 @@
 	- Adding as FixedUnc_MFR or PercUnc_MFR otherwise
 - Only thing remaining to add to the LazyFrames before comparison is the median values, which are based on the measured of the measured offset/LOD
 	- Going to go back into the Interpolated cell to add these
+		- Actually no - needs to be its own cell
+	- Originally wrote a row iteration and then asked ChatGPT to fix it, so ended up with a cross join - going to check to ensure that it works on all LFs because the size is going to end up being VERY large

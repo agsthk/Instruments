@@ -68,7 +68,6 @@ inst_cal_dates = {"2BTech_202": "20240118",
                   "ThermoScientific_42i-TL": "20241216"}
 
 # %% Calibration and zero characterization results
-
 # Gets results of all performed calibrations
 cal_factors = {}
 for root, dirs, files in os.walk(CAL_RESULTS_DIR):
@@ -81,7 +80,6 @@ for root, dirs, files in os.walk(CAL_RESULTS_DIR):
             path,
             schema_overrides={"CalDate": pl.String}
             )
-
 zeros = {}
 off_corr = {}
 lod_corr = {}
@@ -105,8 +103,6 @@ for root, dirs, files in os.walk(ZERO_RESULTS_DIR):
             path = os.path.join(root, file)
             lod_corr[inst] = pl.read_csv(path)
 # %% Reads and concatenates all clean data (from 2025)
-
-# Reads in all clean data    
 data = {}
 for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
     for file in tqdm(files):
@@ -185,7 +181,6 @@ for inst, lfs in data.items():
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
 # %% Interpolated zero measurement offsets and limits of detection
-
 for inst, lfs in data.items():
     if inst not in zeros.keys():
         continue
@@ -428,7 +423,6 @@ for inst, lfs in data.items():
         data[inst][source] = lf
 
 # %% Manufacturer values
-
 for inst, lfs in data.items():
     for source, lf in lfs.items():
         if inst in mfr_lods.keys():
@@ -458,6 +452,83 @@ for inst, lfs in data.items():
                     pl.lit(unc).alias(var + "_PercUnc_MFR"))
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
+# %% Median offsets and LODs
+
+for inst, lfs in data.items():
+    if inst not in zeros.keys():
+        continue
+    for source, lf in lfs.items():
+        # Name of column containing sampling interval starts
+        start_name = lf.collect_schema().names()[0]
+        # Name of column containing sampling interval stops
+        stop_name = start_name.replace("Start", "Stop")
+        # Identifies gaps in zeroing greater than 6 hours
+        z_active_starts = zeros[inst].filter(
+            (pl.col("UTC_Start")
+            .sub(pl.col("UTC_Stop").shift(1))
+            .gt(pl.duration(hours=6)))
+            | (pl.col("UTC_Start")
+               .sub(pl.col("UTC_Stop").shift(1))
+               .is_null())
+            ).select(
+                pl.col("UTC_Start").alias("ZActive_Start")
+                )
+        z_active_stops = zeros[inst].filter(
+            (pl.col("UTC_Start").shift(-1)
+             .sub(pl.col("UTC_Stop"))
+             .gt(pl.duration(hours=6)))
+            | (pl.col("UTC_Start").shift(-1)
+               .sub(pl.col("UTC_Stop"))
+               .is_null())
+            ).select(
+                pl.col("UTC_Stop").alias("ZActive_Stop")
+                )
+        z_active = pl.concat(
+            [z_active_starts, z_active_stops],
+            how="horizontal"
+            )
+        # Labels data as "ZeroingActive" when collected during active
+        # zeroing periods
+        lf = lf.join_asof(
+            z_active.lazy(),
+            left_on=start_name,
+            right_on="ZActive_Start",
+            strategy="backward",
+            coalesce=False
+            ).with_columns(
+                pl.when(
+                    pl.col(start_name).is_between(pl.col("ZActive_Start"),
+                                                  pl.col("ZActive_Stop"))
+                    | pl.col(stop_name).is_between(pl.col("ZActive_Start"),
+                                                   pl.col("ZActive_Stop"))
+                    )
+                .then(pl.lit(True))
+                .otherwise(pl.lit(False))
+                .alias("ZeroingActive")
+                ).select(
+                    ~cs.contains("ZActive"))
+        lf = lf.with_row_index()
+        windows = lf.select(
+            pl.col("index"),
+            pl.col(start_name).dt.offset_by("-2w").alias("WindowStart"),
+            pl.col(stop_name).dt.offset_by("2w").alias("WindowStop")
+            )
+        windows = windows.join(
+            zeros[inst].lazy(),
+            how="cross"
+            ).filter(
+                (pl.col("UTC_Start").is_between(pl.col("WindowStart"),
+                                                pl.col("WindowStop")))
+                | (pl.col("UTC_Stop").is_between(pl.col("WindowStart"),
+                                                 pl.col("WindowStop")))
+                ).group_by("index").agg(
+                    cs.contains("Mean").median()
+                    .name.map(lambda c: c.replace("Mean", "Offset_Median")),
+                    cs.contains("STD").mul(3).median()
+                    .name.map(lambda c: c.replace("STD", "LOD_Median"))
+                    )
+        lf = lf.join(windows, on="index", how="left").drop("index")
+
 # %%
 for inst, df in cal_factors.items():
     # If no 2025 data, skip instrument
