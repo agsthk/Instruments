@@ -17,3 +17,8 @@
 		- Actually no - needs to be its own cell
 	- Originally wrote a row iteration and then asked ChatGPT to fix it, so ended up with a cross join - going to check to ensure that it works on all LFs because the size is going to end up being VERY large
 	- Removed the determination of zeroing active times for the time being - may reimplement later on
+- Checking that conversion from LazyFrame to DataFrame works - it does, but it's taking a while
+	- Cross join issue?
+		- Yes, doesn't take as long otherwise
+		- Killed the kernel trying to run it this way
+- Changed it to a vectorized approach and EVENTUALLY got it to work

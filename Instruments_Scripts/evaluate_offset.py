@@ -452,169 +452,73 @@ for inst, lfs in data.items():
                     pl.lit(unc).alias(var + "_PercUnc_MFR"))
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
+#%%
+
+# Name of column containing sampling interval starts
+start_name = lf.collect_schema().names()[0]
+# Name of column containing sampling interval stops
+stop_name = start_name.replace("Start", "Stop")
+df = lf.collect()
+
+times = df.select(
+    pl.col(start_name).dt.offset_by("-2w"),
+    pl.col(stop_name).dt.offset_by("2w")
+    )
+for i, row in enumerate(times.rows(named=True)):
+    temp_zs = zeros[inst].filter(
+        pl.col("UTC_Start").is_between(row[start_name], row[stop_name])
+        | pl.col("UTC_Stop").is_between(row[start_name], row[stop_name])
+        ).select(
+            cs.contains("Mean").median()
+            .name.map(lambda c: c.replace("Mean", "Offset_Median")),
+            cs.contains("STD").mul(3).median()
+            .name.map(lambda c: c.replace("STD", "LOD_Median"))
+            )
+    if i == 0:
+        zs = temp_zs
+    else:
+        zs = pl.concat([zs, temp_zs])
+df = pl.concat([df, zs], how="horizontal")
+
 # %% Median offsets and LODs
-for inst, lfs in data.items():
-    if inst not in zeros.keys():
+for inst, lfs in tqdm(data.items()):
+    if inst not in tqdm(zeros.keys()):
         continue
     for source, lf in lfs.items():
         # Name of column containing sampling interval starts
         start_name = lf.collect_schema().names()[0]
         # Name of column containing sampling interval stops
         stop_name = start_name.replace("Start", "Stop")
-        # Adds index column to help with later join
-        lf = lf.with_row_index()
-        # Identifies the beginning and end of the windows of time to take
-        # zero measurement medians
-        windows = lf.select(
-            pl.col("index"),
-            pl.col(start_name).dt.offset_by("-2w").alias("WindowStart"),
-            pl.col(stop_name).dt.offset_by("2w").alias("WindowStop")
+        # Identifies the beginning and end of the windows of time to take zero
+        # measurement medians
+        times = lf.select(
+            pl.col(start_name).dt.offset_by("-2w"),
+            pl.col(stop_name).dt.offset_by("2w")
             )
-        # Calculates the median offset and LOD during each window period
-        windows = windows.join(
-            zeros[inst].lazy(),
-            how="cross"
-            ).filter(
-                (pl.col("UTC_Start").is_between(pl.col("WindowStart"),
-                                                pl.col("WindowStop")))
-                | (pl.col("UTC_Stop").is_between(pl.col("WindowStart"),
-                                                 pl.col("WindowStop")))
-                ).group_by("index").agg(
-                    cs.contains("Mean").median()
-                    .name.map(lambda c: c.replace("Mean", "Offset_Median")),
-                    cs.contains("STD").mul(3).median()
-                    .name.map(lambda c: c.replace("STD", "LOD_Median"))
-                    )
-        # Adds median statistics to original LazyFrame
-        lf = lf.join(windows, on="index", how="left").drop("index")
-        # Replaces original LazyFrame with revised LazyFrame in data dictionary
+        lf = lf.with_columns(
+            pl.struct([pl.col(start_name), pl.col(stop_name)]).map_elements(
+                lambda x: zeros[inst].filter(
+                    pl.col("UTC_Start").is_between(
+                        pl.lit(x[start_name]).dt.offset_by("-2w"),
+                        pl.lit(x[stop_name]).dt.offset_by("2w"))
+                    | pl.col("UTC_Stop").is_between(
+                        pl.lit(x[start_name]).dt.offset_by("-2w"),
+                        pl.lit(x[stop_name]).dt.offset_by("2w"))
+                    ).select(
+                        cs.contains("Mean").median()
+                        .name.map(lambda c: c.replace("Mean", "Offset_Median")),
+                        cs.contains("STD").mul(3).median()
+                        .name.map(lambda c: c.replace("STD", "LOD_Median"))
+                        ).to_struct()[0]
+                ).alias("Stats")
+            ).unnest("Stats")
         data[inst][source] = lf
 
-# %%
-for inst, df in cal_factors.items():
-    # If no 2025 data, skip instrument
-    if inst not in data.keys():
-        continue
-    # Transforms calibration offsets into dictionary for easier calling
-    cal_offsets = df.select(
-        pl.col("CalDate"),
-        cs.contains("Offset") & ~cs.contains("NoiseSignal", "Uncertainty")
-        ).rows_by_key(
-            "CalDate", 
-            named=True,
-            unique=True
-            )
-    # Transforms calibration sensitivies into dictionary for easier calling
-    cal_sens = df.select(
-        pl.col("CalDate"),
-        cs.contains("Sensitivity") & ~cs.contains("NoiseSignal", "Uncertainty")
-        ).rows_by_key(
-            "CalDate", 
-            named=True,
-            unique=True
-            )
-    # Adds columns containing fixed offsets determined from calibrations
-    for source, lf in data[inst].items():
-        for caldate, offsets in cal_offsets.items():
-            for var, offset in offsets.items():
-                lf = lf.with_columns(
-                    pl.lit(offset).alias(var + "_" + caldate + "Calibration")
-                    )
-        for caldate, sens in cal_sens.items():
-            for var, sen in sens.items():
-                lf = lf.with_columns(
-                    pl.lit(sen).alias(var + "_" + caldate + "Calibration")
-                    )
-        # Adds columns containing interpolated measured offsets
-        if inst in zeros.keys():
-            inst_zeros = zeros[inst].select(
-                ~cs.contains("STD")
-                )
-            stats_cols = inst_zeros.select(
-                cs.contains("Mean")
-                ).columns
-            z_starts = inst_zeros.select(
-                pl.exclude("UTC_Stop")
-                ).rename({"UTC_Start": lf.collect_schema().names()[0]})
-            z_stops = inst_zeros.select(
-                pl.exclude("UTC_Start")
-                ).rename({"UTC_Stop": lf.collect_schema().names()[0]})
-            lf = pl.concat(
-                [lf, z_starts.lazy(), z_stops.lazy()],
-                how="diagonal_relaxed"
-                ).sort(
-                    by=lf.collect_schema().names()[0]
-                    ).with_columns(
-                        pl.col(stats_cols)
-                        .interpolate_by(lf.collect_schema().names()[0])
-                        ).rename(
-                            lambda name: name.replace("Mean", "Offset_UZA")
-                            )
-            lf = lf.drop_nulls(stats_cols[0].rsplit("_", 1)[0])
-    
-        if inst in correlations.keys():
-            # Transforms correlation information into dictionary for easier calling
-            inst_corr = correlations[inst].select(
-                pl.col("Species", "Slope", "Intercept")
-                ).rows_by_key(
-                    "Species", 
-                    named=True,
-                    unique=True
-                    )
-            if inst.find("2BTech") != -1:
-                temp = "CellTemp_C"
-            else:
-                temp = "InternalTemp_C"
-                
-            for species, factors in inst_corr.items():
-                lf = lf.with_columns(
-                    pl.col(temp)
-                    .mul(factors["Slope"])
-                    .add(factors["Intercept"])
-                    .alias(species + "_ppb_Offset_TemperatureCorrelation")
-                    )
-        # Replaces original LazyFrame with one containing offset columns 
-        data[inst][source] = lf
-
-for inst, sources in data.items():
-    for source, lf in sources.items():
-        # LazyFrame columns
-        cols = lf.collect_schema().names()
-        # Names of columns with offsets
-        offset_cols = [col for col in cols if col.find("Offset") != -1]
-        # Names of columns with sensitivities
-        sens_cols = [col for col in cols if col.find("Sensitivity") != -1]
-        # Names of columns with fixed offsets from calibrations
-        fixed_offset_cols = [col for col in offset_cols if col.find("Calibration") != -1]
-        # Names of columns with variable offsets
-        var_offset_cols = [col for col in offset_cols if col not in fixed_offset_cols]
-        # Calibrates data using fixed calibration offsets
-        for off_col in fixed_offset_cols:
-            species, _, cal = off_col.rsplit("_", 2)
-            sens_col = species + "_Sensitivity_" + cal
-            lf = lf.with_columns(
-                (pl.col(species).sub(pl.col(off_col)))
-                .truediv(pl.col(sens_col))
-                .alias(species + "_FixedOffset_" + cal)
-                )
-        # Calibrates data using variable calibration offsets
-        for off_col in var_offset_cols:
-            species, _, by = off_col.rsplit("_", 2)
-            corrected_col = species + "_" + by + "Offset"
-            lf = lf.with_columns(
-                pl.col(species).sub(pl.col(off_col))
-                .alias(corrected_col)
-                )
-            for sens_col in sens_cols:
-                if sens_col.find(species) == -1:
-                    continue
-                *_, cal = sens_col.rsplit("_")
-                lf = lf.with_columns(
-                    pl.col(corrected_col)
-                    .truediv(pl.col(sens_col))
-                    .alias(corrected_col + "_" + cal)
-                    )
+# %% LazyFrames to DataFrames
+for inst, lfs in tqdm(data.items()):
+    for source, lf in tqdm(lfs.items()):
         data[inst][source] = lf.collect()
+
 #%%
 
 inst_caldates = {"2BTech_205_A": "20250115",
