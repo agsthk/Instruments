@@ -496,7 +496,7 @@ for inst, dfs in tqdm(data.items()):
     for source, df in tqdm(dfs.items()):
         cols = df.columns
         time_col = cols[0]
-        offset_cols= [col for col in cols if col.find("Offset") != -1 and col.find("Uncertainty") == -1]
+        offset_cols= [col for col in cols if col.find("Offset") != -1 and col.find("Uncertainty") == -1 and col.find("NoiseSignal") == -1]
         species = {"_".join(col.split("_")[:2]) for col in offset_cols}
         for i, spec in enumerate(species):
             spec_offset_cols = [col for col in offset_cols if col.find(spec) != -1]
@@ -506,6 +506,7 @@ for inst, dfs in tqdm(data.items()):
                 title=inst + " " + spec
                 )
             hvplot.show(plot)
+    break
 
         
         
