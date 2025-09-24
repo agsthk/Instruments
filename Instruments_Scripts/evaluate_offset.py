@@ -172,12 +172,14 @@ for inst, lfs in data.items():
                 lf = lf.with_columns(
                     pl.lit(sensitivity).alias(label + "_" + cal_date)
                     )
-        # Adds calibration offsets to LazyFrame
-        for cal_date, offsets in cal_offsets.items():
-            for label, offset in offsets.items():
-                lf = lf.with_columns(
-                    pl.lit(offset).alias(label + "_" + cal_date)
-                    )
+        # Adds calibration offsets to LazyFrame if instrument was never zeroed
+        # during measurements
+        if inst not in zeros.keys():
+            for cal_date, offsets in cal_offsets.items():
+                for label, offset in offsets.items():
+                    lf = lf.with_columns(
+                        pl.lit(offset).alias(label + "_" + cal_date)
+                        )
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
 # %% Interpolated zero measurement offsets and limits of detection
@@ -496,7 +498,7 @@ for inst, dfs in tqdm(data.items()):
     for source, df in tqdm(dfs.items()):
         cols = df.columns
         time_col = cols[0]
-        offset_cols= [col for col in cols if col.find("Offset") != -1 and col.find("Uncertainty") == -1 and col.find("NoiseSignal") == -1]
+        offset_cols= [col for col in cols if col.find("Offset") != -1 and col.find("Uncertainty") == -1 and col.find("NoiseSignal") == -1 and col.find("20") == -1]
         species = {"_".join(col.split("_")[:2]) for col in offset_cols}
         for i, spec in enumerate(species):
             spec_offset_cols = [col for col in offset_cols if col.find(spec) != -1]
@@ -506,7 +508,7 @@ for inst, dfs in tqdm(data.items()):
                 title=inst + " " + spec
                 )
             hvplot.show(plot)
-    break
+
 
         
         

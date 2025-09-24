@@ -15,3 +15,4 @@
 # evaluate_offset.py
 - Going to check offsets now that zero intervals are fixed
 - Revising plotting code to visually check different offsets against one another
+- Revised to only add the fixed calibration offsets if the instrument was never zeroed during measurements
