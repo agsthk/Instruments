@@ -11,3 +11,7 @@
 	- Once I do this, the long interval is gone
 	- Also checked and this doesn't mess up Picarro zeroing intervals
 - Deleting plotting code now that this is fixed
+- After merging branches, re-ran code to get updated zero characterization
+# evaluate_offset.py
+- Going to check offsets now that zero intervals are fixed
+- Revising plotting code to visually check different offsets against one another

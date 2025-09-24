@@ -491,96 +491,115 @@ for inst, lfs in tqdm(data.items()):
     for source, lf in tqdm(lfs.items()):
         data[inst][source] = lf.collect()
 
-#%%
+#%% Plotting
+for inst, dfs in tqdm(data.items()):
+    for source, df in tqdm(dfs.items()):
+        cols = df.columns
+        time_col = cols[0]
+        offset_cols= [col for col in cols if col.find("Offset") != -1 and col.find("Uncertainty") == -1]
+        species = {"_".join(col.split("_")[:2]) for col in offset_cols}
+        for i, spec in enumerate(species):
+            spec_offset_cols = [col for col in offset_cols if col.find(spec) != -1]
+            plot = df.hvplot.scatter(
+                x=time_col,
+                y=spec_offset_cols,
+                title=inst + " " + spec
+                )
+            hvplot.show(plot)
 
-inst_caldates = {"2BTech_205_A": "20250115",
-                 "2BTech_205_B": "20250115",
-                 "ThermoScientific_42i-TL": "20241216",
-                 "Picarro_G2307": "20250625"}
+        
+        
+# inst_caldates = {"2BTech_205_A": "20250115",
+#                  "2BTech_205_B": "20250115",
+#                  "ThermoScientific_42i-TL": "20241216",
+#                  "Picarro_G2307": "20250625"}
 
-for inst, sources in data.items():
-    if inst not in inst_caldates.keys():
-        continue
-    # if inst != "2BTech_205_A": continue
-    # if inst != "2BTech_205_B": continue
-    # if inst != "Picarro_G2307": continue
-    # if inst != "ThermoScientific_42i-TL": continue
-    for source, df in sources.items():
-        if source != "DAQ":
-            continue
-        tcol = [col for col in df.columns if col.find("FTC") != -1][0]
-        fixed = [col for col in df.columns if col.find(inst_caldates[inst]) != -1 and col.find("_Offset") == -1 and col.find("Sensitivity") == -1]
-        species = {col.rsplit("_", 2)[0] for col in fixed}
-        for spec in species:
-            name, unit = spec.split("_")
-            spec_cols = [col for col in fixed if col.find(spec) != -1]
-            uza_col = [col for col in spec_cols if col.find("UZA") != -1]
-            if len(uza_col) != 0:
-                uza_col = uza_col[0]
-            fixed_col = [col for col in spec_cols if col.find("Fixed") != -1]
-            if len(fixed_col) != 0:
-                fixed_col = fixed_col[0]
-                df = df.with_columns(
-                    pl.col(uza_col).sub(pl.col(fixed_col)).alias(spec + "_FixedOffsetDifference")
-                    )
-            temp_col = [col for col in spec_cols if col.find("Temperature") != -1]
-            if len(temp_col) != 0:
-                temp_col = temp_col[0]
-                df = df.with_columns(
-                    pl.col(uza_col).sub(pl.col(temp_col)).alias(spec + "_TemperatureOffsetDifference")
-                    )
-            spec_cols = [col for col in df.columns if col.find(spec) != -1 and col.find("Diff") != -1]
+# for inst, sources in data.items():
+    
+    
+    
+#     if inst not in inst_caldates.keys():
+#         continue
+#     # if inst != "2BTech_205_A": continue
+#     # if inst != "2BTech_205_B": continue
+#     # if inst != "Picarro_G2307": continue
+#     # if inst != "ThermoScientific_42i-TL": continue
+#     for source, df in sources.items():
+#         if source != "DAQ":
+#             continue
+#         tcol = [col for col in df.columns if col.find("FTC") != -1][0]
+#         fixed = [col for col in df.columns if col.find(inst_caldates[inst]) != -1 and col.find("_Offset") == -1 and col.find("Sensitivity") == -1]
+#         species = {col.rsplit("_", 2)[0] for col in fixed}
+#         for spec in species:
+#             name, unit = spec.split("_")
+#             spec_cols = [col for col in fixed if col.find(spec) != -1]
+#             uza_col = [col for col in spec_cols if col.find("UZA") != -1]
+#             if len(uza_col) != 0:
+#                 uza_col = uza_col[0]
+#             fixed_col = [col for col in spec_cols if col.find("Fixed") != -1]
+#             if len(fixed_col) != 0:
+#                 fixed_col = fixed_col[0]
+#                 df = df.with_columns(
+#                     pl.col(uza_col).sub(pl.col(fixed_col)).alias(spec + "_FixedOffsetDifference")
+#                     )
+#             temp_col = [col for col in spec_cols if col.find("Temperature") != -1]
+#             if len(temp_col) != 0:
+#                 temp_col = temp_col[0]
+#                 df = df.with_columns(
+#                     pl.col(uza_col).sub(pl.col(temp_col)).alias(spec + "_TemperatureOffsetDifference")
+#                     )
+#             spec_cols = [col for col in df.columns if col.find(spec) != -1 and col.find("Diff") != -1]
             
-            off_plot = df.hvplot.scatter(
-                x=tcol,
-                y=spec_cols,
-                title=inst,
-                width=1200,
-                height=400,
-                ylabel="Difference in calibrated [" + name + "] Relative to UZA Offset (" + unit + ")",
-                )
-            uza_plot = df.filter(
-                pl.col("SamplingLocation").eq("UZA")
-                ).hvplot.scatter(
-                    x=tcol,
-                    y=spec,
-                    ylabel=spec,
-                    width=1200,
-                    height=400)
-            hvplot.show(
-                (off_plot + uza_plot).cols(1)
-                )
-            for col in spec_cols:
-                med = df[col].median()
-                lq = df[col].quantile(0.25)
-                uq = df[col].quantile(0.75)
-                low = df[col].min()
-                up = df[col].max()
-                print(inst + " " + col + f": {med:.4f} ({lq:.4f} - {uq:.4f}), ({low:.4f} - {up:.4f})")
-        # dfs = df.filter(
-        #     pl.col("SamplingLocation").str.contains("C200")
-        #     ).with_columns(
-        #         pl.col(tcol).dt.week().alias("Week")
-        #         ).partition_by("Week")
-        # for df in dfs:
-        #     # # Plotting with matplotlib
-        #     # for spec in species:
-        #     #     fig, ax = plt.subplots()
-        #     #     for col in fixed:
-        #     #         if col.find(spec) == -1:
-        #     #             continue
-        #     #         ax.plot(df[tcol], df[col], label=col)
-        #     # ax.legend()
-        #     # ax.set_title(inst + " " + source + " Week " + str(df["Week"][0]))
-        #     # Plotting with hvplot
-        #     for spec in species:
-        #         spec_cols = [col for col in df.columns if col.find(spec) != -1 and col.find("Diff") != -1]
-        #         hvplot.show(
-        #             df.hvplot.scatter(
-        #                 x=tcol,
-        #                 y=spec_cols,
-        #                 title=inst + " " + source + " Week " + str(df["Week"][0]),
-        #                 width=800,
-        #                 height=400
-        #                 )
-        #             )
+#             off_plot = df.hvplot.scatter(
+#                 x=tcol,
+#                 y=spec_cols,
+#                 title=inst,
+#                 width=1200,
+#                 height=400,
+#                 ylabel="Difference in calibrated [" + name + "] Relative to UZA Offset (" + unit + ")",
+#                 )
+#             uza_plot = df.filter(
+#                 pl.col("SamplingLocation").eq("UZA")
+#                 ).hvplot.scatter(
+#                     x=tcol,
+#                     y=spec,
+#                     ylabel=spec,
+#                     width=1200,
+#                     height=400)
+#             hvplot.show(
+#                 (off_plot + uza_plot).cols(1)
+#                 )
+#             for col in spec_cols:
+#                 med = df[col].median()
+#                 lq = df[col].quantile(0.25)
+#                 uq = df[col].quantile(0.75)
+#                 low = df[col].min()
+#                 up = df[col].max()
+#                 print(inst + " " + col + f": {med:.4f} ({lq:.4f} - {uq:.4f}), ({low:.4f} - {up:.4f})")
+#         # dfs = df.filter(
+#         #     pl.col("SamplingLocation").str.contains("C200")
+#         #     ).with_columns(
+#         #         pl.col(tcol).dt.week().alias("Week")
+#         #         ).partition_by("Week")
+#         # for df in dfs:
+#         #     # # Plotting with matplotlib
+#         #     # for spec in species:
+#         #     #     fig, ax = plt.subplots()
+#         #     #     for col in fixed:
+#         #     #         if col.find(spec) == -1:
+#         #     #             continue
+#         #     #         ax.plot(df[tcol], df[col], label=col)
+#         #     # ax.legend()
+#         #     # ax.set_title(inst + " " + source + " Week " + str(df["Week"][0]))
+#         #     # Plotting with hvplot
+#         #     for spec in species:
+#         #         spec_cols = [col for col in df.columns if col.find(spec) != -1 and col.find("Diff") != -1]
+#         #         hvplot.show(
+#         #             df.hvplot.scatter(
+#         #                 x=tcol,
+#         #                 y=spec_cols,
+#         #                 title=inst + " " + source + " Week " + str(df["Week"][0]),
+#         #                 width=800,
+#         #                 height=400
+#         #                 )
+#         #             )
