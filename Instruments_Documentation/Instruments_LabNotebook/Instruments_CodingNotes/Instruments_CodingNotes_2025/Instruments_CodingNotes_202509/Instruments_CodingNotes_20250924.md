@@ -9,3 +9,5 @@
 	- Definitely see it in the graph
 - Going to modify to concatenate all data before assigning rle_id
 	- Once I do this, the long interval is gone
+	- Also checked and this doesn't mess up Picarro zeroing intervals
+- Deleting plotting code now that this is fixed
