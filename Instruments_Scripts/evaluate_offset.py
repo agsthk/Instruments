@@ -187,10 +187,58 @@ for inst, lfs in data.items():
     if inst not in zeros.keys():
         continue
     for source, lf in lfs.items():
-        # Name of first column to sort by DateTime
+        # Name of sampling interval start time column (for later sorting)
         sort_name = lf.collect_schema().names()[0]
+        # Name of sampling interval stop time column
+        stop_name = sort_name.replace("Start", "Stop")
         # Name of second column to remove zero columns later
         filter_name = lf.collect_schema().names()[1]
+        
+        # Identifies periods with no gaps between zeros greater than 6 hours
+        z_active_starts = zeros[inst].filter(
+            (pl.col("UTC_Start")
+            .sub(pl.col("UTC_Stop").shift(1))
+            .gt(pl.duration(hours=6)))
+            | (pl.col("UTC_Start")
+               .sub(pl.col("UTC_Stop").shift(1))
+               .is_null())
+            ).select(
+                pl.col("UTC_Start").alias("ZActive_Start")
+                )
+        z_active_stops = zeros[inst].filter(
+            (pl.col("UTC_Start").shift(-1)
+             .sub(pl.col("UTC_Stop"))
+             .gt(pl.duration(hours=6)))
+            | (pl.col("UTC_Start").shift(-1)
+               .sub(pl.col("UTC_Stop"))
+               .is_null())
+            ).select(
+                pl.col("UTC_Stop").alias("ZActive_Stop")
+                )
+        z_active = pl.concat(
+            [z_active_starts, z_active_stops],
+            how="horizontal"
+            )
+        # Identifies data collected during active zeroing periods
+        lf = lf.join_asof(
+            z_active.lazy(),
+            left_on=sort_name,
+            right_on="ZActive_Start",
+            strategy="backward",
+            coalesce=False
+            ).with_columns(
+                pl.when(
+                    pl.col(sort_name).is_between(pl.col("ZActive_Start"),
+                                                 pl.col("ZActive_Stop"))
+                    | pl.col(stop_name).is_between(pl.col("ZActive_Start"),
+                                                   pl.col("ZActive_Stop"))
+                    )
+                .then(pl.lit(True))
+                .otherwise(pl.lit(False))
+                .alias("ZeroingActive")
+                ).select(
+                    ~cs.contains("ZActive")
+                    )
         # Uses zero statistics to calculate LOD
         inst_zeros = zeros[inst].with_columns(
                 cs.contains("STD").mul(3)
@@ -199,14 +247,14 @@ for inst, lfs in data.items():
                                               "Offset_UZA").replace("STD",
                                                                     "LOD_UZA")
                     )
-        # Times that zeroing interval begins (with mean zero and LOD during
+        # Times that zeroing intervals begin (with mean zero and LOD during
         # interval)
         zero_starts = inst_zeros.select(
             pl.exclude("UTC_Stop")
             ).rename({
                 "UTC_Start": sort_name
                 }).lazy()
-        # Times that zeroing interval ends (with mean zero and LOD during
+        # Times that zeroing intervals end (with mean zero and LOD during
         # interval)
         zero_stops = inst_zeros.select(
             pl.exclude("UTC_Start")
@@ -223,6 +271,7 @@ for inst, lfs in data.items():
                 ).with_columns(
                     cs.contains("Offset", "UZA").interpolate_by(sort_name)
                     ).drop_nulls(filter_name)
+        
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
 # %% Temperature correlation-based offsets and limits of detection
