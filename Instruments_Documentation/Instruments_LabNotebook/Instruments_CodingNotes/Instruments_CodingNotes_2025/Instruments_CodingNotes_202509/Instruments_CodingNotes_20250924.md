@@ -1,0 +1,9 @@
+- Need to fix the zero starts and stops for O3 and NOx - where does this problem arise?
+- If I had to guess, it's probably in clean_rawdata.py and has something to do with the sampling locations
+- Going to look at characterize_zeros.py first to see if I can find the issue
+	- I think I know where it comes from - I assign a sampling interval based on when the sampling location changes, and I think I'm accidentally grouping the end of phase I with phase II when I do that
+# characterize_zeros.py
+- Revising to try to address the incorrectly identified zero interval between Phase I and Phase II
+- Created and switched to a new branch fix_uza_intvs
+- Plotting to examine where the long interval is
+	- Definitely see it in the graph

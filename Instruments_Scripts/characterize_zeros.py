@@ -12,6 +12,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 import scipy as sp
+import hvplot.polars
 
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
@@ -128,6 +129,16 @@ for inst, dfs in uza_stats.items():
                     )
     uza_stats[inst] = df
 
+hvplot.show(
+    uza_stats["2BTech_205_A"].hvplot.scatter(
+        x="UTC_Start",
+        y="O3_ppb_Mean"
+        )
+    * uza_stats["2BTech_205_A"].hvplot.scatter(
+        x="UTC_Stop",
+        y="O3_ppb_Mean"
+        )
+    )
 
 temps = ["CellTemp_C", "CavityTemp_C", "InternalTemp_C", "ChamberTemp_C"]
 
