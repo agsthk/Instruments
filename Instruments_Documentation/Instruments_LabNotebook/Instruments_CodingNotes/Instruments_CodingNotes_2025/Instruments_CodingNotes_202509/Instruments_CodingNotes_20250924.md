@@ -7,3 +7,5 @@
 - Created and switched to a new branch fix_uza_intvs
 - Plotting to examine where the long interval is
 	- Definitely see it in the graph
+- Going to modify to concatenate all data before assigning rle_id
+	- Once I do this, the long interval is gone

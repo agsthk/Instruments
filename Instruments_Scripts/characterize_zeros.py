@@ -85,13 +85,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             df = pl.read_csv(path, infer_schema_length=None)
         df = df.with_columns(
             cs.contains("UTC").str.to_datetime(),
-            intv=pl.col("SamplingLocation").rle_id()
             )
-        df = df.filter(
-            pl.col("SamplingLocation").eq("UZA")
-            )
-        if df.height == 0:
-            continue
         uza_stats[inst].append(df)
 
 for inst, dfs in uza_stats.items():
@@ -103,8 +97,10 @@ for inst, dfs in uza_stats.items():
         ).sort(
             by=cs.contains("UTC")
             ).with_columns(
-                pl.col("intv").rle_id()
-                )
+                intv=pl.col("SamplingLocation").rle_id()
+                ).filter(
+                    pl.col("SamplingLocation").eq("UZA")
+                    )
     length = df.group_by("intv").len()
     df = df.group_by("intv").agg(
         cs.contains("UTC_Start").min(),
@@ -130,13 +126,13 @@ for inst, dfs in uza_stats.items():
     uza_stats[inst] = df
 
 hvplot.show(
-    uza_stats["2BTech_205_A"].hvplot.scatter(
+    uza_stats["ThermoScientific_42i-TL"].hvplot.scatter(
         x="UTC_Start",
-        y="O3_ppb_Mean"
+        y="NO_ppb_Mean"
         )
-    * uza_stats["2BTech_205_A"].hvplot.scatter(
+    * uza_stats["ThermoScientific_42i-TL"].hvplot.scatter(
         x="UTC_Stop",
-        y="O3_ppb_Mean"
+        y="NO_ppb_Mean"
         )
     )
 
