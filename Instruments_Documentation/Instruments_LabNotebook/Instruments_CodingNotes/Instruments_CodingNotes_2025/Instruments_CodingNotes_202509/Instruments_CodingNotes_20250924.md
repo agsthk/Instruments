@@ -17,3 +17,4 @@
 - Revising plotting code to visually check different offsets against one another
 - Revised to only add the fixed calibration offsets if the instrument was never zeroed during measurements
 - Added identification of zeroing active periods to cell that interpolates offsets and LODs
+- Added code to visually check LODs

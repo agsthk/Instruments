@@ -547,16 +547,25 @@ for inst, dfs in tqdm(data.items()):
     for source, df in tqdm(dfs.items()):
         cols = df.columns
         time_col = cols[0]
-        offset_cols= [col for col in cols if col.find("Offset") != -1 and col.find("Uncertainty") == -1 and col.find("NoiseSignal") == -1 and col.find("20") == -1]
+        offset_cols = [col for col in cols if col.find("Offset") != -1 and col.find("Uncertainty") == -1 and col.find("NoiseSignal") == -1]
+        lod_cols = [col for col in cols if col.find("LOD") != -1]
         species = {"_".join(col.split("_")[:2]) for col in offset_cols}
         for i, spec in enumerate(species):
             spec_offset_cols = [col for col in offset_cols if col.find(spec) != -1]
-            plot = df.hvplot.scatter(
+            offset_plot = df.hvplot.scatter(
                 x=time_col,
                 y=spec_offset_cols,
                 title=inst + " " + spec
                 )
-            hvplot.show(plot)
+            # hvplot.show(offset_plot)
+        for i, spec in enumerate(species):
+            spec_lod_cols = [col for col in lod_cols if col.find(spec) != -1]
+            lod_plot = df.hvplot.scatter(
+                x=time_col,
+                y=spec_lod_cols,
+                title=inst + " " + spec
+                )
+            hvplot.show(lod_plot)
 
 
         
