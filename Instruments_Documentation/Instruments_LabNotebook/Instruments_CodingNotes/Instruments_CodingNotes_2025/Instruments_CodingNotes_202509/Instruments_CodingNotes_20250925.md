@@ -17,3 +17,4 @@
 		- In this cell, will calculate only manufacturer uncertainty
 		- Will have separate uncertainty calculation after for the signal to noise regression
 	- Adding a cell to calculate uncertainty based on regressions
+- When comparing the manufacturer and regression based uncertainty, the regression based one is plenty reasonable and often seems to be better - will use that for all of them

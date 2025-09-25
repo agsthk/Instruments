@@ -745,60 +745,70 @@ for inst, dfs in data.items():
             week_dfs = df.with_columns(
                 pl.col(time_col).dt.week().alias("week")
                 ).partition_by("week")
-            for i, week_df in enumerate(week_dfs):
-                plot = week_df.hvplot.scatter(
-                    x=time_col,
-                    y=diff_cols
-                    )
-                if i < 2:
-                    hvplot.show(plot)
+            # for i, week_df in enumerate(week_dfs):
+            #     plot = week_df.hvplot.scatter(
+            #         x=time_col,
+            #         y=diff_cols
+            #         )
+            #     if i < 2:
+            #         hvplot.show(plot)
             
 
 
 # %% Plotting
-# for inst, dfs in tqdm(data.items()):
-#     if inst != "Picarro_G2307": continue
-#     for source, df in tqdm(dfs.items()):
-#         cols = df.columns
-#         time_col = cols[0]
-#         offset_cols = [col for col in cols if col.find("Offset") != -1 and col.find("Uncertainty") == -1 and col.find("NoiseSignal") == -1]
-#         lod_cols = [col for col in cols if col.find("LOD") != -1]
-#         species = {"_".join(col.split("_")[:2]) for col in offset_cols}
-        
-#         week_dfs = df.with_columns(
-#             pl.col(time_col).dt.month().alias("month")
-#             ).partition_by("month")
-#         for j, df in enumerate(week_dfs):
-#             # if j <= 2:
-#             #     continue
-#             for i, spec in enumerate(species):
-#                 # if spec != "CH2O_ppb": continue
-#                 spec_offset_cols = [col for col in offset_cols if col.find(spec) != -1]
-#                 # fig, ax = plt.subplots()
-#                 # for col in spec_offset_cols:
-#                 #     ax.plot(df[time_col], df[col], label = col)
-#                 # ax.legend()
-#                 offset_plot = df.hvplot.scatter(
-#                     x=time_col,
-#                     y=spec_offset_cols,
-#                     title=inst + " " + spec
-#                     )
-#             # break
-#             # hvplot.show(offset_plot)
+for inst, dfs in tqdm(data.items()):
+    if inst != "ThermoScientific_42i-TL": continue
+    for source, df in tqdm(dfs.items()):
+        cols = df.columns
+        time_col = cols[0]
+        offset_cols = [col for col in cols if col.find("Offset") != -1 and col.find("Uncertainty") == -1 and col.find("NoiseSignal") == -1]
+        lod_cols = [col for col in cols if col.find("LOD") != -1]
+        species = {"_".join(col.split("_")[:2]) for col in offset_cols}
+        unc_cols = [col for col in cols if col.find("Uncertainty") != -1]
+        week_dfs = df.filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).with_columns(
+                pl.col(time_col).dt.month().alias("month")
+                ).partition_by("month")
+        for j, df in enumerate(week_dfs):
+            # if j > 0:
+            #     continue
+            for i, spec in enumerate(species):
+                # if spec != "CH2O_ppb": continue
+                spec_offset_cols = [col for col in offset_cols if col.find(spec) != -1]
+                # fig, ax = plt.subplots()
+                # for col in spec_offset_cols:
+                #     ax.plot(df[time_col], df[col], label = col)
+                # ax.legend()
+                offset_plot = df.hvplot.scatter(
+                    x=time_col,
+                    y=spec_offset_cols,
+                    title=inst + " " + spec
+                    )
+            # break
+            # hvplot.show(offset_plot)
 
-#             for i, spec in enumerate(species):
-#                 spec_lod_cols = [col for col in lod_cols if col.find(spec) != -1]
-#                 fig, ax = plt.subplots()
-#                 for col in spec_lod_cols:
-#                     ax.plot(df[time_col], df[col], label = col)
-#                 ax.legend()
-#                 lod_plot = df.hvplot.line(
-#                     x=time_col,
-#                     y=spec_lod_cols,
-#                     title=inst + " " + spec
-#                     )
-#             # hvplot.show(lod_plot)
-#         # break
+            for i, spec in enumerate(species):
+                spec_lod_cols = [col for col in lod_cols if col.find(spec) != -1]
+                # fig, ax = plt.subplots()
+                # for col in spec_lod_cols:
+                #     ax.plot(df[time_col], df[col], label = col)
+                # ax.legend()
+                lod_plot = df.hvplot.line(
+                    x=time_col,
+                    y=spec_lod_cols,
+                    title=inst + " " + spec
+                    )
+            # hvplot.show(lod_plot)
+            
+            for i, spec in enumerate(species):
+                spec_unc_cols = [col for col in unc_cols if col.find(spec) != -1]
+                unc_plot = df.hvplot.line(
+                    x=time_col,
+                    y=spec_unc_cols,
+                    title=inst + " " + spec)
+                hvplot.show(unc_plot)
+        # break
 
 # inst_caldates = {"2BTech_205_A": "20250115",
 #                  "2BTech_205_B": "20250115",
