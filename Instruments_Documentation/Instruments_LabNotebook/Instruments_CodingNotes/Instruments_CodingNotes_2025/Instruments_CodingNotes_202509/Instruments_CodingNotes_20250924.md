@@ -20,3 +20,9 @@
 - Added code to visually check LODs
 	- Looks odd - figured out why, it was because I was (once again) applying the offset factors to calculate temperature based LOD
 		- Fixed
+- Visually, both offsets and LODs look reasonable
+- Considering how to approach the median offset/LOD calculations
+	- Using the cross join did not work
+	- Iterating row by row did not work
+	- Proposed: calculate a rolling median on the zeros and then use join_asof with the strategy "nearest" to get as close as we can with a "quicker" estimate
+		- Don't anticipate that the rolling median will change fast enough for the time difference between the nearest zero and the current point to matter

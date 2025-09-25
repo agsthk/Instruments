@@ -504,46 +504,61 @@ for inst, lfs in data.items():
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
 # %% Median offsets and LODs
-# for inst, lfs in tqdm(data.items()):
-#     if inst not in zeros.keys():
-#         continue
-#     for source, lf in lfs.items():
-#         # Name of column containing sampling interval starts
-#         start_name = lf.collect_schema().names()[0]
-#         # Name of column containing sampling interval stops
-#         stop_name = start_name.replace("Start", "Stop")
-#         # Identifies the beginning and end of the windows of time to take zero
-#         # measurement medians
-#         times = lf.select(
-#             pl.col(start_name).dt.offset_by("-2w"),
-#             pl.col(stop_name).dt.offset_by("2w")
-#             )
-#         lf = lf.with_columns(
-#             pl.struct([pl.col(start_name), pl.col(stop_name)]).map_elements(
-#                 lambda x: zeros[inst].filter(
-#                     pl.col("UTC_Start").is_between(
-#                         pl.lit(x[start_name]).dt.offset_by("-2w"),
-#                         pl.lit(x[stop_name]).dt.offset_by("2w"))
-#                     | pl.col("UTC_Stop").is_between(
-#                         pl.lit(x[start_name]).dt.offset_by("-2w"),
-#                         pl.lit(x[stop_name]).dt.offset_by("2w"))
-#                     ).select(
-#                         cs.contains("Mean").median()
-#                         .name.map(lambda c: c.replace("Mean", "Offset_Median")),
-#                         cs.contains("STD").mul(3).median()
-#                         .name.map(lambda c: c.replace("STD", "LOD_Median"))
-#                         ).to_struct()[0]
-#                 ).alias("Stats")
-#             ).unnest("Stats")
-#         data[inst][source] = lf
+for inst, lfs in tqdm(data.items()):
+    if inst not in zeros.keys():
+        continue
+    weeks = 1
+    with_mid = zeros[inst].select(
+        # Gets mid point of zero interval
+        pl.col("UTC_Start").add(
+            (pl.col("UTC_Stop").sub(pl.col("UTC_Start"))).truediv(2)
+            ).alias("UTC_Mid"),
+        cs.contains("Mean"),
+        # Calculates LOD from STD
+        cs.contains("STD").mul(3)
+        ).rename(
+            lambda name: name.replace(
+                "Mean", "Offset_Median"
+                ).replace(
+                    "STD", "LOD_Median"
+                    )
+                    )
+    # Extends last UZA measurement to 1 week out to prevent gap after shifting
+    # midpoints back by 1 week
+    with_mid = pl.concat(
+        [with_mid,
+         with_mid.tail(1).with_columns(
+             pl.col("UTC_Mid").dt.offset_by("2w"))]
+        )
+    # Calculates 2 week rolling median of offsets and LODs
+    rolling = with_mid.select(
+        # Shifts midpoint to be in the center of the 2 week interval
+        pl.col("UTC_Mid").dt.offset_by("-1w"),
+        cs.contains("Offset", "LOD")
+        .rolling_median_by("UTC_Mid", window_size="2w")
+        )
+    for source, lf in lfs.items():
+        # Name of sampling interval start time column
+        start_name = lf.collect_schema().names()[0]
+        # Assigns rolling median value based on closest time in rolling
+        lf = lf.join_asof(
+            rolling.lazy(),
+            left_on=start_name,
+            right_on="UTC_Mid",
+            strategy="nearest",
+            coalesce=True
+            )
+        # Replaces original LazyFrame with revised LazyFrame in data dictionary
+        data[inst][source] = lf
 
 # %% LazyFrames to DataFrames
 for inst, lfs in tqdm(data.items()):
     for source, lf in tqdm(lfs.items()):
         data[inst][source] = lf.collect()
 
-#%% Plotting
+# %% Plotting
 for inst, dfs in tqdm(data.items()):
+    if inst != "Picarro_G2307": continue
     for source, df in tqdm(dfs.items()):
         cols = df.columns
         time_col = cols[0]
@@ -566,10 +581,8 @@ for inst, dfs in tqdm(data.items()):
                 title=inst + " " + spec
                 )
             hvplot.show(lod_plot)
+    break
 
-
-        
-        
 # inst_caldates = {"2BTech_205_A": "20250115",
 #                  "2BTech_205_B": "20250115",
 #                  "ThermoScientific_42i-TL": "20241216",
