@@ -551,6 +551,82 @@ for inst, lfs in tqdm(data.items()):
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
 
+# %% Calibrates data
+for inst, lfs in data.items():
+    if inst not in inst_cal_dates.keys():
+        continue
+    for source, lf in lfs.items():
+        # Calibration date to apply
+        inst_cal_date = inst_cal_dates[inst]
+        # Names of all columns
+        lf_cols = lf.collect_schema().names()
+        offset_cols = [col for col in lf_cols if col.find("Offset") != -1 and col.find("NoiseSignal") == -1]
+        # Variables with offset corrections
+        offset_vars = {"_".join(col.split("_")[:2]) for col in offset_cols}
+        # UZA interpolated offset columns
+        uza_cols = [col for col in offset_cols if col.find("UZA") != -1]
+        # Temperature correlation offset columns
+        tempcorr_cols = [col for col in offset_cols if col.find("TempCorr") != -1]
+        # Rolling median offset columns
+        med_cols = [col for col in offset_cols if col.find("Median") != -1]
+        # Calibration offset columns
+        cal_cols = [col for col in offset_cols if col.find(inst_cal_date) != -1]
+        # Sensitivity columns
+        sens_cols = [col for col in lf_cols if col.find("Sensitivity") != -1 and col.find(inst_cal_date) != -1]
+        # Variables with known sensitivities
+        sens_vars = {"_".join(col.split("_")[:2]) for col in sens_cols}
+        if inst in zeros.keys():
+            # For zeroing inactive periods, sets temperature correlation
+            # offsets as preferred with median offsets secondary
+            if len(tempcorr_cols) != 0:
+                sec_offset = tempcorr_cols
+            else:
+                sec_offset = med_cols
+            # Sets actual offset depending on if zeroing is active or not
+            for var in offset_vars:
+                uza_off = [col for col in uza_cols if col.find(var) != -1][0]
+                sec_off = [col for col in sec_offset if col.find(var) != -1][0]
+                lf = lf.with_columns(
+                    pl.when(pl.col("ZeroingActive"))
+                    .then(pl.col(uza_off))
+                    .otherwise(pl.col(sec_off))
+                    .alias(var + "_Offset")
+                    )
+        else:
+            for var in offset_vars:
+                # Calibration offset for current variable
+                off = [col for col in cal_cols if col.find(var) != -1][0]
+                # Sets calibration offset as offset to use
+                lf = lf.with_columns(
+                    pl.col(off).alias(var + "_Offset")
+                    )
+        # Corrects zero offset for variable calibration
+        for var in offset_vars:
+            lf = lf.with_columns(
+                pl.col(var)
+                .sub(pl.col(var + "_Offset"))
+                .alias(var + "_Calibrated")
+                )
+        # Applies sensitivity factors if available
+        for var in sens_vars:
+            sens = [col for col in sens_cols if col.find(var) != -1][0]
+            # Applies sensitivity to zero-corrected measurement
+            if var in offset_vars:
+                lf = lf.with_columns(
+                    pl.col(var + "_Calibrated")
+                    .truediv(pl.col(sens))
+                    )
+            # Applies sensitivity to uncorrected measurement if no zero
+            # correction
+            else:
+                lf = lf.with_columns(
+                    pl.col(var)
+                    .truediv(pl.col(sens))
+                    .alias(var + "_Calibrated")
+                    )
+        # Replaces original LazyFrame with revised LazyFrame in data dictionary
+        data[inst][source] = lf
+            
 # %% LazyFrames to DataFrames
 for inst, lfs in tqdm(data.items()):
     for source, lf in tqdm(lfs.items()):

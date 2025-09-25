@@ -10,3 +10,5 @@
 	- Plotting results week by week
 	- Calculated min, max, lq, uq, and median of differences for each alternative method
 	- Recognizing that this is not the best way to spend my time - will come back to this as I can, but need to move on to uncertainties
+- Before uncertainties can be calculated, must calibrate data
+	- Wrote code that I think works for this
