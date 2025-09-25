@@ -472,37 +472,6 @@ for inst, lfs in data.items():
                                 )
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
-
-# %% Manufacturer values
-for inst, lfs in data.items():
-    for source, lf in lfs.items():
-        if inst in mfr_lods.keys():
-            # Adds constant manufacturer LOD for each variable
-            for var, lod in mfr_lods[inst].items():
-                lf = lf.with_columns(
-                    pl.lit(lod).alias(var + "_LOD_MFR")
-                    )
-        if inst in eq_mfr_prec.keys():
-            # Adds manufacturer slope and intercept to calculate uncertainty
-            # for each variable
-            for var, factors in eq_mfr_prec[inst].items():
-                lf = lf.with_columns(
-                    pl.lit(factors[0]).alias(var + "_NoiseSignal_Slope_MFR"),
-                    pl.lit(factors[1]).alias(var + "_NoiseSignal_Offset_MFR")
-                    )
-        if inst in const_mfr_prec.keys():
-            # Adds constant manufacturer uncertainty for each variable
-            for var, unc in const_mfr_prec[inst].items():
-                lf = lf.with_columns(
-                    pl.lit(unc).alias(var + "_FixedUnc_MFR")
-                    )
-        if inst in perc_mfr_prec.keys():
-            # Adds percent manufacturer uncertainty for each variable
-            for var, unc in perc_mfr_prec[inst].items():
-                lf = lf.with_columns(
-                    pl.lit(unc).alias(var + "_PercUnc_MFR"))
-        # Replaces original LazyFrame with revised LazyFrame in data dictionary
-        data[inst][source] = lf
 # %% Median offsets and LODs
 for inst, lfs in tqdm(data.items()):
     if inst not in zeros.keys():
@@ -626,7 +595,51 @@ for inst, lfs in data.items():
                     )
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
-            
+# %% Manufacturer values for LOD and uncertainty
+for inst, lfs in data.items():
+    for source, lf in lfs.items():
+        if inst in mfr_lods.keys():
+            # Adds constant manufacturer LOD for each variable
+            for var, lod in mfr_lods[inst].items():
+                lf = lf.with_columns(
+                    pl.lit(lod).alias(var + "_LOD_MFR")
+                    )
+        if inst in eq_mfr_prec.keys():
+            # Calculates uncertainty from manufacturer slope and intercept
+            for var, factors in eq_mfr_prec[inst].items():
+                lf = lf.with_columns(
+                    (pl.col(var + "_Calibrated").mul(factors[1]))
+                    .add(factors[0])
+                    .alias(var + "_Uncertainty_MFR")
+                    )
+        if inst in const_mfr_prec.keys():
+            # Adds constant manufacturer uncertainty for each variable
+            for var, unc in const_mfr_prec[inst].items():
+                lf = lf.with_columns(
+                    pl.lit(unc).alias(var + "_Uncertainty_MFR")
+                    )
+        if inst in perc_mfr_prec.keys():
+            for var, unc in perc_mfr_prec[inst].items():
+                # If both a constant and percent uncertainty given, overwrites
+                # constant uncertainty when percent uncertainty is larger
+                if (var + "_Uncertainty_MFR") in lf.collect_schema().names():
+                    lf = lf.with_columns(
+                        pl.when(
+                            pl.col(var + "_Calibrated").mul(unc)
+                            .gt(pl.col(var + "_Uncertainty_MFR"))
+                            )
+                        .then(pl.col(var + "_Calibrated").mul(unc))
+                        .otherwise(pl.col(var + "_Uncertainty_MFR"))
+                        .alias(var + "_Uncertainty_MFR")
+                        )
+                # Applies percent uncertainty if no fixed uncertainty given
+                else:
+                    lf = lf.with_columns(
+                        pl.col(var + "_Calibrated").mul(unc)
+                        .alias(var + "_Uncertainty_MFR")
+                        )
+        # Replaces original LazyFrame with revised LazyFrame in data dictionary
+        data[inst][source] = lf
 # %% LazyFrames to DataFrames
 for inst, lfs in tqdm(data.items()):
     for source, lf in tqdm(lfs.items()):

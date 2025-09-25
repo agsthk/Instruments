@@ -12,3 +12,7 @@
 	- Recognizing that this is not the best way to spend my time - will come back to this as I can, but need to move on to uncertainties
 - Before uncertainties can be calculated, must calibrate data
 	- Wrote code that I think works for this
+- Now going to calculate uncertainties based on the calibrated data
+	- Moving the manufacturer values cell after the calibration because that should make the DataFrames a little cleaner - not so much needed to be stored
+		- In this cell, will calculate only manufacturer uncertainty
+		- Will have separate uncertainty calculation after for the signal to noise regression
