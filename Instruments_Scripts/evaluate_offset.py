@@ -640,6 +640,27 @@ for inst, lfs in data.items():
                         )
         # Replaces original LazyFrame with revised LazyFrame in data dictionary
         data[inst][source] = lf
+# %% Regression uncertainties
+for inst, lfs in data.items():
+    for source, lf in lfs.items():
+        # Columns containing noise-to-signal regression parameters
+        snr_cols = [col for col in lf.collect_schema().names()
+                    if col.find("NoiseSignal") != -1]
+        snr_vars = {"_".join(col.split("_")[:2]) for col in snr_cols}
+        # Calculates uncertainty for each variable using noise-to-signal
+        # regression parameters
+        for var in snr_vars:
+            slope = [col for col in snr_cols if col.find(var) != -1 
+                     and col.find("Slope") != -1][0]
+            offset = [col for col in snr_cols if col.find(var) != -1 
+                      and col.find("Offset") != -1][0]
+            lf = lf.with_columns(
+                (pl.col(var + "_Calibrated").mul(pl.col(slope)))
+                .add(pl.col(offset))
+                .alias(var + "_Uncertainty_SNR")
+                )
+        # Replaces original LazyFrame with revised LazyFrame in data dictionary
+        data[inst][source] = lf
 # %% LazyFrames to DataFrames
 for inst, lfs in tqdm(data.items()):
     for source, lf in tqdm(lfs.items()):

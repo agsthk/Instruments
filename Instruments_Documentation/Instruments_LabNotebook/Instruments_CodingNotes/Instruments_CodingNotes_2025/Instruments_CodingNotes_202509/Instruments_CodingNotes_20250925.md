@@ -16,3 +16,4 @@
 	- Moving the manufacturer values cell after the calibration because that should make the DataFrames a little cleaner - not so much needed to be stored
 		- In this cell, will calculate only manufacturer uncertainty
 		- Will have separate uncertainty calculation after for the signal to noise regression
+	- Adding a cell to calculate uncertainty based on regressions
