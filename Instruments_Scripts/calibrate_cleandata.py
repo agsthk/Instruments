@@ -9,8 +9,6 @@ import os
 import polars as pl
 import polars.selectors as cs
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-import hvplot.polars
 # from calibrate_instruments import set_ax_ticks
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
@@ -528,17 +526,14 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         lf = lf.select(
             ~cs.contains("NoiseSignal")
             )
-            
-
-
-
-#%%
-        # f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
-        # f_name = f_name[0] + "_" + cal_dates[inst] + "Calibration_" + f_name[1]
-        # f_dir = root.replace("Clean", "Calibrated")
-        # if not os.path.exists(f_dir):
-        #     os.makedirs(f_dir)
-        # path = os.path.join(f_dir,
-        #                     f_name)
-        # df.write_csv(path)
+        # Collects LazyFrame for exporting and exports calibrated data
+        df = lf.collect()
+        f_name = file.replace("Clean", "Calibrated").rsplit("_", 1)
+        f_name = f_name[0] + "_" + cal_dates[inst] + "Calibration_" + f_name[1]
+        f_dir = root.replace("Clean", "Calibrated")
+        if not os.path.exists(f_dir):
+            os.makedirs(f_dir)
+        path = os.path.join(f_dir,
+                            f_name)
+        df.write_csv(path)
         

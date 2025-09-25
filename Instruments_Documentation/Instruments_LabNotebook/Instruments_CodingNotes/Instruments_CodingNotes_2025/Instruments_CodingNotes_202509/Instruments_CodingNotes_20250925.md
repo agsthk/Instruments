@@ -20,3 +20,4 @@
 - When comparing the manufacturer and regression based uncertainty, the regression based one is plenty reasonable and often seems to be better - will use that for all of them
 # calibrate_cleandata.py
 - Modifying this script to apply what I learned through evaluate_offset.py
+- After modifying, set to export the calibrated data once more - now I have this finalized and can ICARTT!
