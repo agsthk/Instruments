@@ -9,7 +9,7 @@ import os
 import polars as pl
 import polars.selectors as cs
 from tqdm import tqdm
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import hvplot.polars
 
 # Declares full path to Instruments_Data/ directory
@@ -555,33 +555,140 @@ for inst, lfs in tqdm(data.items()):
 for inst, lfs in tqdm(data.items()):
     for source, lf in tqdm(lfs.items()):
         data[inst][source] = lf.collect()
+# %% Statistics
+diff_stats = {inst: {source: {} for source in dfs.keys()}
+              for inst, dfs in data.items()}
+for inst, dfs in data.items():
+    if inst not in zeros.keys():
+        continue
+    for source, df in dfs.items():
+        # Compares only during active zeroing periods
+        df = df.filter(
+            pl.col("ZeroingActive")
+            )
+        # Columns containing "true" values
+        measured_cols = df.select(cs.contains("UZA")).columns
+        for col in measured_cols:
+            # Columns containing alternative calculations
+            compare_cols = df.select(
+                cs.contains(col.replace("UZA", ""))
+                & ~cs.contains("UZA")
+                ).columns
+            # Calculates absolute difference between "true" and alternative
+            # values
+            for comp_col in compare_cols:
+                df = df.with_columns(
+                    pl.col(comp_col).sub(pl.col(col)).name.suffix("_Diff")
+                    )
+            # Columns containing absolute differences
+            diff_cols = df.select(
+                cs.contains("Diff") & cs.contains(col.replace("UZA", ""))
+                ).columns
+            split_diff_cols = [col.split("_") for col in diff_cols]
+            # Current species
+            spec = "_".join(split_diff_cols[0][:2])
+            if spec not in diff_stats[inst][source].keys():
+                diff_stats[inst][source][spec] = {}
+            # Current characteristic (Offset, LOD)
+            char = split_diff_cols[0][2]
+            if char not in diff_stats[inst][source][spec].keys():
+                diff_stats[inst][source][spec][char] = {}
+            # Calculates statistics on differences relative to UZA measurements
+            mins = df.select(
+                pl.col(diff_cols).min()
+                ).to_dict(as_series=False)
+            lqs = df.select(
+                pl.col(diff_cols).quantile(0.25)
+                ).to_dict(as_series=False)
+            meds = df.select(
+                pl.col(diff_cols).median()
+                ).to_dict(as_series=False)
+            uqs = df.select(
+                pl.col(diff_cols).quantile(0.25)
+                ).to_dict(as_series=False)
+            maxs = df.select(
+                pl.col(diff_cols).max()
+                ).to_dict(as_series=False)
+            # Adds statistics to diff_stats
+            for key, value in mins.items():
+                split_key = key.split("_")
+                if split_key[3] not in diff_stats[inst][source][spec][split_key[2]].keys():
+                    diff_stats[inst][source][spec][split_key[2]][split_key[3]] = []
+                diff_stats[inst][source][spec][split_key[2]][split_key[3]].append(
+                    value[0]
+                    )
+                diff_stats[inst][source][spec][split_key[2]][split_key[3]].append(
+                    lqs[key][0]
+                    )
+                diff_stats[inst][source][spec][split_key[2]][split_key[3]].append(
+                    meds[key][0]
+                    )
+                diff_stats[inst][source][spec][split_key[2]][split_key[3]].append(
+                    uqs[key][0]
+                    )
+                diff_stats[inst][source][spec][split_key[2]][split_key[3]].append(
+                    maxs[key][0]
+                    )
+            # First Fort Collins DateTime column name
+            time_col = df.select(cs.contains("FTC")).columns[0]
+            # Splits DataFrame by week to improve plotting
+            week_dfs = df.with_columns(
+                pl.col(time_col).dt.week().alias("week")
+                ).partition_by("week")
+            for i, week_df in enumerate(week_dfs):
+                plot = week_df.hvplot.scatter(
+                    x=time_col,
+                    y=diff_cols
+                    )
+                if i < 2:
+                    hvplot.show(plot)
+            
+
 
 # %% Plotting
-for inst, dfs in tqdm(data.items()):
-    if inst != "Picarro_G2307": continue
-    for source, df in tqdm(dfs.items()):
-        cols = df.columns
-        time_col = cols[0]
-        offset_cols = [col for col in cols if col.find("Offset") != -1 and col.find("Uncertainty") == -1 and col.find("NoiseSignal") == -1]
-        lod_cols = [col for col in cols if col.find("LOD") != -1]
-        species = {"_".join(col.split("_")[:2]) for col in offset_cols}
-        for i, spec in enumerate(species):
-            spec_offset_cols = [col for col in offset_cols if col.find(spec) != -1]
-            offset_plot = df.hvplot.scatter(
-                x=time_col,
-                y=spec_offset_cols,
-                title=inst + " " + spec
-                )
-            # hvplot.show(offset_plot)
-        for i, spec in enumerate(species):
-            spec_lod_cols = [col for col in lod_cols if col.find(spec) != -1]
-            lod_plot = df.hvplot.line(
-                x=time_col,
-                y=spec_lod_cols,
-                title=inst + " " + spec
-                )
-            hvplot.show(lod_plot)
-    break
+# for inst, dfs in tqdm(data.items()):
+#     if inst != "Picarro_G2307": continue
+#     for source, df in tqdm(dfs.items()):
+#         cols = df.columns
+#         time_col = cols[0]
+#         offset_cols = [col for col in cols if col.find("Offset") != -1 and col.find("Uncertainty") == -1 and col.find("NoiseSignal") == -1]
+#         lod_cols = [col for col in cols if col.find("LOD") != -1]
+#         species = {"_".join(col.split("_")[:2]) for col in offset_cols}
+        
+#         week_dfs = df.with_columns(
+#             pl.col(time_col).dt.month().alias("month")
+#             ).partition_by("month")
+#         for j, df in enumerate(week_dfs):
+#             # if j <= 2:
+#             #     continue
+#             for i, spec in enumerate(species):
+#                 # if spec != "CH2O_ppb": continue
+#                 spec_offset_cols = [col for col in offset_cols if col.find(spec) != -1]
+#                 # fig, ax = plt.subplots()
+#                 # for col in spec_offset_cols:
+#                 #     ax.plot(df[time_col], df[col], label = col)
+#                 # ax.legend()
+#                 offset_plot = df.hvplot.scatter(
+#                     x=time_col,
+#                     y=spec_offset_cols,
+#                     title=inst + " " + spec
+#                     )
+#             # break
+#             # hvplot.show(offset_plot)
+
+#             for i, spec in enumerate(species):
+#                 spec_lod_cols = [col for col in lod_cols if col.find(spec) != -1]
+#                 fig, ax = plt.subplots()
+#                 for col in spec_lod_cols:
+#                     ax.plot(df[time_col], df[col], label = col)
+#                 ax.legend()
+#                 lod_plot = df.hvplot.line(
+#                     x=time_col,
+#                     y=spec_lod_cols,
+#                     title=inst + " " + spec
+#                     )
+#             # hvplot.show(lod_plot)
+#         # break
 
 # inst_caldates = {"2BTech_205_A": "20250115",
 #                  "2BTech_205_B": "20250115",

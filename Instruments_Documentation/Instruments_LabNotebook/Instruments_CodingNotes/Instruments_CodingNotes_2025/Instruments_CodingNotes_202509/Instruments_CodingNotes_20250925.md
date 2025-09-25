@@ -1,0 +1,12 @@
+# evaluate_offset.py
+- Wanting to visually check the median offsets and LODs against the measured values to ensure they seem reasonable
+	- Plotting for Picarro is genuinely taking forever
+	- Ozone looks fine
+		- There is a temperature correlation for LOD that shouldn't be there - may have happened when I reran characterize_zeros.py, going to delete it
+			- Will come back to the characterize_zeros.py script and set an R2 cutoff for exporting the temperature correlations
+	- Thermo looks fine
+	- They all look good!
+- Adding code to calculate statistics comparing other methods of offset/LOD determination to UZA measurements during active zeroing periods
+	- Plotting results week by week
+	- Calculated min, max, lq, uq, and median of differences for each alternative method
+	- Recognizing that this is not the best way to spend my time - will come back to this as I can, but need to move on to uncertainties
