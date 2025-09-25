@@ -314,7 +314,7 @@ for inst, lfs in data.items():
                                          unique=True
                                          ).items()}
                 # Estimates LOD from temperatures
-                for species, factors in inst_off_corr.items():
+                for species, factors in inst_lod_corr.items():
                     lf = lf.with_columns(
                         pl.col(temp_col)
                         .mul(factors["Slope"])
@@ -560,7 +560,7 @@ for inst, dfs in tqdm(data.items()):
             # hvplot.show(offset_plot)
         for i, spec in enumerate(species):
             spec_lod_cols = [col for col in lod_cols if col.find(spec) != -1]
-            lod_plot = df.hvplot.scatter(
+            lod_plot = df.hvplot.line(
                 x=time_col,
                 y=spec_lod_cols,
                 title=inst + " " + spec
