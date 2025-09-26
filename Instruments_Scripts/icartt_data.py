@@ -37,14 +37,11 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
     header_path = os.path.join(ICARTT_HEADER_DIR, header_file)
     with open(header_path, "r") as file:
         header = yaml.load(file, Loader=yaml.Loader)
-    headers[inst] = header
-    
-    
-for inst, header in headers.items():
+
     inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
                                      inst + "_CalibratedData",
                                      inst + "_CalibratedDAQData")
-    inst_icartt_data_dir = os.path.join(ICARTT_HEADER_DIR,
+    inst_icartt_data_dir = os.path.join(ICARTT_DATA_DIR,
                                         inst + "_ICARTTData",
                                         inst + "_ICARTTData_" + header["REVISION"])
     if not os.path.exists(inst_icartt_data_dir):
@@ -80,7 +77,24 @@ for inst, header in headers.items():
     camp_data = pl.concat(camp_files, how="diagonal_relaxed")
     camp_data = camp_data.with_columns(
         (cs.contains("FTC") & ~cs.contains("Stop")).dt.week().alias("Week")
-        ).collect().partition_by("Week", include_key=False)
+        ).collect()
+    
+    # Shift start times so that they don't overlap with previous intervals
+    start_cols = [col for col in camp_data.columns if col.find("Start") != -1]
+    for start_col in start_cols:
+        stop_col = start_col.replace("Start", "Stop")
+        camp_data.with_columns(
+            pl.when(
+                pl.col(start_col).lt(pl.col(stop_col).shift(1))
+                )
+            .then(pl.col(stop_col).shift(1))
+            .otherwise(pl.col(start_col))
+            .alias(start_col)
+            )
+    camp_data = camp_data.partition_by("Week", include_key=False)
+    
+
+    
     ivar_line = (
         header["ivar"]["shortname"]
         + "," + header["ivar"]["unit"]
@@ -174,6 +188,6 @@ for inst, header in headers.items():
                           header["REVISION"]]) + ".ict"
         fpath = os.path.join(inst_icartt_data_dir,
                              fname)
-        with open(fpath, "w") as file:
+        with open(fpath, "w+") as file:
             file.write(header_with_data)
 

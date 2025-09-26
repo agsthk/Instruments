@@ -33,4 +33,6 @@
 - Taking the start and stop dates and getting those in the format needed for data collection and revision dates
 - Actually was able to get the header together quite easily, and the data is also ready, so it's just a matter of exporting
 	- Worked through that reasonably quickly and it all worked, going to run the data through the ICARTT checker and see what it says
-	- 
+- Before I check it, actually need to make sure I'm fixing the timestamps so that intervals don't overlap
+- Will also need to fill the missing data with the Picarro, but leaving that for tomorrow
+- Scanning is failing but I have no idea why
