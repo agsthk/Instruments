@@ -1,0 +1,144 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Sep 26 16:09:14 2025
+
+@author: agsthk
+"""
+# %% Package imports and dictionary definitions
+import os
+import polars as pl
+import polars.selectors as cs
+import pytz
+from datetime import datetime
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import hvplot.polars
+
+# Declares full path to Instruments_Data/ directory
+data_dir = os.getcwd()
+# Starts in Instruments/ directory
+if "Instruments" in os.path.dirname(data_dir):
+    data_dir = os.path.dirname(data_dir)
+data_dir = os.path.join(data_dir, "Instruments_Data")
+
+# Full path to directory containing all structured raw data
+STRUCT_DATA_DIR = os.path.join(data_dir, "Instruments_StructuredData")
+AVG_TIME_DIR = os.path.join(data_dir, "Instruments_ManualData", "Instruments_AveragingTimes")
+
+insts = ["2BTech_205_A",
+         #"2BTech_205_B",
+         "2BTech_405nm",
+         "Picarro_G2307",
+         "ThermoScientific_42i-TL"]
+avg_times = {}
+for avg_times_file in os.listdir(AVG_TIME_DIR):
+    inst = avg_times_file.rsplit("_", 1)[0]
+    avg_times_path = os.path.join(AVG_TIME_DIR,
+                                  avg_times_file)
+    avg_times[inst] = pl.read_csv(avg_times_path).with_columns(
+        pl.col("UTC_Start").str.to_datetime()
+        ).sort(
+            by="UTC_Start"
+            ).lazy()
+# %% Data read-in and concatenation
+data = {inst: {} for inst in insts}
+for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
+    for file in tqdm(files):
+        if file.startswith("."):
+            continue
+        path = os.path.join(root, file)
+        for inst in insts:
+            if path.find(inst) != -1:
+                break
+        if path.find(inst) == -1:
+            continue
+        _, source = file[:-17].split("_Structured")
+        date = file.rsplit("_", 1)[-1][:-4]
+        if date.find("2024") == -1:
+            continue
+        if inst == "2BTech_405nm":
+            lf = pl.scan_csv(path, schema_overrides={"ErrorByte": pl.String()})
+        else:
+            lf = pl.scan_csv(path)
+        lf = lf.with_columns(
+            pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
+            pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
+            )
+        if inst in avg_times.keys():
+            lf = lf.join_asof(
+                    avg_times[inst],
+                    left_on="UTC_DateTime",
+                    right_on="UTC_Start",
+                    strategy="backward"
+                    )
+            lf = lf.select(
+                pl.col("UTC_DateTime").dt.offset_by("-" + pl.col("AveragingTime")).alias("UTC_Start"),
+                pl.col("UTC_DateTime").alias("UTC_Stop"),
+                pl.col("FTC_DateTime").dt.offset_by("-" + pl.col("AveragingTime")).alias("FTC_Start"),
+                pl.col("FTC_DateTime").alias("FTC_Stop"),
+                pl.exclude("UTC_DateTime", "FTC_DateTime", "UTC_Start", "AveragingTime")
+                )
+        if source not in data[inst].keys():
+            data[inst][source] = [lf]
+        else:
+            data[inst][source].append(lf)
+
+all_weeks = []
+for inst, sources in data.items():
+    for source, lfs in sources.items():
+        by_week = {
+            key[0]: df for key, df in pl.concat(lfs).with_columns(
+               (cs.contains("FTC") & ~cs.contains("Stop")).dt.week().alias("Week")
+               ).collect().partition_by(
+                   "Week", as_dict=True, include_key=False
+                   ).items()
+                   }
+        all_weeks += list(by_week.keys())
+        data[inst][source] = by_week
+        
+all_weeks = list(set(all_weeks))
+all_weeks.sort()
+
+# %% Plotting
+
+for week in all_weeks:
+    week_plots = []
+    if week < 23 or week > 33: continue
+    # fig, ax = plt.subplots(figsize=(8, 6))
+    # ax.set_title(str(week))
+    for inst, sources in data.items():
+        for source, dfs in sources.items():
+            if week not in dfs.keys():
+                continue
+            df = dfs[week]
+            cols = df.columns
+            time_col = [col for col in cols if col.find("FTC") != -1][0]
+            for var in ["O3_ppb", "NO2_ppb", "CH2O_ppb"]:
+                if var in cols:
+                    break
+            if var not in cols:
+                continue
+            week_plots.append(
+                df.hvplot.scatter(
+                    x=time_col,
+                    y=var,
+                    ylim=(-10, 150)
+                    )
+                )
+    for i, plot in enumerate(week_plots):
+        if i == 0:
+            week_plot = plot
+        else:
+            week_plot = week_plot * plot
+    hvplot.show(week_plot)
+    # break
+    #         ax.plot(
+    #             df[time_col],
+    #             df[var],
+    #             label=var
+    #             )
+    # ax.legend()
+    # ax.set_ylim(-10, 100)
+            
+            

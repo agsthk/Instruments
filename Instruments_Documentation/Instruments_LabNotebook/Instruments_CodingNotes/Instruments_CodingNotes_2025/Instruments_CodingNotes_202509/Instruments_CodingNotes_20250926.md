@@ -38,3 +38,9 @@
 	- Revised filling to proceed if data is integer values as well
 - All worked - I'M FREEEEEEEEE
 	- (of phase II data kind of, Aranet and vent CO2 still need to be done, as does pre-leak fix trace gases, but I think I get to be excited about it)
+# align_timestamps.py
+- Created new script that I will use to align the timestamps from Phase I
+- Want to align the timestamps before assigning sampling locations, so working with the structured data
+	- ~~May~~ Will change this to be part of cleaning later
+- Copied over the read-in code from clean_rawdata.py so that averaging times are applied correctly
+- Working on getting plots - week by week
