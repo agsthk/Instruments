@@ -63,7 +63,7 @@ for sampling_locs_file in os.listdir(SAMPLING_LOC_DIR):
             pl.col("SamplingLocation")
             ).with_columns(
                 pl.col("UTC_Stop").fill_null(
-                    pl.col("UTC_Start").dt.offset_by("1y")
+                    pl.col("UTC_Start").dt.offset_by("10y")
                     )
                 )
 

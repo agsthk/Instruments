@@ -20,3 +20,10 @@
 		- Spoke too soon - didn't work with all of them, but that's because I overwrote the variable in the fixed header that all were using so the dates in the header didn't match the dates in the file name
 	- Also had to fix filtering of data to just contain C200 rather than equaling C200, otherwise vent data disappears
 	- Added a rounding to 1/10th of a second when files are read in to see if it stops yelling at me for "unusual" data
+		- It did
+- Trace gas ICARTT files are done and all passed !!!!!!!!!!!!!!!
+- Next, need to ICARTT the files that weren't ever calibrated - should be straightforward to modify script to do this
+# clean_rawdata.py
+- There is an issue in here that is leading to the sampling locations not being assigned
+	- Found the issue - the sampling stop is set to 1 year after sampling start, which doesn't work when the location never changes
+	- Changing it to be 10 years - should be fine at that point (I hope)
