@@ -19,3 +19,4 @@
 		- IT WORKED !!!!!!!!!!!
 		- Spoke too soon - didn't work with all of them, but that's because I overwrote the variable in the fixed header that all were using so the dates in the header didn't match the dates in the file name
 	- Also had to fix filtering of data to just contain C200 rather than equaling C200, otherwise vent data disappears
+	- Added a rounding to 1/10th of a second when files are read in to see if it stops yelling at me for "unusual" data

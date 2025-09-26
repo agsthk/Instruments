@@ -64,8 +64,10 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
         if file_date >= camp_start and file_date <= camp_stop:
             path = os.path.join(inst_cal_data_dir, file)
             camp_files.append(pl.scan_csv(path).with_columns(
-                cs.contains("UTC").str.to_datetime(time_zone="UTC"),
+                cs.contains("UTC").str.to_datetime(time_zone="UTC")
+                .dt.round(every="100ms"),
                 cs.contains("FTC").str.to_datetime(time_zone="America/Denver")
+                .dt.round(every="100ms")
                 ).select(
                     # Keeps only the variables described in the ICARTT header
                     # and SamplingLocation
