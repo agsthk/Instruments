@@ -89,21 +89,43 @@ for inst, sources in data.items():
     for source, lfs in sources.items():
         by_week = {
             key[0]: df for key, df in pl.concat(lfs).with_columns(
-               (cs.contains("FTC") & ~cs.contains("Stop")).dt.week().alias("Week")
-               ).collect().partition_by(
-                   "Week", as_dict=True, include_key=False
-                   ).items()
-                   }
+                (cs.contains("FTC") & ~cs.contains("Stop"))
+                .sub((cs.contains("FTC") & ~cs.contains("Stop")).shift(1))
+                .dt.total_microseconds().truediv(1e6)
+                .alias("dt"),
+                (cs.contains("FTC") & ~cs.contains("Stop")).dt.week().alias("Week")
+                ).collect().partition_by(
+                    "Week", as_dict=True, include_key=False
+                    ).items()
+                    }
         all_weeks += list(by_week.keys())
         data[inst][source] = by_week
         
 all_weeks = list(set(all_weeks))
 all_weeks.sort()
 
+# %% Reads solenoid valve states
+valve_states = pl.read_csv(
+    os.path.join(
+        data_dir,
+        "Instruments_DerivedData",
+        "Picarro_G2307_DerivedData",
+        "Picarro_G2307_SolenoidValveStates.csv"
+        )
+    ).with_columns(
+        pl.selectors.contains("UTC").str.to_datetime()
+        )
+valve_open = valve_states.filter(
+    pl.col("SolenoidValves").eq(1)
+    ).select("UTC_Start")
+valve_closed = valve_states.filter(
+    pl.col("SolenoidValves").eq(1)
+    ).select("UTC_Stop")
 # %% Plotting
 
 for week in all_weeks:
     week_plots = []
+    ddt_plots = []
     if week < 23 or week > 33: continue
     # fig, ax = plt.subplots(figsize=(8, 6))
     # ax.set_title(str(week))
@@ -119,6 +141,19 @@ for week in all_weeks:
                     break
             if var not in cols:
                 continue
+            df = df.with_columns(
+                pl.col(var).sub(pl.col(var).shift(1)).truediv(pl.col("dt"))
+                .alias("d" + var + "/dt")
+                )
+            ddt_df = df.drop_nulls().with_columns(
+                pl.col("d" + var + "/dt").rolling_mean_by(time_col, window_size="30m").alias("mean"),
+                pl.col("d" + var + "/dt").rolling_std_by(time_col, window_size="30m").mul(3).alias("std"),
+                ).filter(
+                    ~pl.col("d" + var + "/dt").is_between(
+                        (pl.col("mean").sub(pl.col("std"))),
+                        (pl.col("mean").add(pl.col("std")))
+                        )
+                    )
             week_plots.append(
                 df.hvplot.scatter(
                     x=time_col,
@@ -126,12 +161,23 @@ for week in all_weeks:
                     ylim=(-10, 150)
                     )
                 )
+            ddt_plots.append(
+                ddt_df.hvplot.scatter(
+                    x=time_col,
+                    y="d" + var + "/dt"
+                    )
+                )
     for i, plot in enumerate(week_plots):
         if i == 0:
             week_plot = plot
         else:
             week_plot = week_plot * plot
-    hvplot.show(week_plot)
+    for i, plot in enumerate(ddt_plots):
+        if i == 0:
+            ddt_plot = plot
+        else:
+            ddt_plot = ddt_plot * plot
+    hvplot.show((week_plot + ddt_plot).cols(1))
     # break
     #         ax.plot(
     #             df[time_col],

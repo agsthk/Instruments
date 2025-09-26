@@ -44,3 +44,5 @@
 	- ~~May~~ Will change this to be part of cleaning later
 - Copied over the read-in code from clean_rawdata.py so that averaging times are applied correctly
 - Working on getting plots - week by week
+- Adding d/dt of the variables to the plots as a separate subplot
+- Will pick back up later
