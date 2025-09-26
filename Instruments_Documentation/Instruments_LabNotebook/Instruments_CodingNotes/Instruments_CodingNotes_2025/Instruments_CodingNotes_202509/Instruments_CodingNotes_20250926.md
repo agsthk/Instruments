@@ -36,3 +36,5 @@
 - TempRHDoor data exported fine but didn't read fine
 	- Ended up being an issue with the filling of null values - door status is an integer
 	- Revised filling to proceed if data is integer values as well
+- All worked - I'M FREEEEEEEEE
+	- (of phase II data kind of, Aranet and vent CO2 still need to be done, as does pre-leak fix trace gases, but I think I get to be excited about it)
