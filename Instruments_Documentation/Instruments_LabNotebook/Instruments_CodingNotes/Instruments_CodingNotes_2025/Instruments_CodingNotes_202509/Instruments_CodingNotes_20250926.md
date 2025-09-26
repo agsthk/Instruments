@@ -6,3 +6,10 @@
 	- No clue why this is, maybe the header counts as a normal comment?
 - Now the scanning is working! Still a few things to change though
 - Need to filter to only include C200 data
+- I think it may be a good idea to calculate the mid time - how to go about doing this?
+	- Creates two new variables that need to get added to the header
+	- Actually this is way too much work - not doing it, the mid point isn't necessary
+- Do need to fill the missing values for Picarro
+	- Actually need to adjust all timestamps if I can, the scanner doesn't like if times are even slightly more than 1 second apart
+	- The RA data also fails the scanner which is cool so I don't have a reference for how I did this before
+	- Did some complicated stuff but I do think it ended up working - time to test with the ICARTT scanner

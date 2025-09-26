@@ -9,8 +9,7 @@ Created on Thu Sep 25 17:19:15 2025
 import os
 import polars as pl
 import polars.selectors as cs
-from tqdm import tqdm
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import yaml
 # from calibrate_instruments import set_ax_ticks
@@ -34,6 +33,7 @@ ICARTT_HEADER_DIR = os.path.join(data_dir,
 headers = {}
 for header_file in os.listdir(ICARTT_HEADER_DIR):
     inst = header_file.split("_ICARTTInputs")[0]
+    if inst != "Picarro_G2307": continue
     header_path = os.path.join(ICARTT_HEADER_DIR, header_file)
     with open(header_path, "r") as file:
         header = yaml.load(file, Loader=yaml.Loader)
@@ -77,15 +77,13 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
                         )
                     ))
     camp_data = pl.concat(camp_files, how="diagonal_relaxed")
+    # Removes non-C200 data
     camp_data = camp_data.filter(
         pl.col("SamplingLocation").eq("C200")
         ).select(
             pl.exclude("SamplingLocation")
-            )
-    camp_data = camp_data.with_columns(
-        (cs.contains("FTC") & ~cs.contains("Stop")).dt.week().alias("Week")
-        ).collect()
-    
+            ).collect()
+
     # Shift start times so that they don't overlap with previous intervals
     start_cols = [col for col in camp_data.columns if col.find("Start") != -1]
     for start_col in start_cols:
@@ -98,10 +96,57 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
             .otherwise(pl.col(start_col))
             .alias(start_col)
             )
-    camp_data = camp_data.partition_by("Week", include_key=False)
-    
-
-    
+    # Adjusts timestamps to be no more than 1 second apart for continuous data
+    if len(start_cols) == 0:
+        # Timestamp to compare to
+        prev_ts = camp_data["UTC_DateTime"][0]
+        # List of adjusted timestamps
+        adjusted = [prev_ts]
+        for ts in camp_data["UTC_DateTime"][1:]:
+            # Replaces timestamp if it's more than 1 second after the previous
+            # provided it isn't a true gap
+            if (ts > prev_ts + timedelta(seconds=1)
+                and ts < prev_ts + timedelta(seconds=3)):
+                ts = prev_ts + timedelta(seconds=1)
+            # Adds adjusted timestamp to adjusted and sets it as prev_ts
+            adjusted.append(ts)
+            prev_ts = ts
+        # Replaces UTC timestamps with adjusted ones
+        camp_data = camp_data.with_columns(
+            pl.Series("UTC_DateTime", adjusted)
+            )
+        # Identifies times needed to fill measurement gaps
+        missing_times = camp_data.select(
+            pl.datetime_ranges(
+                start=pl.col("UTC_DateTime"), end=pl.col("UTC_DateTime").shift(-1),
+                interval="1s", closed="none").list.explode().drop_nulls()
+            )
+        # Adds missing times to camp_data DataFrame
+        camp_data = pl.concat(
+            [camp_data, missing_times],
+            how="diagonal_relaxed"
+            ).sort(
+                by="UTC_DateTime"
+                ).with_columns(
+                    # Gets adjusted FTC_DateTimes
+                    pl.col("UTC_DateTime")
+                    .dt.convert_time_zone("America/Denver")
+                    .alias("FTC_DateTime")
+                    )
+        # Fills missing values with appropriate flag
+        camp_data = camp_data.with_columns(
+            [pl.col(dvar).fill_null(float(chars["missingflag"]))
+             for dvar, chars in header["dvars"].items()
+             if camp_data[dvar].dtype == pl.Float64()]
+            )
+    # Splits campaign data by ISO week
+    camp_data = camp_data.with_columns(
+        (cs.contains("FTC") & ~cs.contains("Stop")).dt.week().alias("Week")
+        ).partition_by(
+            "Week",
+            include_key=False
+            )
+    # Creates line containing independent variable information
     ivar_line = (
         header["ivar"]["shortname"]
         + "," + header["ivar"]["unit"]
@@ -111,9 +156,14 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
         ivar_line += ("," + header["ivar"]["longname"])
         
     n_dvars = str(len(header["dvars"].keys()))
-    scale_line = ",".join([value["scale"] for value in header["dvars"].values()])
-    missing_line = ",".join([value["missingflag"] for value in header["dvars"].values()])
-    
+    # Creates scales and missing values lines for dependent variables
+    scale_line = ",".join(
+        [value["scale"] for value in header["dvars"].values()]
+        )
+    missing_line = ",".join(
+        [value["missingflag"] for value in header["dvars"].values()]
+        )
+    # Creates descriptor lines for all dependent variables
     dvar_lines = []
     for dvar, chars in header["dvars"].items():
         dvar_line = ",".join([dvar, chars["unit"], chars["standardname"]])
@@ -122,20 +172,22 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
         dvar_lines.append(dvar_line)
     dvar_lines = "\n".join(dvar_lines)
     
+    # Creates special comments lines
     if "Special Comments" in header.keys():
         spec_coms = "1\n" + header["Special Comments"]
     else:
         spec_coms = "0"
-        
+    # Creates normal comments lines
     norm_coms = [key + ": " + value for key, value in header.items()
                  if key.isupper() and key != "FFI"]
     n_norm_coms = len(norm_coms) + 1
     norm_coms = "\n".join(norm_coms)
-    
+    # Calculates number of lines
     n_lines = 14 + n_norm_coms + int(n_dvars) + int(spec_coms[0])
     n_lines = str(n_lines)
     n_norm_coms = str(n_norm_coms)
-    
+    # Generates header with all known information common to campaign and
+    # placeholders for values that will vary by week
     fixed_header = (
         n_lines + "," + header["FFI"] + "," + header["Version Number"] + "\n"
         + header["PI Name"] + "\n"
@@ -188,11 +240,14 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
             ).replace(
                 "REVISIONDATE", ftc_stop.strftime("%Y,%m,%d")
                 )
+        # Combines header with data
         header_with_data = fixed_header + "\n" + df.write_csv()
+        # Creates ICARTT file name
         fname = "_".join([header["dataID"],
                           header["locationID"],
                           ftc_start.strftime("%Y%m%d"),
                           header["REVISION"]]) + ".ict"
+        # Exports ICARTT file
         fpath = os.path.join(inst_icartt_data_dir,
                              fname)
         with open(fpath, "w+") as file:
