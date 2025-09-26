@@ -14,4 +14,7 @@
 	- The RA data also fails the scanner which is cool so I don't have a reference for how I did this before
 	- Did some complicated stuff but I do think it ended up working - time to test with the ICARTT scanner
 		- Still encountering an error - going to attempt to round the timestamps before adjusting/ filling and see if that makes a difference
-	
+	- That wasn't the source of the error - it doesn't like when the difference is < 1 either, so need to revise script to make every difference exactly 1 I suppose
+	- Need to change the rounding to every one second, that way I know they all end with .0 and won't flag in the ICARTT scanner (I hope)
+		- IT WORKED !!!!!!!!!!!
+		- 

@@ -33,7 +33,6 @@ ICARTT_HEADER_DIR = os.path.join(data_dir,
 headers = {}
 for header_file in os.listdir(ICARTT_HEADER_DIR):
     inst = header_file.split("_ICARTTInputs")[0]
-    if inst != "Picarro_G2307": continue
     header_path = os.path.join(ICARTT_HEADER_DIR, header_file)
     with open(header_path, "r") as file:
         header = yaml.load(file, Loader=yaml.Loader)
@@ -100,17 +99,16 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
     if len(start_cols) == 0:
         # Rounds timestamps to nearest tenth of a second
         camp_data = camp_data.with_columns(
-            cs.contains("DateTime").dt.round(every="100ms")
+            cs.contains("DateTime").dt.round(every="1s")
             )
         # Timestamp to compare to
         prev_ts = camp_data["UTC_DateTime"][0]
         # List of adjusted timestamps
         adjusted = [prev_ts]
         for ts in camp_data["UTC_DateTime"][1:]:
-            # Replaces timestamp if it's more than 1 second after the previous
-            # provided it isn't a true gap
-            if (ts > prev_ts + timedelta(seconds=1)
-                and ts < prev_ts + timedelta(seconds=3)):
+            # Replaces timestamp if it isn't exactly 1 second after the
+            # previous provided it isn't a true gap
+            if (ts < prev_ts + timedelta(seconds=3)):
                 ts = prev_ts + timedelta(seconds=1)
             # Adds adjusted timestamp to adjusted and sets it as prev_ts
             adjusted.append(ts)
