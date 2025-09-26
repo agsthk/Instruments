@@ -238,7 +238,7 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
             .truediv(1e6)
             )
         # Gets collection and revision date from start and stop times
-        fixed_header = df_header.replace(
+        df_header = df_header.replace(
             "COLLECTIONDATE", ftc_start.strftime("%Y,%m,%d")
             ).replace(
                 "REVISIONDATE", ftc_stop.strftime("%Y,%m,%d")
