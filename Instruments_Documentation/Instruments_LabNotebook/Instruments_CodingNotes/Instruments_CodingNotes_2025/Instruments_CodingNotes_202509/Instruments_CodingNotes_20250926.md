@@ -30,4 +30,9 @@
 		- Worked!
 # icartt_data.py
 - Adjusting code to take in clean data files if no calibrations were performed
-- Appears to work
+- Appears to work just fine
+	- Note - DO NOT POST VENT CO2!!! TIME OFFSET ISN'T CORRECTED!!!!
+- The Aranet data in the past had all the sensors combined - I wonder how I can do that or if I even should?
+- TempRHDoor data exported fine but didn't read fine
+	- Ended up being an issue with the filling of null values - door status is an integer
+	- Revised filling to proceed if data is integer values as well

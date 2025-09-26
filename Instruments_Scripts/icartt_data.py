@@ -44,7 +44,7 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
     if not os.path.exists(inst_icartt_data_dir):
         os.makedirs(inst_icartt_data_dir)
     if "Calibration" in header.keys():
-        # continue
+        continue
         inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
                                          inst + "_CalibratedData",
                                          inst + "_CalibratedDAQData")
@@ -149,7 +149,8 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
         camp_data = camp_data.with_columns(
             [pl.col(dvar).fill_null(float(chars["missingflag"]))
              for dvar, chars in header["dvars"].items()
-             if camp_data[dvar].dtype == pl.Float64()]
+             if camp_data[dvar].dtype == pl.Float64()
+             or camp_data[dvar].dtype == pl.Int64()]
             )
     # Splits campaign data by ISO week
     camp_data = camp_data.with_columns(
