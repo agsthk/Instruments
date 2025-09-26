@@ -17,4 +17,4 @@
 	- That wasn't the source of the error - it doesn't like when the difference is < 1 either, so need to revise script to make every difference exactly 1 I suppose
 	- Need to change the rounding to every one second, that way I know they all end with .0 and won't flag in the ICARTT scanner (I hope)
 		- IT WORKED !!!!!!!!!!!
-		- 
+		- Spoke too soon - didn't work with all of them, but that's because I overwrote the variable in the fixed header that all were using so the dates in the header didn't match the dates in the file name

@@ -209,6 +209,7 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
         + norm_coms
         )
     for df in camp_data:
+        df_header = fixed_header
         # Midnight of the first day of data
         ftc_start = df.select(
             (cs.contains("FTC") & ~cs.contains("Stop")).min()
@@ -237,13 +238,13 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
             .truediv(1e6)
             )
         # Gets collection and revision date from start and stop times
-        fixed_header = fixed_header.replace(
+        fixed_header = df_header.replace(
             "COLLECTIONDATE", ftc_start.strftime("%Y,%m,%d")
             ).replace(
                 "REVISIONDATE", ftc_stop.strftime("%Y,%m,%d")
                 )
         # Combines header with data
-        header_with_data = fixed_header + "\n" + df.write_csv()
+        header_with_data = df_header + "\n" + df.write_csv()
         # Creates ICARTT file name
         fname = "_".join([header["dataID"],
                           header["locationID"],
