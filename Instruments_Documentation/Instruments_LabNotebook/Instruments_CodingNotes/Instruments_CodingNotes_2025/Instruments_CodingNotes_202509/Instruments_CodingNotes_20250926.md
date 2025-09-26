@@ -27,3 +27,7 @@
 - There is an issue in here that is leading to the sampling locations not being assigned
 	- Found the issue - the sampling stop is set to 1 year after sampling start, which doesn't work when the location never changes
 	- Changing it to be 10 years - should be fine at that point (I hope)
+		- Worked!
+# icartt_data.py
+- Adjusting code to take in clean data files if no calibrations were performed
+- Appears to work

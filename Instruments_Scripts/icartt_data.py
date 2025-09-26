@@ -22,6 +22,8 @@ data_dir = os.path.join(data_dir, "Instruments_Data")
 
 # Full path to directory containing all calibrated clean data
 CALIBRATED_DATA_DIR = os.path.join(data_dir, "Instruments_CalibratedData")
+# Full path to directory containing all cleaned data
+CLEAN_DATA_DIR = os.path.join(data_dir, "Instruments_CleanData")
 ICARTT_DATA_DIR = os.path.join(data_dir, "Instruments_ICARTTData")
 if not os.path.exists(ICARTT_DATA_DIR):
     os.makedirs(ICARTT_DATA_DIR)
@@ -36,19 +38,25 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
     header_path = os.path.join(ICARTT_HEADER_DIR, header_file)
     with open(header_path, "r") as file:
         header = yaml.load(file, Loader=yaml.Loader)
-
-    inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
-                                     inst + "_CalibratedData",
-                                     inst + "_CalibratedDAQData")
     inst_icartt_data_dir = os.path.join(ICARTT_DATA_DIR,
                                         inst + "_ICARTTData",
                                         inst + "_ICARTTData_" + header["REVISION"])
     if not os.path.exists(inst_icartt_data_dir):
         os.makedirs(inst_icartt_data_dir)
-        
-    cal_date = header["Calibration"]
-    correct_cal_files = [file for file in os.listdir(inst_cal_data_dir)
-                         if (file.find(cal_date + "Calibration") != -1)]
+    if "Calibration" in header.keys():
+        # continue
+        inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
+                                         inst + "_CalibratedData",
+                                         inst + "_CalibratedDAQData")
+        cal_date = header["Calibration"]
+        correct_cal_files = [file for file in os.listdir(inst_cal_data_dir)
+                             if (file.find(cal_date + "Calibration") != -1)]
+    else:
+        inst_cal_data_dir = os.path.join(CLEAN_DATA_DIR,
+                                           inst + "_CleanData")
+        inst_cal_data_dir = os.path.join(inst_cal_data_dir,
+                                         os.listdir(inst_cal_data_dir)[0])
+        correct_cal_files = [file for file in os.listdir(inst_cal_data_dir)]
     camp_start = datetime.strptime(header["Campaign Start"], "%Y%m%d").replace(
         hour=0, minute=0, second=0, tzinfo=pytz.timezone("America/Denver")
         )
