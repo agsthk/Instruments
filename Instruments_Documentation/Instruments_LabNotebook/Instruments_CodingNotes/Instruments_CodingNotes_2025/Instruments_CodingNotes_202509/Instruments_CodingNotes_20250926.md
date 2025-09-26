@@ -4,3 +4,5 @@
 - Campaign dates are off for the YAML files - accidentally extended the room ozone to start too early instead of the vent ozone - fixed
 - Other issue is that the number of normal comments is off - needs to increase by 1 - fixed
 	- No clue why this is, maybe the header counts as a normal comment?
+- Now the scanning is working! Still a few things to change though
+- Need to filter to only include C200 data

@@ -69,12 +69,19 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
                 cs.contains("FTC").str.to_datetime(time_zone="America/Denver")
                 ).select(
                     # Keeps only the variables described in the ICARTT header
+                    # and SamplingLocation
                     pl.col(
                         [header["ivar"]["shortname"]]
                         + list(header["dvars"].keys())
+                        + ["SamplingLocation"]
                         )
                     ))
     camp_data = pl.concat(camp_files, how="diagonal_relaxed")
+    camp_data = camp_data.filter(
+        pl.col("SamplingLocation").eq("C200")
+        ).select(
+            pl.exclude("SamplingLocation")
+            )
     camp_data = camp_data.with_columns(
         (cs.contains("FTC") & ~cs.contains("Stop")).dt.week().alias("Week")
         ).collect()
