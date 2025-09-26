@@ -122,10 +122,10 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
         
     norm_coms = [key + ": " + value for key, value in header.items()
                  if key.isupper() and key != "FFI"]
-    n_norm_coms = len(norm_coms)
+    n_norm_coms = len(norm_coms) + 1
     norm_coms = "\n".join(norm_coms)
     
-    n_lines = 15 + n_norm_coms + int(n_dvars) + int(spec_coms[0])
+    n_lines = 14 + n_norm_coms + int(n_dvars) + int(spec_coms[0])
     n_lines = str(n_lines)
     n_norm_coms = str(n_norm_coms)
     
