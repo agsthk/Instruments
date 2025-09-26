@@ -98,6 +98,10 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
             )
     # Adjusts timestamps to be no more than 1 second apart for continuous data
     if len(start_cols) == 0:
+        # Rounds timestamps to nearest tenth of a second
+        camp_data = camp_data.with_columns(
+            cs.contains("DateTime").dt.round(every="100ms")
+            )
         # Timestamp to compare to
         prev_ts = camp_data["UTC_DateTime"][0]
         # List of adjusted timestamps

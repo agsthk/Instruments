@@ -13,3 +13,5 @@
 	- Actually need to adjust all timestamps if I can, the scanner doesn't like if times are even slightly more than 1 second apart
 	- The RA data also fails the scanner which is cool so I don't have a reference for how I did this before
 	- Did some complicated stuff but I do think it ended up working - time to test with the ICARTT scanner
+		- Still encountering an error - going to attempt to round the timestamps before adjusting/ filling and see if that makes a difference
+	
