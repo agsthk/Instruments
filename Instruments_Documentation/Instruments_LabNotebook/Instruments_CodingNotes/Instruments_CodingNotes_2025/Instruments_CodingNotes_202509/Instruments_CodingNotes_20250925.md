@@ -21,3 +21,16 @@
 # calibrate_cleandata.py
 - Modifying this script to apply what I learned through evaluate_offset.py
 - After modifying, set to export the calibrated data once more - now I have this finalized and can ICARTT!
+# icartt_data.py
+- Going to create a script to generate ICARTT files from the calibrated data - plan to pull a lot from existing ICARTT script, but need to modify to pull from YAML headers
+- Creating YAML files - starting with 2BTech_205_A
+	- Took forever actually but I did do it
+- Now working on reading in the YAML files, looks like it worked fine
+- Need to structure what was in the YAML files into an ICARTT header
+- Also need to read in the relevant data
+- Successfully have relevant data read in and concatenated
+- Also able to convert datetime into seconds since midnight
+- Taking the start and stop dates and getting those in the format needed for data collection and revision dates
+- Actually was able to get the header together quite easily, and the data is also ready, so it's just a matter of exporting
+	- Worked through that reasonably quickly and it all worked, going to run the data through the ICARTT checker and see what it says
+	- 
