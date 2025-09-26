@@ -83,7 +83,7 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
     start_cols = [col for col in camp_data.columns if col.find("Start") != -1]
     for start_col in start_cols:
         stop_col = start_col.replace("Start", "Stop")
-        camp_data.with_columns(
+        camp_data = camp_data.with_columns(
             pl.when(
                 pl.col(start_col).lt(pl.col(stop_col).shift(1))
                 )
@@ -125,7 +125,7 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
     n_norm_coms = len(norm_coms)
     norm_coms = "\n".join(norm_coms)
     
-    n_lines = 14 + n_norm_coms + int(n_dvars) + int(spec_coms[0])
+    n_lines = 15 + n_norm_coms + int(n_dvars) + int(spec_coms[0])
     n_lines = str(n_lines)
     n_norm_coms = str(n_norm_coms)
     
