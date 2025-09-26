@@ -78,7 +78,7 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
     camp_data = pl.concat(camp_files, how="diagonal_relaxed")
     # Removes non-C200 data
     camp_data = camp_data.filter(
-        pl.col("SamplingLocation").eq("C200")
+        pl.col("SamplingLocation").str.contains("C200")
         ).select(
             pl.exclude("SamplingLocation")
             ).collect()
