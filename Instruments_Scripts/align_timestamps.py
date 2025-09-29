@@ -236,9 +236,6 @@ all_weeks.sort()
 
 # %% Plotting
 
-by_week
-
-# %%
 for week in all_weeks:
     week_plots = []
     ddt_plots = []
@@ -246,7 +243,7 @@ for week in all_weeks:
     # fig, ax = plt.subplots(figsize=(8, 6))
     # ax.set_title(str(week))
     for inst, sources in data.items():
-        if inst != "Picarro_G2307":
+        if inst != "2BTech_205_A":
             continue
         for source, dfs in sources.items():
             if week not in dfs.keys():
@@ -259,31 +256,17 @@ for week in all_weeks:
                     break
             if var not in cols:
                 continue
-            df = df.with_columns(
-                pl.col(var).sub(pl.col(var).shift(1)).truediv(pl.col("dt"))
-                .alias("d" + var + "/dt")
-                )
-
             
-            ddt_df = df.drop_nulls().with_columns(
-                pl.col("d" + var + "/dt").rolling_mean_by(time_col, window_size="30m").alias("mean"),
-                pl.col("d" + var + "/dt").rolling_std_by(time_col, window_size="30m").mul(2).alias("std"),
-                ).filter(
-                    ~pl.col("d" + var + "/dt").is_between(
-                        (pl.col("mean").sub(pl.col("std"))),
-                        (pl.col("mean").add(pl.col("std")))
-                        )
+            
+            week_uza_starts = uza_starts[inst][source].filter(
+                pl.col(time_col).is_between(
+                    df[time_col].min(), df[time_col].max()
                     )
-            week_valve_open = valve_open.filter(
-                pl.col("UTC_Start").is_between(
-                    df["UTC_DateTime"].min(), df["UTC_DateTime"].max()
-                    ))
-            uza_start = week_valve_open.join_asof(
-                ddt_df,
-                left_on="UTC_Start",
-                right_on="UTC_DateTime",
-                strategy="forward",
-                coalesce=False
+                )
+            week_uza_stops = uza_stops[inst][source].filter(
+                pl.col(time_col).is_between(
+                    df[time_col].min(), df[time_col].max()
+                    )
                 )
             week_plots.append(
                 df.hvplot.scatter(
@@ -293,7 +276,13 @@ for week in all_weeks:
                     )
                 )
             week_plots.append(
-                uza_start.hvplot.scatter(
+                week_uza_starts.hvplot.scatter(
+                    x=time_col,
+                    y=var
+                    )
+                )
+            week_plots.append(
+                week_uza_stops.hvplot.scatter(
                     x=time_col,
                     y=var
                     )
