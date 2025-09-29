@@ -8,3 +8,4 @@
 		- Joined the real timestamps with the DataFrame and determined how many seconds the instrument said passed since the most recent known correct timestamp
 		- Converted from instrument seconds passed to real seconds passed, then used that offset from the most recent correct timestamp to determine the corrected value
 		- Seems to work well!
+	- Revised code to be well-commented and to replace original columns with corrected columns instead of creating new ones
