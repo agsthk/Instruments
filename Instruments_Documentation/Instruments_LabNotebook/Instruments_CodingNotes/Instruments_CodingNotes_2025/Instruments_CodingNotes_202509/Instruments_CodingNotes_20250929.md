@@ -12,3 +12,10 @@
 	- Would like to convert this into a function in case I need to apply it to other instruments - perhaps should wait on that?
 		- Will wait
 	- Integrated time offset correction into the concatenation/collection/split by week code block
+- Now, going to work on identifying the times that Picarro and 2B start/stop measuring UZA using a combination of valve states and derivatives
+	- Beginning with Picarro as I know that one does best
+		- Wondering if I need the valve states actually - going to check how good Picarro derivative works to identify since the valve states don't always correspond to actual zeroing
+			- Using the valve states - makes it a lot more straightforward
+	- I think I may wish to change the partitioning by week to happen a bit later
+		- Want to calculate d/dt before splitting, then want to consider determining all zero starts/stops for each instrument before splitting
+		- Fixed code to calculate d/dt before splitting

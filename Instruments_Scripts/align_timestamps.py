@@ -142,15 +142,26 @@ for inst, sources in data.items():
                         .name.map(lambda name: name.replace("UTC", "FTC"))
                         )
         
+        lf = lf.with_columns(
+            # Adds dt column based on gap between consecutive measurements
+            (cs.contains("FTC") & ~cs.contains("Stop"))
+            .sub((cs.contains("FTC") & ~cs.contains("Stop")).shift(1))
+            .dt.total_microseconds().truediv(1e6)
+            .alias("dt"),
+            # Adds week of year column
+            (cs.contains("FTC") & ~cs.contains("Stop")).dt.week()
+            .alias("Week")
+            )
+        # Calculates derivative of variable with respect to time
+        lf = lf.with_columns(
+            cs.contains("O3_ppb", "NO2_ppb", "CH2O_ppb")
+            .sub(cs.contains("O3_ppb", "NO2_ppb", "CH2O_ppb").shift(1))
+            .truediv(pl.col("dt"))
+            .alias("ddt")
+            )
+        
         by_week = {
-            key[0]: df for key, df in lf.with_columns(
-                (cs.contains("FTC") & ~cs.contains("Stop"))
-                .sub((cs.contains("FTC") & ~cs.contains("Stop")).shift(1))
-                .dt.total_microseconds().truediv(1e6)
-                .alias("dt"),
-                (cs.contains("FTC") & ~cs.contains("Stop")).dt.week()
-                .alias("Week")
-                ).collect().partition_by(
+            key[0]: df for key, df in lf.collect().partition_by(
                     "Week", as_dict=True, include_key=False
                     ).items()
                     }
@@ -187,6 +198,8 @@ for week in all_weeks:
     # fig, ax = plt.subplots(figsize=(8, 6))
     # ax.set_title(str(week))
     for inst, sources in data.items():
+        if inst != "Picarro_G2307":
+            continue
         for source, dfs in sources.items():
             if week not in dfs.keys():
                 continue
@@ -202,15 +215,28 @@ for week in all_weeks:
                 pl.col(var).sub(pl.col(var).shift(1)).truediv(pl.col("dt"))
                 .alias("d" + var + "/dt")
                 )
+
+            
             ddt_df = df.drop_nulls().with_columns(
                 pl.col("d" + var + "/dt").rolling_mean_by(time_col, window_size="30m").alias("mean"),
-                pl.col("d" + var + "/dt").rolling_std_by(time_col, window_size="30m").mul(3).alias("std"),
+                pl.col("d" + var + "/dt").rolling_std_by(time_col, window_size="30m").mul(2).alias("std"),
                 ).filter(
                     ~pl.col("d" + var + "/dt").is_between(
                         (pl.col("mean").sub(pl.col("std"))),
                         (pl.col("mean").add(pl.col("std")))
                         )
                     )
+            week_valve_open = valve_open.filter(
+                pl.col("UTC_Start").is_between(
+                    df["UTC_DateTime"].min(), df["UTC_DateTime"].max()
+                    ))
+            uza_start = week_valve_open.join_asof(
+                ddt_df,
+                left_on="UTC_Start",
+                right_on="UTC_DateTime",
+                strategy="forward",
+                coalesce=False
+                )
             week_plots.append(
                 df.hvplot.scatter(
                     x=time_col,
@@ -218,23 +244,30 @@ for week in all_weeks:
                     ylim=(-10, 150)
                     )
                 )
-            ddt_plots.append(
-                ddt_df.hvplot.scatter(
+            week_plots.append(
+                uza_start.hvplot.scatter(
                     x=time_col,
-                    y="d" + var + "/dt"
+                    y=var
                     )
                 )
+            # ddt_plots.append(
+            #     uza_start.hvplot.scatter(
+            #         x=time_col,
+            #         y="d" + var + "/dt"
+            #         )
+                # )
     for i, plot in enumerate(week_plots):
         if i == 0:
             week_plot = plot
         else:
             week_plot = week_plot * plot
-    for i, plot in enumerate(ddt_plots):
-        if i == 0:
-            ddt_plot = plot
-        else:
-            ddt_plot = ddt_plot * plot
-    hvplot.show((week_plot + ddt_plot).cols(1))
+    # for i, plot in enumerate(ddt_plots):
+    #     if i == 0:
+    #         ddt_plot = plot
+    #     else:
+    #         ddt_plot = ddt_plot * plot
+    hvplot.show(week_plot)
+    # hvplot.show((week_plot + ddt_plot).cols(1))
     # break
     #         ax.plot(
     #             df[time_col],
