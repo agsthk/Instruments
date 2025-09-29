@@ -9,3 +9,6 @@
 		- Converted from instrument seconds passed to real seconds passed, then used that offset from the most recent correct timestamp to determine the corrected value
 		- Seems to work well!
 	- Revised code to be well-commented and to replace original columns with corrected columns instead of creating new ones
+	- Would like to convert this into a function in case I need to apply it to other instruments - perhaps should wait on that?
+		- Will wait
+	- Integrated time offset correction into the concatenation/collection/split by week code block

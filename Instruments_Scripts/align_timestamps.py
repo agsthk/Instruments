@@ -62,8 +62,10 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         else:
             lf = pl.scan_csv(path)
         lf = lf.with_columns(
-            pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
-            pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
+            pl.selectors.contains("UTC")
+            .str.to_datetime(time_zone="UTC"),
+            pl.selectors.contains("FTC")
+            .str.to_datetime(time_zone="America/Denver")
             )
         if inst in avg_times.keys():
             lf = lf.join_asof(
@@ -73,73 +75,81 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                     strategy="backward"
                     )
             lf = lf.select(
-                pl.col("UTC_DateTime").dt.offset_by("-" + pl.col("AveragingTime")).alias("UTC_Start"),
+                pl.col("UTC_DateTime")
+                .dt.offset_by("-" + pl.col("AveragingTime"))
+                .alias("UTC_Start"),
                 pl.col("UTC_DateTime").alias("UTC_Stop"),
-                pl.col("FTC_DateTime").dt.offset_by("-" + pl.col("AveragingTime")).alias("FTC_Start"),
+                pl.col("FTC_DateTime")
+                .dt.offset_by("-" + pl.col("AveragingTime"))
+                .alias("FTC_Start"),
                 pl.col("FTC_DateTime").alias("FTC_Stop"),
-                pl.exclude("UTC_DateTime", "FTC_DateTime", "UTC_Start", "AveragingTime")
+                pl.exclude(
+                    "UTC_DateTime",
+                    "FTC_DateTime",
+                    "UTC_Start",
+                    "AveragingTime"
+                    )
                 )
         if source not in data[inst].keys():
             data[inst][source] = [lf]
         else:
             data[inst][source].append(lf)
-#%%
-
-df = pl.concat(data["2BTech_205_A"]["SD"]).collect()
-
-# %%
-
-
-
-# Declares Timestamps known to be synched with real time
-real_ts = [
-    datetime(2024, 5, 23, 15, 57, 5, tzinfo=pytz.UTC),
-    datetime(2024, 6, 25, 19, 35, 18, tzinfo=pytz.UTC)
-    ]
-# Given instrument 15 seconds ahead before second sync, determines extra
-# seconds added by instrument per real second
-diff = 15 / (real_ts[1] - real_ts[0]).total_seconds()
-# Approximates an initial synchronized timestamp given instrument ~1 minute
-# ahead before first sync
-real_ts = [real_ts[0] - timedelta(seconds=(60 / diff))] + real_ts
-real_ts = pl.DataFrame(real_ts, schema=["RealTimestamp"])
-# Calculates time since last known synced timestamp for each measurement as
-# determined by instrument and converts to real time passed
-df = df.join_asof(
-    real_ts,
-    left_on="UTC_Stop",
-    right_on="RealTimestamp",
-    strategy="backward"
-    ).with_columns(
-        cs.contains("UTC").sub(pl.col("RealTimestamp"))
-        .dt.total_microseconds().truediv((1 + diff))
-        .cast(pl.Int64).cast(pl.String).add("us")
-        .name.suffix("_Passed")
-        )
-# Determines corrected time from time passed since last synced timestamp
-df = df.with_columns((
-    pl.col("RealTimestamp").dt.offset_by(pl.col(col))
-    .alias(col.replace("_Passed", ""))
-    for col in cs.expand_selector(df, cs.contains("_Passed"))
-    )).select(
-        ~cs.contains("_Passed", "RealTimestamp")
-        ).with_columns(
-            # Converts corrected UTC timestamp to local timestamp
-            cs.contains("UTC").dt.convert_time_zone("America/Denver")
-            .name.map(lambda name: name.replace("UTC", "FTC"))
-            )
 
 #%%
 all_weeks = []
 for inst, sources in data.items():
     for source, lfs in sources.items():
+        # 
+        lf = pl.concat(lfs)
+        if inst == "2BTech_205_A":
+            # Declares Timestamps known to be synched with real time
+            real_ts = [
+                datetime(2024, 5, 23, 15, 57, 5, tzinfo=pytz.UTC),
+                datetime(2024, 6, 25, 19, 35, 18, tzinfo=pytz.UTC)
+                ]
+            # Given instrument 15 seconds ahead before second sync, determines
+            # extra seconds added by instrument per real second
+            diff = 15 / (real_ts[1] - real_ts[0]).total_seconds()
+            # Approximates an initial synchronized timestamp given instrument
+            # ~1 minute ahead before first sync
+            real_ts = [real_ts[0] - timedelta(seconds=(60 / diff))] + real_ts
+            real_ts = pl.DataFrame(real_ts, schema=["RealTimestamp"])
+            # Calculates time since last known synced timestamp for each
+            # measurement as determined by instrument and converts to real time passed
+            lf = lf.join_asof(
+                real_ts.lazy(),
+                left_on="UTC_Stop",
+                right_on="RealTimestamp",
+                strategy="backward"
+                ).with_columns(
+                    cs.contains("UTC").sub(pl.col("RealTimestamp"))
+                    .dt.total_microseconds().truediv((1 + diff))
+                    .cast(pl.Int64).cast(pl.String).add("us")
+                    .name.suffix("_Passed")
+                    )
+            # Determines corrected time from time passed since last synced
+            # timestamp
+            lf = lf.with_columns((
+                pl.col("RealTimestamp").dt.offset_by(pl.col(col))
+                .alias(col.replace("_Passed", ""))
+                for col in cs.expand_selector(lf, cs.contains("_Passed"))
+                )).select(
+                    ~cs.contains("_Passed", "RealTimestamp")
+                    ).with_columns(
+                        # Converts corrected UTC timestamp to local timestamp
+                        cs.contains("UTC")
+                        .dt.convert_time_zone("America/Denver")
+                        .name.map(lambda name: name.replace("UTC", "FTC"))
+                        )
+        
         by_week = {
-            key[0]: df for key, df in pl.concat(lfs).with_columns(
+            key[0]: df for key, df in lf.with_columns(
                 (cs.contains("FTC") & ~cs.contains("Stop"))
                 .sub((cs.contains("FTC") & ~cs.contains("Stop")).shift(1))
                 .dt.total_microseconds().truediv(1e6)
                 .alias("dt"),
-                (cs.contains("FTC") & ~cs.contains("Stop")).dt.week().alias("Week")
+                (cs.contains("FTC") & ~cs.contains("Stop")).dt.week()
+                .alias("Week")
                 ).collect().partition_by(
                     "Week", as_dict=True, include_key=False
                     ).items()
@@ -150,16 +160,7 @@ for inst, sources in data.items():
 all_weeks = list(set(all_weeks))
 all_weeks.sort()
 
-# %%
-data["2BTech_205_A"]["SD"][21].filter(
-    pl.col("FTC_Start").dt.day().eq(23)
-    & pl.col("FTC_Start").dt.hour().eq(9)
-    )
-data["2BTech_205_A"]["SD"][26].filter(
-    pl.col("FTC_Start").dt.day().eq(25)
-    & pl.col("FTC_Start").dt.hour().eq(13)
-    & pl.col("FTC_Start").dt.minute().is_between(30, 37)
-    )
+
 # %% Reads solenoid valve states
 valve_states = pl.read_csv(
     os.path.join(
