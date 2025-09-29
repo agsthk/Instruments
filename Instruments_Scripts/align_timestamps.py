@@ -9,7 +9,7 @@ import os
 import polars as pl
 import polars.selectors as cs
 import pytz
-from datetime import datetime
+from datetime import datetime, timedelta
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -83,7 +83,109 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             data[inst][source] = [lf]
         else:
             data[inst][source].append(lf)
+#%%
 
+df = pl.concat(data["2BTech_205_A"]["SD"]).collect()
+
+# %%
+
+
+
+
+real_ts = [
+    datetime(2024, 5, 23, 15, 57, 5, tzinfo=pytz.UTC),
+    datetime(2024, 6, 25, 19, 35, 18, tzinfo=pytz.UTC)
+    ]
+diff = 15 / (real_ts[1] - real_ts[0]).total_seconds()
+real_ts = [real_ts[0] - timedelta(seconds=(60 / diff))] + real_ts
+real_ts = pl.DataFrame(real_ts, schema=["RealTimestamp"])
+
+test = df.join_asof(
+    real_ts,
+    left_on="UTC_Stop",
+    right_on="RealTimestamp",
+    strategy="backward"
+    ).with_columns(
+        cs.contains("UTC").sub(pl.col("RealTimestamp"))
+        .dt.total_microseconds().truediv((1 + diff))
+        .cast(pl.Int64).cast(pl.String).add("us")
+        .name.suffix("_Corr")
+        )
+        
+test = test.with_columns(
+    (pl.col("RealTimestamp").dt.offset_by(pl.col(x)).alias(x)
+     for x in cs.expand_selector(test, cs.contains("_Corr")))
+    ).with_columns(
+        cs.contains("_Corr").dt.convert_time_zone("America/Denver")
+        .name.map(lambda name: name.replace("UTC", "FTC"))
+        )
+
+        
+test.filter(
+    pl.col("FTC_Stop").ge(datetime(2024, 5, 23, 9, 40, 3, tzinfo=pytz.timezone("America/Denver")))
+    )
+hvplot.show(
+    test.hvplot.scatter(
+        x="UTC_Start",
+        y="UTC_Start_Corr")
+    )
+# %%
+df.join_asof(
+    correct_timestamps,
+    left_on="UTC_Stop",
+    right_on="CorrectTimestamp",
+    strategy="backward"
+    ).with_columns(
+        pl.col("UTC_Stop").sub(pl.col("CorrectTimestamp"))
+        .dt.total_microseconds().truediv(1 + 6.5e-6)
+        .cast(pl.Int64).cast(pl.String).add("us")
+        # .cast(pl.Duration(time_unit="us"))
+        # .cast(pl.String)
+        .alias("Correction")
+        ).with_columns(
+            pl.col("CorrectTimestamp").dt.offset_by(pl.col("Correction"))
+            )
+# %%
+
+
+
+test = df.with_columns(
+    pl.when(
+        pl.col("FTC_Stop").eq(datetime(2024, 5, 23, 9, 40, 3, tzinfo=pytz.timezone("America/Denver")))
+        )
+    .then(
+        pl.lit(datetime(2024, 5, 23, 9, 39, 3))
+        )
+    .alias("FTC_Stop_Real")
+    ).with_columns(
+        pl.when(
+            pl.col("FTC_Stop").eq(datetime(2024, 6, 25, 13, 31, 50, tzinfo=pytz.timezone("America/Denver")))
+            )
+        .then(
+            pl.lit(datetime(2024, 6, 25, 13, 31, 35))
+            )
+        .otherwise(
+            pl.col("FTC_Stop_Real")
+            )
+        .alias("FTC_Stop_Real")
+        ).with_columns(
+            pl.col("FTC_Stop_Real").cast(pl.Int64).interpolate_by("FTC_Stop")
+            .cast(pl.Datetime(time_unit="us")).dt.replace_time_zone("America/Denver")
+            ).with_columns(
+                pl.col("FTC_Stop").sub(pl.col("FTC_Stop").shift(1)).alias("dt_report"),
+                pl.col("FTC_Stop_Real").sub(pl.col("FTC_Stop_Real").shift(1)).alias("dt_real")
+                ).drop_nulls(
+                    cs.contains("dt")
+                    ).with_columns(
+                        pl.col("dt_report").sub(pl.col("dt_real")).alias("diff")
+                        )
+# %%
+
+test.select(
+    pl.median("diff")
+    )
+
+#%%
 all_weeks = []
 for inst, sources in data.items():
     for source, lfs in sources.items():
@@ -104,6 +206,16 @@ for inst, sources in data.items():
 all_weeks = list(set(all_weeks))
 all_weeks.sort()
 
+# %%
+data["2BTech_205_A"]["SD"][21].filter(
+    pl.col("FTC_Start").dt.day().eq(23)
+    & pl.col("FTC_Start").dt.hour().eq(9)
+    )
+data["2BTech_205_A"]["SD"][26].filter(
+    pl.col("FTC_Start").dt.day().eq(25)
+    & pl.col("FTC_Start").dt.hour().eq(13)
+    & pl.col("FTC_Start").dt.minute().is_between(30, 37)
+    )
 # %% Reads solenoid valve states
 valve_states = pl.read_csv(
     os.path.join(
