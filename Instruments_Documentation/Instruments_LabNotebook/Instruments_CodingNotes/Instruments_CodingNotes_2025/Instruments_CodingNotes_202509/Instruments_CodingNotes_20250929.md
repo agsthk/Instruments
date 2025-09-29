@@ -19,3 +19,5 @@
 	- I think I may wish to change the partitioning by week to happen a bit later
 		- Want to calculate d/dt before splitting, then want to consider determining all zero starts/stops for each instrument before splitting
 		- Fixed code to calculate d/dt before splitting
+	- Moving valve state read in to earlier in the script
+	- Added code to identify the start and stop of UZA measurements before partitioning by week

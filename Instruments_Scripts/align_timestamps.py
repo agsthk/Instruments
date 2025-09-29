@@ -41,6 +41,25 @@ for avg_times_file in os.listdir(AVG_TIME_DIR):
         ).sort(
             by="UTC_Start"
             ).lazy()
+            
+# %% Reads solenoid valve states
+valve_states = pl.read_csv(
+    os.path.join(
+        data_dir,
+        "Instruments_DerivedData",
+        "Picarro_G2307_DerivedData",
+        "Picarro_G2307_SolenoidValveStates.csv"
+        )
+    ).with_columns(
+        pl.selectors.contains("UTC").str.to_datetime()
+        )
+valve_open = valve_states.filter(
+    pl.col("SolenoidValves").eq(1)
+    ).select("UTC_Start")
+valve_closed = valve_states.filter(
+    pl.col("SolenoidValves").eq(1)
+    ).select("UTC_Stop")
+
 # %% Data read-in and concatenation
 data = {inst: {} for inst in insts}
 for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
@@ -97,9 +116,10 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
 
 #%%
 all_weeks = []
+uza_starts = {inst: {} for inst in data.keys()}
+uza_stops = {inst: {} for inst in data.keys()}
 for inst, sources in data.items():
     for source, lfs in sources.items():
-        # 
         lf = pl.concat(lfs)
         if inst == "2BTech_205_A":
             # Declares Timestamps known to be synched with real time
@@ -160,6 +180,49 @@ for inst, sources in data.items():
             .alias("ddt")
             )
         
+        # Determines where d/dt is an outlier
+        outliers = lf.drop_nulls().with_columns(
+            pl.col("ddt").rolling_mean_by(
+                (cs.contains("FTC") & ~cs.contains("Stop")),
+                window_size="30m"
+                ).alias("mean"),
+            pl.col("ddt").rolling_std_by(
+                (cs.contains("FTC") & ~cs.contains("Stop")),
+                window_size="30m"
+                ).alias("std"),
+            ).filter(
+                ~pl.col("ddt").is_between(
+                    pl.col("mean").sub(pl.col("std").mul(2)),
+                    pl.col("mean").add(pl.col("std").mul(2)))
+                ).collect()
+        # Strategy that will be used to select d/dt outliers that indicate
+        # start/stop of zero measurement; Should be forward if timestamps are
+        # aligned, but is backward if Picarro is too far ahead
+        if inst == "Picarro_G2307":
+            strategy = "forward"
+        else:
+            strategy = "backward"
+        # First time column
+        right_on = outliers.columns[0]
+        # Determines time of first UZA measurement corresponding to each valve
+        # opening
+        uza_starts[inst][source] = valve_open.join_asof(
+            outliers,
+            left_on="UTC_Start",
+            right_on=right_on,
+            strategy=strategy,
+            coalesce=False
+            ).drop_nulls()
+        # Determines time of last UZA measurement corresponding to each valve
+        # closing
+        uza_stops[inst][source] = valve_closed.join_asof(
+            outliers,
+            left_on="UTC_Stop",
+            right_on=right_on,
+            strategy=strategy,
+            coalesce=False
+            ).drop_nulls()
+        # Partitions data by week
         by_week = {
             key[0]: df for key, df in lf.collect().partition_by(
                     "Week", as_dict=True, include_key=False
@@ -171,26 +234,11 @@ for inst, sources in data.items():
 all_weeks = list(set(all_weeks))
 all_weeks.sort()
 
-
-# %% Reads solenoid valve states
-valve_states = pl.read_csv(
-    os.path.join(
-        data_dir,
-        "Instruments_DerivedData",
-        "Picarro_G2307_DerivedData",
-        "Picarro_G2307_SolenoidValveStates.csv"
-        )
-    ).with_columns(
-        pl.selectors.contains("UTC").str.to_datetime()
-        )
-valve_open = valve_states.filter(
-    pl.col("SolenoidValves").eq(1)
-    ).select("UTC_Start")
-valve_closed = valve_states.filter(
-    pl.col("SolenoidValves").eq(1)
-    ).select("UTC_Stop")
 # %% Plotting
 
+by_week
+
+# %%
 for week in all_weeks:
     week_plots = []
     ddt_plots = []
