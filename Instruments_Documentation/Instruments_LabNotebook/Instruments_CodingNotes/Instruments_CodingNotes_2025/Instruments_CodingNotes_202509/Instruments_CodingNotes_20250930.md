@@ -7,3 +7,19 @@
 - Now, want to go back into the UZA assignment and see if I can't figure out how to identify the first O3 point that measures UZA instead of the 2nd/3rd/whatever it was doing
 	- Got it to identify only the first outlier as an outlier if there are consecutive outliers
 	- But the second I bring it in to the actual processing loop it fails to identify outliers for 2BTech_205_A - this is the problem I was encountering yesterday
+		- Broke it down - the issue arises when cacllating rolling mean/std and resulting llim/ulum in the loop
+			- It's the rolling mean/std
+				- Calculating a standard deviation on the order of 10^23?
+				- Genuinely I don't understand what's happening here - I'm using the exact same code that works outside of the loop
+	- Going to break the processing loop to first get all the concatenated data, then have a loop to do the outlier/uza start/stop stuff, then partition by week
+		- Still doing this, but I fear the issue may have had something to do with dropping nulls
+			- It doesn't
+		- Switching to use quantiles instead of mean/std
+			- When I did this, seemed to work okay
+	- FINALLY GOT IT TO WORK!!!!!!!!!!!!!!!
+		- Quick look at plots confirmed
+			- Picarro is offset, but I believe that has to do with the offset correction - checking
+				- It had to do with the number of IQR's being too low - changed it to 3, going to double check O3 and NOx to ensure that doesn't end up a problem
+				- All good - keep it at 3
+				- When I go back to applying offset correction, does something funky  - trying to apply but then use backward strategy to identify outliers
+					- Mostly worked, but still don't like it much - commenting out the correction for time drift of picarro and continuing with the forward method

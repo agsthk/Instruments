@@ -55,12 +55,12 @@ valve_states = pl.read_csv(
         )
 valve_open = valve_states.filter(
     pl.col("SolenoidValves").eq(1)
-    ).select("UTC_Start")
+    ).select("UTC_Start").rename({"UTC_Start": "ValveOpen"})
 valve_closed = valve_states.filter(
     pl.col("SolenoidValves").eq(1)
-    ).select("UTC_Stop")
+    ).select("UTC_Stop").rename({"UTC_Stop": "ValveClosed"})
 
-# %% Data read-in and concatenation
+# %% Data read-in
 data = {inst: {} for inst in insts}
 for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
     for file in tqdm(files):
@@ -114,10 +114,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         else:
             data[inst][source].append(lf)
 
-#%%
-all_weeks = []
-uza_starts = {inst: {} for inst in data.keys()}
-uza_stops = {inst: {} for inst in data.keys()}
+#%% Data concatenation and timestamp correction
 for inst, sources in data.items():
     for source, lfs in sources.items():
         lf = pl.concat(lfs)
@@ -135,7 +132,8 @@ for inst, sources in data.items():
             real_ts = [real_ts[0] - timedelta(seconds=(60 / diff))] + real_ts
             real_ts = pl.DataFrame(real_ts, schema=["RealTimestamp"])
             # Calculates time since last known synced timestamp for each
-            # measurement as determined by instrument and converts to real time passed
+            # measurement as determined by instrument and converts to real time
+            # passed
             lf = lf.join_asof(
                 real_ts.lazy(),
                 left_on="UTC_Stop",
@@ -161,25 +159,25 @@ for inst, sources in data.items():
                         .dt.convert_time_zone("America/Denver")
                         .name.map(lambda name: name.replace("UTC", "FTC"))
                         )
-        if inst == "Picarro_G2307":
-            # Corrects drift (estimated)
-            diff = (9.476
-                    / ((datetime(2024, 6, 30, 23, 44, 1)
-                        - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()))
-            lf = lf.with_columns(
-                pl.col("UTC_DateTime").sub(pl.min("UTC_DateTime"))
-                .dt.total_microseconds().truediv(1 + diff)
-                .cast(pl.Int64).cast(pl.String).add("us")
-                .alias("Passed")
-                ).with_columns(
-                    pl.min("UTC_DateTime").dt.offset_by(pl.col("Passed"))
-                    .alias("UTC_DateTime")
-                    ).with_columns(
-                        # Converts corrected UTC timestamp to local timestamp
-                        cs.contains("UTC")
-                        .dt.convert_time_zone("America/Denver")
-                        .name.map(lambda name: name.replace("UTC", "FTC"))
-                        )
+        # if inst == "Picarro_G2307":
+        #     # Corrects drift (estimated)
+        #     diff = (9.476
+        #             / ((datetime(2024, 6, 30, 23, 44, 1)
+        #                 - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()))
+        #     lf = lf.with_columns(
+        #         pl.col("UTC_DateTime").sub(pl.min("UTC_DateTime"))
+        #         .dt.total_microseconds().truediv(1 + diff)
+        #         .cast(pl.Int64).cast(pl.String).add("us")
+        #         .alias("Passed")
+        #         ).with_columns(
+        #             pl.min("UTC_DateTime").dt.offset_by(pl.col("Passed"))
+        #             .alias("UTC_DateTime")
+        #             ).with_columns(
+        #                 # Converts corrected UTC timestamp to local timestamp
+        #                 cs.contains("UTC")
+        #                 .dt.convert_time_zone("America/Denver")
+        #                 .name.map(lambda name: name.replace("UTC", "FTC"))
+        #                 )
         lf = lf.with_columns(
             # Adds dt column based on gap between consecutive measurements
             (cs.contains("FTC") & ~cs.contains("Stop"))
@@ -197,96 +195,158 @@ for inst, sources in data.items():
             .truediv(pl.col("dt"))
             .alias("ddt")
             )
-        
-        # Determines where d/dt is an outlier
-        outliers = lf.drop_nulls().with_columns(
-            pl.col("ddt").rolling_mean_by(
-                (cs.contains("FTC") & ~cs.contains("Stop")),
-                window_size="30m"
-                ).alias("mean"),
-            pl.col("ddt").rolling_std_by(
-                (cs.contains("FTC") & ~cs.contains("Stop")),
-                window_size="30m"
-                ).alias("std"),
-            ).filter(
-                ~pl.col("ddt").is_between(
-                    pl.col("mean").sub(pl.col("std").mul(2)),
-                    pl.col("mean").add(pl.col("std").mul(2)))
-                ).collect()
-        # Strategy that will be used to select d/dt outliers that indicate
-        # start/stop of zero measurement; Should be forward if timestamps are
-        # aligned, but is backward if Picarro is too far ahead
-        if inst == "Picarro_G2307":
-            strategy = "forward"
-        else:
-            strategy = "backward"
+        data[inst][source] = lf.collect()
+    
+# %% Identifies starts and stops of UZA measurements
+uza_starts = {inst: {} for inst in data.keys()}
+uza_stops = {inst: {} for inst in data.keys()}
+for inst, sources in data.items():
+    for source, df in sources.items():
         # First time column
-        right_on = outliers.columns[0]
-        # Determines time of first UZA measurement corresponding to each valve
-        # opening
+        time_col = df.columns[0]
+        # Identifies points where d/dt is more than 1.5 IQRs below/above the
+        # lower/upper quantile
+        outliers = df.drop_nulls().with_columns(
+            pl.col("ddt").rolling_quantile_by(by=time_col,
+                                              window_size="360m",
+                                              quantile=0.25).alias("lq"),
+            pl.col("ddt").rolling_quantile_by(by=time_col,
+                                              window_size="360m",
+                                              quantile=0.75).alias("uq"),
+            ).with_columns(
+                pl.col("lq").sub((pl.col("uq").sub(pl.col("lq"))).mul(3))
+                .alias("llim"),
+                pl.col("lq").add((pl.col("uq").sub(pl.col("lq"))).mul(3))
+                .alias("ulim")
+                ).with_columns(
+                    pl.when(
+                        pl.col("ddt").is_between(pl.col("llim"),
+                                                 pl.col("ulim"))
+                        )
+                    .then(False)
+                    .otherwise(True)
+                    .alias("Outlier")
+                    ).with_columns(
+                        # Keeps only the first of consecutive outliers
+                        pl.when(
+                            pl.col("Outlier") & pl.col("Outlier").shift(1)
+                            )
+                        .then(False)
+                        .otherwise(pl.col("Outlier"))
+                        .alias("Outlier")
+                        ).filter(
+                           pl.col("Outlier")
+                           )
+        if inst == "Picarro_G2307":
+            strat = "forward"
+        else:
+            strat = "backward"
+        # Identifies which outliers correspond to the first/last UZA
+        # measurement for each valve opening/closing
         uza_starts[inst][source] = valve_open.join_asof(
             outliers,
-            left_on="UTC_Start",
-            right_on=right_on,
-            strategy=strategy,
+            left_on="ValveOpen",
+            right_on=time_col,
             coalesce=False,
-            tolerance="6m"
-            ).drop_nulls()
-        # Determines time of last UZA measurement corresponding to each valve
-        # closing
+            strategy=strat,
+            tolerance="10m"
+            ).drop_nulls(time_col).select(
+                cs.contains(
+                    "ValveOpen", "TC", "O3_ppb", "NO2_ppb", "CH2O_ppb"
+                    )
+                )
         uza_stops[inst][source] = valve_closed.join_asof(
             outliers,
-            left_on="UTC_Stop",
-            right_on=right_on,
-            strategy=strategy,
+            left_on="ValveClosed",
+            right_on=time_col,
             coalesce=False,
-            tolerance="6m"
-            ).drop_nulls()
-        # Partitions data by week
-        by_week = lf.collect()#{
-        #     key[0]: df for key, df in lf.collect().partition_by(
-        #             "Week", as_dict=True, include_key=False
-        #             ).items()
-        #             }
-        # all_weeks += list(by_week.keys())
-        data[inst][source] = by_week
+            strategy=strat,
+            tolerance="10m"
+            ).drop_nulls(time_col).select(
+                cs.contains(
+                    "ValveClosed", "TC", "O3_ppb", "NO2_ppb", "CH2O_ppb"
+                    )
+                )
+
+# %% Partitions data by week
+# all_weeks = []
+# for inst, sources in data.items():
+#     for source, df in sources.items():
+#         # Partitions data by week
+#         by_week = {
+#             key[0]: df for key, df in lf.collect().partition_by(
+#                     "Week", as_dict=True, include_key=False
+#                     ).items()
+#                     }
+#         all_weeks += list(by_week.keys())
+#         data[inst][source] = by_week
         
 # all_weeks = list(set(all_weeks))
 # all_weeks.sort()
 # %%
-df = data["2BTech_205_A"]["SD"].filter(
-    # pl.col("ddt").is_between(-100, 100)
-    # & pl.col("O3_ppb").is_between(-20, 150)
-    pl.col("UTC_Start").dt.month().gt(6)
-    | (pl.col("UTC_Start").dt.month().eq(6) & pl.col("UTC_Start").dt.day().gt(12))
-    ).with_columns(
-        pl.col("ddt").rolling_mean_by(by="UTC_Start", window_size="360m").alias("Mean"),
-        pl.col("ddt").rolling_std_by(by="UTC_Start", window_size="360m").alias("STD"),
-        ).with_columns(
-            pl.col("Mean").sub(pl.col("STD").mul(2)).alias("llim"),
-            pl.col("Mean").add(pl.col("STD").mul(2)).alias("ulim")
-            ).with_columns(
-                pl.when(
-                    pl.col("ddt").is_between(pl.col("llim"), pl.col("ulim"))
-                    )
-                .then(False)
-                .otherwise(True)
-                .alias("Outlier")
-                ).with_columns(
-                    pl.when(
-                        pl.col("Outlier") & pl.col("Outlier").shift(1)
-                        )
-                    .then(False)
-                    .otherwise(pl.col("Outlier"))
-                    .alias("Outlier")
-                    )
+
+
+start = uza_starts["Picarro_G2307"]["Logger"]
+stop = uza_stops["Picarro_G2307"]["Logger"]
+df = data["Picarro_G2307"]["Logger"].filter(
+    pl.col("UTC_DateTime").ge(start["ValveOpen"].min())
+    & pl.col("UTC_DateTime").le(stop["ValveClosed"].max())
+    )
+hvplot.show(
+    df.hvplot.scatter(
+        x="FTC_DateTime",
+        y="CH2O_ppb"
+        ) * start.hvplot.scatter(
+            x="FTC_DateTime",
+            y="CH2O_ppb"
+            ) * stop.hvplot.scatter(
+                x="FTC_DateTime",
+                y="CH2O_ppb"
+                )
+    )
+
+start = uza_starts["ThermoScientific_42i-TL"]["Logger"]
+stop = uza_stops["ThermoScientific_42i-TL"]["Logger"]
+df = data["ThermoScientific_42i-TL"]["Logger"].filter(
+    pl.col("UTC_Start").ge(start["ValveOpen"].min())
+    & pl.col("UTC_Stop").le(stop["ValveClosed"].max())
+    )
 hvplot.show(
     df.hvplot.scatter(
         x="FTC_Start",
-        y="O3_ppb",
-        by="Outlier"
-        )
+        y="NO2_ppb"
+        ) * start.hvplot.scatter(
+            x="FTC_Start",
+            y="NO2_ppb"
+            ) * stop.hvplot.scatter(
+                x="FTC_Start",
+                y="NO2_ppb"
+                )
     )
+
+start = uza_starts["2BTech_205_A"]["SD"].filter(
+    pl.col("O3_ppb").lt(1000)
+    )
+stop = uza_stops["2BTech_205_A"]["SD"].filter(
+    pl.col("O3_ppb").lt(1000)
+    )
+df = data["2BTech_205_A"]["SD"].filter(
+    pl.col("UTC_Start").ge(start["ValveOpen"].min())
+    & pl.col("UTC_Stop").le(stop["ValveClosed"].max())
+    & pl.col("O3_ppb").lt(1000))
+hvplot.show(
+    df.hvplot.scatter(
+        x="FTC_Start",
+        y="O3_ppb"
+        ) * start.hvplot.scatter(
+            x="FTC_Start",
+            y="O3_ppb"
+            ) * stop.hvplot.scatter(
+                x="FTC_Start",
+                y="O3_ppb"
+                )
+    )
+
 hvplot.show(
     (df.hvplot.scatter(
         x="FTC_Start",
