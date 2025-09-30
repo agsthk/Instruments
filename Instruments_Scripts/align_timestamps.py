@@ -28,7 +28,7 @@ AVG_TIME_DIR = os.path.join(data_dir, "Instruments_ManualData", "Instruments_Ave
 
 insts = ["2BTech_205_A",
          #"2BTech_205_B",
-         "2BTech_405nm",
+         # "2BTech_405nm",
          "Picarro_G2307",
          "ThermoScientific_42i-TL"]
 avg_times = {}
@@ -251,9 +251,11 @@ for inst, sources in data.items():
             strategy=strat,
             tolerance="10m"
             ).drop_nulls(time_col).select(
-                cs.contains(
-                    "ValveOpen", "TC", "O3_ppb", "NO2_ppb", "CH2O_ppb"
-                    )
+                pl.col("ValveOpen"),
+                # Adds instrument to time columns for later joining
+                cs.contains("TC").name.map(
+                        lambda name: name + "_" + inst
+                        )
                 )
         uza_stops[inst][source] = valve_closed.join_asof(
             outliers,
@@ -263,145 +265,57 @@ for inst, sources in data.items():
             strategy=strat,
             tolerance="10m"
             ).drop_nulls(time_col).select(
-                cs.contains(
-                    "ValveClosed", "TC", "O3_ppb", "NO2_ppb", "CH2O_ppb"
-                    )
+                pl.col("ValveClosed"), 
+                # Adds instrument to time columns for later joining
+                cs.contains("TC").name.map(
+                        lambda name: name + "_" + inst
+                        )
                 )
-
-# %% Partitions data by week
-# all_weeks = []
-# for inst, sources in data.items():
-#     for source, df in sources.items():
-#         # Partitions data by week
-#         by_week = {
-#             key[0]: df for key, df in lf.collect().partition_by(
-#                     "Week", as_dict=True, include_key=False
-#                     ).items()
-#                     }
-#         all_weeks += list(by_week.keys())
-#         data[inst][source] = by_week
-        
-# all_weeks = list(set(all_weeks))
-# all_weeks.sort()
-# %%
-
-
-start = uza_starts["Picarro_G2307"]["Logger"]
-stop = uza_stops["Picarro_G2307"]["Logger"]
-df = data["Picarro_G2307"]["Logger"].filter(
-    pl.col("UTC_DateTime").ge(start["ValveOpen"].min())
-    & pl.col("UTC_DateTime").le(stop["ValveClosed"].max())
-    )
-hvplot.show(
-    df.hvplot.scatter(
-        x="FTC_DateTime",
-        y="CH2O_ppb"
-        ) * start.hvplot.scatter(
-            x="FTC_DateTime",
-            y="CH2O_ppb"
-            ) * stop.hvplot.scatter(
-                x="FTC_DateTime",
-                y="CH2O_ppb"
-                )
-    )
-
-start = uza_starts["ThermoScientific_42i-TL"]["Logger"]
-stop = uza_stops["ThermoScientific_42i-TL"]["Logger"]
-df = data["ThermoScientific_42i-TL"]["Logger"].filter(
-    pl.col("UTC_Start").ge(start["ValveOpen"].min())
-    & pl.col("UTC_Stop").le(stop["ValveClosed"].max())
-    )
-hvplot.show(
-    df.hvplot.scatter(
-        x="FTC_Start",
-        y="NO2_ppb"
-        ) * start.hvplot.scatter(
-            x="FTC_Start",
-            y="NO2_ppb"
-            ) * stop.hvplot.scatter(
-                x="FTC_Start",
-                y="NO2_ppb"
-                )
-    )
-
-start = uza_starts["2BTech_205_A"]["SD"].filter(
-    pl.col("O3_ppb").lt(1000)
-    )
-stop = uza_stops["2BTech_205_A"]["SD"].filter(
-    pl.col("O3_ppb").lt(1000)
-    )
-df = data["2BTech_205_A"]["SD"].filter(
-    pl.col("UTC_Start").ge(start["ValveOpen"].min())
-    & pl.col("UTC_Stop").le(stop["ValveClosed"].max())
-    & pl.col("O3_ppb").lt(1000))
-hvplot.show(
-    df.hvplot.scatter(
-        x="FTC_Start",
-        y="O3_ppb"
-        ) * start.hvplot.scatter(
-            x="FTC_Start",
-            y="O3_ppb"
-            ) * stop.hvplot.scatter(
-                x="FTC_Start",
-                y="O3_ppb"
-                )
-    )
-
-hvplot.show(
-    (df.hvplot.scatter(
-        x="FTC_Start",
-        y="O3_ppb"
-        ) + (df.hvplot.scatter(
-            x="FTC_Start",
-            y="ddt",
-            by="Outlier") * df.hvplot.line(
-                x="FTC_Start",
-                y=["llim", "ulim"],
-                color="black")
-        )).cols(1)
-    )
-
-# %%
-# Names the measurement start column by instrument
-for inst, starts in uza_starts.items():
-    for source, df in starts.items():
-        uza_starts[inst][source] = df.select(
-            pl.col("UTC_Start"),
-            cs.contains("UTC_DateTime", "_right").alias(inst + "_UTC_Start"),
-            cs.contains("UTC_Stop").alias(inst + "_UTC_Stop")
-            )
-for inst, stops in uza_stops.items():
-    for source, df in stops.items():
-        uza_stops[inst][source] = df.select(
-            pl.col("UTC_Stop"),
-            cs.contains("UTC_Start").alias(inst + "_UTC_Start"),
-            cs.contains("UTC_DateTime", "_right").alias(inst + "_UTC_Stop")
-            )
+                
 # Joins the UZA measurement starts/stops for all instruments
 uza_starts_joined = uza_starts["Picarro_G2307"]["Logger"].join(
-    uza_starts["ThermoScientific_42i-TL"]["Logger"],
-    on="UTC_Start",
+    uza_starts["2BTech_205_A"]["SD"],
+    on="ValveOpen",
     how="full",
     coalesce=True
     ).join(
-        uza_starts["2BTech_205_A"]["SD"],
-        on="UTC_Start",
+        uza_starts["ThermoScientific_42i-TL"]["Logger"],
+        on="ValveOpen",
         how="full",
         coalesce=True
         )
 uza_stops_joined = uza_stops["Picarro_G2307"]["Logger"].join(
-    uza_stops["ThermoScientific_42i-TL"]["Logger"],
-    on="UTC_Stop",
-    how="full",
-    coalesce=True
-    ).join(
-        uza_stops["2BTech_205_A"]["SD"],
-        on="UTC_Stop",
-        how="full",
-        coalesce=True
-        )
+     uza_stops["2BTech_205_A"]["SD"],
+     on="ValveClosed",
+     how="full",
+     coalesce=True
+     ).join(
+         uza_stops["ThermoScientific_42i-TL"]["Logger"],
+         on="ValveClosed",
+         how="full",
+         coalesce=True
+         )                   
 
-9.476 / (datetime(2024, 6, 30, 23, 44, 1) - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()
+# %% Partitions data by week
+all_weeks = []
+for inst, sources in data.items():
+    for source, df in sources.items():
+        # Partitions data by week
+        by_week = {
+            key[0]: df for key, df in lf.collect().partition_by(
+                    "Week", as_dict=True, include_key=False
+                    ).items()
+                    }
+        all_weeks += list(by_week.keys())
+        data[inst][source] = by_week
+        
+all_weeks = list(set(all_weeks))
+all_weeks.sort()
+# %%
+
+
+
+# %%
 
 for week in all_weeks:
     week_plots = []
