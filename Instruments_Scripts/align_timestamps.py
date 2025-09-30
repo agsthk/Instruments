@@ -161,7 +161,21 @@ for inst, sources in data.items():
                         .dt.convert_time_zone("America/Denver")
                         .name.map(lambda name: name.replace("UTC", "FTC"))
                         )
-        
+        if inst == "Picarro_G2307":
+            # Corrects drift (estimated)
+            
+            diff = 9.476 / (datetime(2024, 6, 30, 23, 44, 1) - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()
+            lf = lf.with_columns(
+                pl.lit(lf.select(pl.min("UTC_DateTime")).collect().item()).alias("RealTimestamp"),
+                pl.col("UTC_DateTime").sub(pl.min("UTC_DateTime"))
+                .dt.total_microseconds().truediv(1 + diff)
+                .cast(pl.Int64).cast(pl.String).add("us")
+                .alias("Passed")
+                )
+            lf = lf.with_columns(
+                pl.col("RealTimestamp")
+                .dt.offset_by(pl.col("Passed").alias("UTC_DateTime"))
+                )
         lf = lf.with_columns(
             # Adds dt column based on gap between consecutive measurements
             (cs.contains("FTC") & ~cs.contains("Stop"))
@@ -211,7 +225,8 @@ for inst, sources in data.items():
             left_on="UTC_Start",
             right_on=right_on,
             strategy=strategy,
-            coalesce=False
+            coalesce=False,
+            tolerance="6m"
             ).drop_nulls()
         # Determines time of last UZA measurement corresponding to each valve
         # closing
@@ -220,7 +235,8 @@ for inst, sources in data.items():
             left_on="UTC_Stop",
             right_on=right_on,
             strategy=strategy,
-            coalesce=False
+            coalesce=False,
+            tolerance="6m"
             ).drop_nulls()
         # Partitions data by week
         by_week = {
@@ -234,6 +250,134 @@ for inst, sources in data.items():
 all_weeks = list(set(all_weeks))
 all_weeks.sort()
 
+# %%
+# Names the measurement start column by instrument
+for inst, starts in uza_starts.items():
+    for source, df in starts.items():
+        uza_starts[inst][source] = df.select(
+            pl.col("UTC_Start"),
+            cs.contains("UTC_DateTime", "_right").alias(inst + "_UTC_Start"),
+            cs.contains("UTC_Stop").alias(inst + "_UTC_Stop")
+            )
+for inst, stops in uza_stops.items():
+    for source, df in stops.items():
+        uza_stops[inst][source] = df.select(
+            pl.col("UTC_Stop"),
+            cs.contains("UTC_Start").alias(inst + "_UTC_Start"),
+            cs.contains("UTC_DateTime", "_right").alias(inst + "_UTC_Stop")
+            )
+# Joins the UZA measurement starts/stops for all instruments
+uza_starts_joined = uza_starts["Picarro_G2307"]["Logger"].join(
+    uza_starts["ThermoScientific_42i-TL"]["Logger"],
+    on="UTC_Start",
+    how="full",
+    coalesce=True
+    ).join(
+        uza_starts["2BTech_205_A"]["SD"],
+        on="UTC_Start",
+        how="full",
+        coalesce=True
+        )
+uza_stops_joined = uza_stops["Picarro_G2307"]["Logger"].join(
+    uza_stops["ThermoScientific_42i-TL"]["Logger"],
+    on="UTC_Stop",
+    how="full",
+    coalesce=True
+    ).join(
+        uza_stops["2BTech_205_A"]["SD"],
+        on="UTC_Stop",
+        how="full",
+        coalesce=True
+        )
+
+9.476 / (datetime(2024, 6, 30, 23, 44, 1) - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()
+
+for week in all_weeks:
+    week_plots = []
+    if week < 23 or week > 33: continue
+    for inst, sources in data.items():
+        if inst == "ThermoScientific_42i-TL": break
+        for source, dfs in sources.items():
+            if week not in dfs.keys(): continue
+            df = dfs[week]
+            cols = df.columns
+            time_col = [col for col in cols if col.find("FTC") != -1][0]
+            for var in ["O3_ppb", "NO2_ppb", "CH2O_ppb"]:
+                if var in cols:
+                    break
+            if var not in cols:
+                continue
+            week_plots.append(
+                df.hvplot.scatter(
+                    x=time_col,
+                    y=var,
+                    ylim=(-10, 150),
+                    shared_axes=True
+                    )
+                )
+    for i, plot in enumerate(week_plots):
+        if i == 0:
+            week_plot = plot
+        else:
+            week_plot = week_plot * plot
+            
+    week_uza_starts = uza_starts_joined.with_columns(
+        cs.contains("UTC").dt.convert_time_zone("America/Denver").name.map(lambda name: name.replace("UTC", "FTC"))
+        ).filter(
+            pl.col("FTC_Start").dt.week().eq(week)
+            ).select(
+                cs.contains("FTC")
+                ).select(
+                    pl.exclude("FTC_Start")
+                    )
+                    
+    week_uza_stops = uza_stops_joined.with_columns(
+         cs.contains("UTC").dt.convert_time_zone("America/Denver").name.map(lambda name: name.replace("UTC", "FTC"))
+         ).filter(
+             pl.col("FTC_Stop").dt.week().eq(week)
+             ).select(
+                 cs.contains("FTC")
+                 ).select(
+                     pl.exclude("FTC_Stop")
+                     )
+    diff_plot = week_uza_starts.with_columns(
+        cs.contains("2BTech").sub(pl.col("Picarro_G2307_FTC_Start")).dt.total_microseconds().truediv(1e6).name.suffix("_Diff")
+        ).rename(
+            {"2BTech_205_A_FTC_Start": "FTC_Start"}).hvplot.scatter(
+                x="FTC_Start",
+                y=["2BTech_205_A_FTC_Start_Diff", "2BTech_205_A_FTC_Stop_Diff"],
+                shared_axes=True
+                ) * week_uza_stops.with_columns(
+                    cs.contains("2BTech").sub(pl.col("Picarro_G2307_FTC_Stop")).dt.total_microseconds().truediv(1e6).name.suffix("_Diff")
+                    ).rename(
+                        {"2BTech_205_A_FTC_Start": "FTC_Start"}).hvplot.scatter(
+                            x="FTC_Start",
+                            y=["2BTech_205_A_FTC_Start_Diff", "2BTech_205_A_FTC_Stop_Diff"],
+                            shared_axes=True)
+                
+    hvplot.show(
+        (week_plot + diff_plot).cols(1)
+        )
+
+
+hvplot.show(
+    uza_starts_joined.with_columns(
+        cs.contains("2BTech").sub(pl.col("Picarro_G2307_UTC_Start"))
+        ).hvplot.scatter(
+        x="Picarro_G2307_UTC_Start",
+        y=["2BTech_205_A_UTC_Start", "2BTech_205_A_UTC_Stop"]
+        )
+    )
+uza_starts_joined.select(
+    cs.contains("2BTech").sub(pl.col("Picarro_G2307_UTC_Start")).median()
+    )
+uza_starts_joined.with_columns(
+    pl.exclude("UTC_Start").sub(pl.col("UTC_Start"))
+    )
+uza_stops_joined.with_columns(
+    pl.exclude("UTC_Stop").sub(pl.col("UTC_Stop")).median()
+    )
+        
 # %% Plotting
 
 for week in all_weeks:
@@ -243,8 +387,8 @@ for week in all_weeks:
     # fig, ax = plt.subplots(figsize=(8, 6))
     # ax.set_title(str(week))
     for inst, sources in data.items():
-        if inst != "2BTech_205_A":
-            continue
+        # if inst != "2BTech_205_A":
+        #     continue
         for source, dfs in sources.items():
             if week not in dfs.keys():
                 continue

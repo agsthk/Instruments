@@ -22,3 +22,15 @@
 	- Moving valve state read in to earlier in the script
 	- Added code to identify the start and stop of UZA measurements before partitioning by week
 - Revised code to look at the UZA measurement starts/stops
+	- Because it is doing a backwards join as of, it's identifying the second point for 2BTech_205_A that shows a change between room air and zero air - need to add a filter that makes it identify the first one only
+		- Tried but it didn't work - even though it's theoretically the same as last time I did this
+			- Ends up just removing everything for some reason
+		- Perhaps I can just recognize that the timestamps are ~1 minute off - account for that
+			- More often than not they are ahead, going to try to just shift the time and see how that works
+				- It doesn't - great :)
+		- I can't figure this out! What if I just create an extra column that is offset by like 5 minutes, join by that one using a forward join, then remove it and use the original?
+			- Didn't work either
+			- Reset this file to the last commit and am just gonna work with it from there (tired of things not working :)))))))
+	- Based on the slope of the difference between the corrected UZA measurement times for 2BTech_205_A and Picarro, I believe that the Picarro has a zero drift of ~20 us/s
+		- Attempted to correct, but didn't work :/
+		- AHHHHHHHH !!!!!!! I HATE IT HERE
