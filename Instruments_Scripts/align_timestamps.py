@@ -243,18 +243,64 @@ for inst, sources in data.items():
             tolerance="6m"
             ).drop_nulls()
         # Partitions data by week
-        by_week = {
-            key[0]: df for key, df in lf.collect().partition_by(
-                    "Week", as_dict=True, include_key=False
-                    ).items()
-                    }
-        all_weeks += list(by_week.keys())
+        by_week = lf.collect()#{
+        #     key[0]: df for key, df in lf.collect().partition_by(
+        #             "Week", as_dict=True, include_key=False
+        #             ).items()
+        #             }
+        # all_weeks += list(by_week.keys())
         data[inst][source] = by_week
         
-all_weeks = list(set(all_weeks))
-all_weeks.sort()
+# all_weeks = list(set(all_weeks))
+# all_weeks.sort()
 # %%
-data["Picarro_G2307"]["Logger"]
+df = data["2BTech_205_A"]["SD"].filter(
+    # pl.col("ddt").is_between(-100, 100)
+    # & pl.col("O3_ppb").is_between(-20, 150)
+    pl.col("UTC_Start").dt.month().gt(6)
+    | (pl.col("UTC_Start").dt.month().eq(6) & pl.col("UTC_Start").dt.day().gt(12))
+    ).with_columns(
+        pl.col("ddt").rolling_mean_by(by="UTC_Start", window_size="360m").alias("Mean"),
+        pl.col("ddt").rolling_std_by(by="UTC_Start", window_size="360m").alias("STD"),
+        ).with_columns(
+            pl.col("Mean").sub(pl.col("STD").mul(2)).alias("llim"),
+            pl.col("Mean").add(pl.col("STD").mul(2)).alias("ulim")
+            ).with_columns(
+                pl.when(
+                    pl.col("ddt").is_between(pl.col("llim"), pl.col("ulim"))
+                    )
+                .then(False)
+                .otherwise(True)
+                .alias("Outlier")
+                ).with_columns(
+                    pl.when(
+                        pl.col("Outlier") & pl.col("Outlier").shift(1)
+                        )
+                    .then(False)
+                    .otherwise(pl.col("Outlier"))
+                    .alias("Outlier")
+                    )
+hvplot.show(
+    df.hvplot.scatter(
+        x="FTC_Start",
+        y="O3_ppb",
+        by="Outlier"
+        )
+    )
+hvplot.show(
+    (df.hvplot.scatter(
+        x="FTC_Start",
+        y="O3_ppb"
+        ) + (df.hvplot.scatter(
+            x="FTC_Start",
+            y="ddt",
+            by="Outlier") * df.hvplot.line(
+                x="FTC_Start",
+                y=["llim", "ulim"],
+                color="black")
+        )).cols(1)
+    )
+
 # %%
 # Names the measurement start column by instrument
 for inst, starts in uza_starts.items():
