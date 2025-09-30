@@ -163,19 +163,23 @@ for inst, sources in data.items():
                         )
         if inst == "Picarro_G2307":
             # Corrects drift (estimated)
-            
-            diff = 9.476 / (datetime(2024, 6, 30, 23, 44, 1) - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()
+            diff = (9.476
+                    / ((datetime(2024, 6, 30, 23, 44, 1)
+                        - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()))
             lf = lf.with_columns(
-                pl.lit(lf.select(pl.min("UTC_DateTime")).collect().item()).alias("RealTimestamp"),
                 pl.col("UTC_DateTime").sub(pl.min("UTC_DateTime"))
                 .dt.total_microseconds().truediv(1 + diff)
                 .cast(pl.Int64).cast(pl.String).add("us")
                 .alias("Passed")
-                )
-            lf = lf.with_columns(
-                pl.col("RealTimestamp")
-                .dt.offset_by(pl.col("Passed").alias("UTC_DateTime"))
-                )
+                ).with_columns(
+                    pl.min("UTC_DateTime").dt.offset_by(pl.col("Passed"))
+                    .alias("UTC_DateTime")
+                    ).with_columns(
+                        # Converts corrected UTC timestamp to local timestamp
+                        cs.contains("UTC")
+                        .dt.convert_time_zone("America/Denver")
+                        .name.map(lambda name: name.replace("UTC", "FTC"))
+                        )
         lf = lf.with_columns(
             # Adds dt column based on gap between consecutive measurements
             (cs.contains("FTC") & ~cs.contains("Stop"))
@@ -249,7 +253,8 @@ for inst, sources in data.items():
         
 all_weeks = list(set(all_weeks))
 all_weeks.sort()
-
+# %%
+data["Picarro_G2307"]["Logger"]
 # %%
 # Names the measurement start column by instrument
 for inst, starts in uza_starts.items():
