@@ -302,7 +302,7 @@ for inst, sources in data.items():
     for source, df in sources.items():
         # Partitions data by week
         by_week = {
-            key[0]: df for key, df in lf.collect().partition_by(
+            key[0]: df for key, df in df.partition_by(
                     "Week", as_dict=True, include_key=False
                     ).items()
                     }
@@ -311,176 +311,86 @@ for inst, sources in data.items():
         
 all_weeks = list(set(all_weeks))
 all_weeks.sort()
-# %%
 
-
-
-# %%
+uza_starts_joined = {
+    key[0]: df for key, df in uza_starts_joined.with_columns(
+        pl.col("ValveOpen")
+        .dt.convert_time_zone("America/Denver")
+        .dt.week()
+        .alias("Week")
+        ).partition_by(
+            "Week", as_dict=True, include_key=False
+            ).items()
+            }
+uza_stops_joined = {
+    key[0]: df for key, df in uza_stops_joined.with_columns(
+        pl.col("ValveClosed")
+        .dt.convert_time_zone("America/Denver")
+        .dt.week()
+        .alias("Week")
+        ).partition_by(
+            "Week", as_dict=True, include_key=False
+            ).items()
+            }
+# %% Plotting
 
 for week in all_weeks:
     week_plots = []
-    if week < 23 or week > 33: continue
-    for inst, sources in data.items():
-        if inst == "ThermoScientific_42i-TL": break
-        for source, dfs in sources.items():
-            if week not in dfs.keys(): continue
-            df = dfs[week]
-            cols = df.columns
-            time_col = [col for col in cols if col.find("FTC") != -1][0]
-            for var in ["O3_ppb", "NO2_ppb", "CH2O_ppb"]:
-                if var in cols:
-                    break
-            if var not in cols:
-                continue
-            week_plots.append(
-                df.hvplot.scatter(
-                    x=time_col,
-                    y=var,
-                    ylim=(-10, 150),
-                    shared_axes=True
-                    )
+    if week < 23 or week > 33:
+        continue
+    if week in data["2BTech_205_A"]["SD"].keys():
+        week_plots.append(
+            data["2BTech_205_A"]["SD"][week].hvplot.scatter(
+                x="FTC_Start",
+                y="O3_ppb",
+                shared_axes=True
                 )
+            )
+    if week in data["Picarro_G2307"]["Logger"].keys():
+        week_plots.append(
+            data["Picarro_G2307"]["Logger"][week].hvplot.scatter(
+                x="FTC_DateTime",
+                y="CH2O_ppb",
+                shared_axes=True
+                )
+            )
     for i, plot in enumerate(week_plots):
         if i == 0:
             week_plot = plot
         else:
             week_plot = week_plot * plot
-            
-    week_uza_starts = uza_starts_joined.with_columns(
-        cs.contains("UTC").dt.convert_time_zone("America/Denver").name.map(lambda name: name.replace("UTC", "FTC"))
-        ).filter(
-            pl.col("FTC_Start").dt.week().eq(week)
-            ).select(
-                cs.contains("FTC")
-                ).select(
-                    pl.exclude("FTC_Start")
-                    )
-                    
-    week_uza_stops = uza_stops_joined.with_columns(
-         cs.contains("UTC").dt.convert_time_zone("America/Denver").name.map(lambda name: name.replace("UTC", "FTC"))
-         ).filter(
-             pl.col("FTC_Stop").dt.week().eq(week)
-             ).select(
-                 cs.contains("FTC")
-                 ).select(
-                     pl.exclude("FTC_Stop")
-                     )
-    diff_plot = week_uza_starts.with_columns(
-        cs.contains("2BTech").sub(pl.col("Picarro_G2307_FTC_Start")).dt.total_microseconds().truediv(1e6).name.suffix("_Diff")
-        ).rename(
-            {"2BTech_205_A_FTC_Start": "FTC_Start"}).hvplot.scatter(
+    week_uza_starts = uza_starts_joined[week].with_columns(
+        pl.col("ValveOpen").dt.convert_time_zone("America/Denver")
+        .alias("FTC_Start")
+        )
+    week_uza_stops = uza_stops_joined[week].with_columns(
+        pl.col("ValveClosed").dt.convert_time_zone("America/Denver")
+        .alias("FTC_Start")
+        )
+    
+    week_uza_start_diffs = week_uza_starts.select(
+        pl.col("FTC_Start"),
+        (cs.contains("2BTech") & cs.contains("FTC"))
+        .sub(pl.col("FTC_DateTime_Picarro_G2307"))
+        .dt.total_microseconds().truediv(1e6).name.map(lambda name: name.replace("2BTech_205_A", "Diff"))
+        ).drop_nulls(cs.contains("_Diff"))
+    week_uza_stop_diffs = week_uza_stops.select(
+        pl.col("FTC_Start"),
+        (cs.contains("2BTech") & cs.contains("FTC"))
+        .sub(pl.col("FTC_DateTime_Picarro_G2307"))
+        .dt.total_microseconds().truediv(1e6).name.map(lambda name: name.replace("2BTech_205_A", "Diff"))
+        ).drop_nulls(cs.contains("_Diff"))
+    
+    
+    diff_plot = week_uza_start_diffs.hvplot.scatter(
                 x="FTC_Start",
-                y=["2BTech_205_A_FTC_Start_Diff", "2BTech_205_A_FTC_Stop_Diff"],
+                y=["FTC_Start_Diff", "FTC_Stop_Diff"],
                 shared_axes=True
-                ) * week_uza_stops.with_columns(
-                    cs.contains("2BTech").sub(pl.col("Picarro_G2307_FTC_Stop")).dt.total_microseconds().truediv(1e6).name.suffix("_Diff")
-                    ).rename(
-                        {"2BTech_205_A_FTC_Start": "FTC_Start"}).hvplot.scatter(
+                ) * week_uza_stop_diffs.hvplot.scatter(
                             x="FTC_Start",
-                            y=["2BTech_205_A_FTC_Start_Diff", "2BTech_205_A_FTC_Stop_Diff"],
+                            y=["FTC_Start_Diff", "FTC_Stop_Diff"],
                             shared_axes=True)
                 
     hvplot.show(
         (week_plot + diff_plot).cols(1)
         )
-
-
-hvplot.show(
-    uza_starts_joined.with_columns(
-        cs.contains("2BTech").sub(pl.col("Picarro_G2307_UTC_Start"))
-        ).hvplot.scatter(
-        x="Picarro_G2307_UTC_Start",
-        y=["2BTech_205_A_UTC_Start", "2BTech_205_A_UTC_Stop"]
-        )
-    )
-uza_starts_joined.select(
-    cs.contains("2BTech").sub(pl.col("Picarro_G2307_UTC_Start")).median()
-    )
-uza_starts_joined.with_columns(
-    pl.exclude("UTC_Start").sub(pl.col("UTC_Start"))
-    )
-uza_stops_joined.with_columns(
-    pl.exclude("UTC_Stop").sub(pl.col("UTC_Stop")).median()
-    )
-        
-# %% Plotting
-
-for week in all_weeks:
-    week_plots = []
-    ddt_plots = []
-    if week < 23 or week > 33: continue
-    # fig, ax = plt.subplots(figsize=(8, 6))
-    # ax.set_title(str(week))
-    for inst, sources in data.items():
-        # if inst != "2BTech_205_A":
-        #     continue
-        for source, dfs in sources.items():
-            if week not in dfs.keys():
-                continue
-            df = dfs[week]
-            cols = df.columns
-            time_col = [col for col in cols if col.find("FTC") != -1][0]
-            for var in ["O3_ppb", "NO2_ppb", "CH2O_ppb"]:
-                if var in cols:
-                    break
-            if var not in cols:
-                continue
-            
-            
-            week_uza_starts = uza_starts[inst][source].filter(
-                pl.col(time_col).is_between(
-                    df[time_col].min(), df[time_col].max()
-                    )
-                )
-            week_uza_stops = uza_stops[inst][source].filter(
-                pl.col(time_col).is_between(
-                    df[time_col].min(), df[time_col].max()
-                    )
-                )
-            week_plots.append(
-                df.hvplot.scatter(
-                    x=time_col,
-                    y=var,
-                    ylim=(-10, 150)
-                    )
-                )
-            week_plots.append(
-                week_uza_starts.hvplot.scatter(
-                    x=time_col,
-                    y=var
-                    )
-                )
-            week_plots.append(
-                week_uza_stops.hvplot.scatter(
-                    x=time_col,
-                    y=var
-                    )
-                )
-            # ddt_plots.append(
-            #     uza_start.hvplot.scatter(
-            #         x=time_col,
-            #         y="d" + var + "/dt"
-            #         )
-                # )
-    for i, plot in enumerate(week_plots):
-        if i == 0:
-            week_plot = plot
-        else:
-            week_plot = week_plot * plot
-    # for i, plot in enumerate(ddt_plots):
-    #     if i == 0:
-    #         ddt_plot = plot
-    #     else:
-    #         ddt_plot = ddt_plot * plot
-    hvplot.show(week_plot)
-    # hvplot.show((week_plot + ddt_plot).cols(1))
-    # break
-    #         ax.plot(
-    #             df[time_col],
-    #             df[var],
-    #             label=var
-    #             )
-    # ax.legend()
-    # ax.set_ylim(-10, 100)
-            
-            

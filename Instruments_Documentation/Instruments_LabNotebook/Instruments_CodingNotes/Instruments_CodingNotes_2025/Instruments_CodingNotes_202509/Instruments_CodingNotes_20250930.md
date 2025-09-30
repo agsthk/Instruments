@@ -24,3 +24,4 @@
 				- When I go back to applying offset correction, does something funky  - trying to apply but then use backward strategy to identify outliers
 					- Mostly worked, but still don't like it much - commenting out the correction for time drift of picarro and continuing with the forward method
 - Joining the UZA measurement times into one dataframe
+- Revised plotting to work with the changes I made
