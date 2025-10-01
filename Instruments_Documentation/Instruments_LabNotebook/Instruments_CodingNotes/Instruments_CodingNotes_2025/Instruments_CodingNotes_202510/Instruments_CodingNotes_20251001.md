@@ -10,3 +10,8 @@
 	- Does not appear that I corrected the time drift - maybe need to do the reverse of what I did?
 		- Yes, that fixed it!
 	- Also realized why it should always be a forward join - if Picarro is ahead, then the valve open/closed is inevitably in front of the first/last UZA measurement
+- As a side note, it seems that for some weeks the time drift correction overcorrected - need to figure out how to handle that later
+- Going to apply a constant offset of 288 seconds to Picarro and remove the time drift to see what that does
+	- WAYYYYY too much
+- Constant offset of 100s looks reasonable, so expect something within 60 seconds of that
+- August 12, 2024 07:53:22 - with a -65s offset, synced with 2BTech_205_A

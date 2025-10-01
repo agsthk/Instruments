@@ -143,24 +143,28 @@ for inst, sources in data.items():
                         .name.map(lambda name: name.replace("UTC", "FTC"))
                         )
         if inst == "Picarro_G2307":
-            # Corrects drift (estimated)
-            diff = (9.476
-                    / ((datetime(2024, 6, 30, 23, 44, 1)
-                        - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()))
+            # # Corrects drift (estimated)
+            # diff = (9.476
+            #         / ((datetime(2024, 6, 30, 23, 44, 1)
+            #             - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()))
+            # lf = lf.with_columns(
+            #     pl.col("UTC_DateTime").sub(pl.min("UTC_DateTime"))
+            #     .dt.total_microseconds().mul(1 + diff)
+            #     .cast(pl.Int64).cast(pl.String).add("us")
+            #     .alias("Passed")
+            #     ).with_columns(
+            #         pl.min("UTC_DateTime").dt.offset_by(pl.col("Passed"))
+            #         .alias("UTC_DateTime")
+            #         ).with_columns(
+            #             # Converts corrected UTC timestamp to local timestamp
+            #             cs.contains("UTC")
+            #             .dt.convert_time_zone("America/Denver")
+            #             .name.map(lambda name: name.replace("UTC", "FTC"))
+            #             )
+            # Applies constant offset to Picarro time
             lf = lf.with_columns(
-                pl.col("UTC_DateTime").sub(pl.min("UTC_DateTime"))
-                .dt.total_microseconds().mul(1 + diff)
-                .cast(pl.Int64).cast(pl.String).add("us")
-                .alias("Passed")
-                ).with_columns(
-                    pl.min("UTC_DateTime").dt.offset_by(pl.col("Passed"))
-                    .alias("UTC_DateTime")
-                    ).with_columns(
-                        # Converts corrected UTC timestamp to local timestamp
-                        cs.contains("UTC")
-                        .dt.convert_time_zone("America/Denver")
-                        .name.map(lambda name: name.replace("UTC", "FTC"))
-                        )
+                cs.contains("DateTime").dt.offset_by("-65s")
+                )
         lf = lf.with_columns(
             # Adds dt column based on gap between consecutive measurements
             (cs.contains("FTC") & ~cs.contains("Stop"))
@@ -179,6 +183,7 @@ for inst, sources in data.items():
             .alias("ddt")
             )
         data[inst][source] = lf.collect()
+
 # %% Identifies adjusted valve state times from corrected Picarro timestamps
 
 valve_open = data["Picarro_G2307"]["Logger"].filter(
@@ -322,6 +327,7 @@ uza_stops_joined = {
             "Week", as_dict=True, include_key=False
             ).items()
             }
+
 # %% Plotting
 
 for week in all_weeks:
