@@ -45,3 +45,14 @@
 - For Thermo, drift seems to be ~40 us/s
 	- When I try to implement that it DOES NOT work
 - Going back to my original plan - use the timestamps that I decided on with Picarro, don't change Thermo at all
+- Will be moving to implement timestamp correction in clean_rawdata.py
+	- What do I do about the already determined valve states?
+		- If I just apply a fixed correction, then the answer to this is easy...
+			- Come back to here
+# clean_rawdata.py
+- First, working only with 2024 data
+- I think I want to do the timestamp correction prior to the determination of averaging times - that should make things easier
+	- I'm going to apply a fixed offset of 60 us to the Picarro data to make it easier on myself
+		- STOP SUBSCRIBING TO THE SUNK COST FALLACY!!!!!!!!!!
+		- And then I can just change the 2024 valve open/close to be offset by -60s :)
+- After making changes, just going to apply them all and create the associated files, then I will check them in another script

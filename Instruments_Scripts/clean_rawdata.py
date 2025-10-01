@@ -7,8 +7,9 @@ Created on Mon Jul 21 16:52:19 2025
 
 import os
 import polars as pl
+import polars.selectors as cs
 import pytz
-from datetime import datetime
+from datetime import datetime, timedelta
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -75,8 +76,17 @@ valve_states = pl.read_csv(
         "Picarro_G2307_SolenoidValveStates.csv"
         )
     ).with_columns(
-        pl.selectors.contains("UTC").str.to_datetime()
-        )
+        cs.contains("UTC").str.to_datetime()
+        ).with_columns(
+            pl.when(pl.col("UTC_Start").dt.year().eq(2024))
+            .then(pl.col("UTC_Start").dt.offset_by("-60s"))
+            .otherwise(pl.col("UTC_Start"))
+            .alias("UTC_Start"),
+            pl.when(pl.col("UTC_Stop").dt.year().eq(2024))
+            .then(pl.col("UTC_Stop").dt.offset_by("-60s"))
+            .otherwise(pl.col("UTC_Stop"))
+            .alias("UTC_Stop")
+            )
         
 valve_states = valve_states.select(
     pl.selectors.contains("UTC"),
@@ -240,6 +250,8 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             continue
         _, source = file[:-17].split("_Structured")
         date = file.rsplit("_", 1)[-1][:-4]
+        if date.find("2024") == -1:
+            continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -248,6 +260,51 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
             pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
             )
+        if inst == "2BTech_205_A":
+            # Declares Timestamps known to be synched with real time
+            real_ts = [
+                datetime(2024, 5, 23, 15, 57, 5, tzinfo=pytz.UTC),
+                datetime(2024, 6, 25, 19, 35, 18, tzinfo=pytz.UTC)
+                ]
+            # Given instrument 15 seconds ahead before second sync, determines
+            # extra seconds added by instrument per real second
+            diff = 15 / (real_ts[1] - real_ts[0]).total_seconds()
+            # Approximates an initial synchronized timestamp given instrument
+            # ~1 minute ahead before first sync
+            real_ts = [real_ts[0] - timedelta(seconds=(60 / diff))] + real_ts
+            real_ts = pl.DataFrame(real_ts, schema=["RealTimestamp"])
+            # Calculates time since last known synced timestamp for each
+            # measurement as determined by instrument and converts to real time
+            # passed
+            lf = lf.join_asof(
+                real_ts.lazy(),
+                left_on="UTC_DateTime",
+                right_on="RealTimestamp",
+                strategy="backward"
+                ).with_columns(
+                    cs.contains("UTC").sub(pl.col("RealTimestamp"))
+                    .dt.total_microseconds().truediv((1 + diff))
+                    .cast(pl.Int64).cast(pl.String).add("us")
+                    .name.suffix("_Passed")
+                    )
+            # Determines corrected time from time passed since last synced
+            # timestamp
+            lf = lf.with_columns((
+                pl.col("RealTimestamp").dt.offset_by(pl.col(col))
+                .alias(col.replace("_Passed", ""))
+                for col in cs.expand_selector(lf, cs.contains("_Passed"))
+                )).select(
+                    ~cs.contains("_Passed", "RealTimestamp")
+                    ).with_columns(
+                        # Converts corrected UTC timestamp to local timestamp
+                        cs.contains("UTC")
+                        .dt.convert_time_zone("America/Denver")
+                        .name.map(lambda name: name.replace("UTC", "FTC"))
+                        )
+        if inst == "Picarro_G2307":
+            lf = lf.with_columns(
+                pl.col("UTC_DateTime").dt.offset_by("-60s")
+                )
         if inst in avg_times.keys():
             lf = lf.join_asof(
                     avg_times[inst],
