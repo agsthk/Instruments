@@ -14,6 +14,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import hvplot.polars
+import holoviews as hv
 
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
@@ -236,7 +237,7 @@ for inst, sources in data.items():
         if inst == "Picarro_G2307":
             strat = "forward"
         else:
-            strat = "backward"
+            strat = "forward"
         # Identifies which outliers correspond to the first/last UZA
         # measurement for each valve opening/closing
         uza_starts[inst][source] = valve_open.join_asof(
@@ -246,13 +247,13 @@ for inst, sources in data.items():
             coalesce=False,
             strategy=strat,
             tolerance="10m"
-            ).drop_nulls(time_col)#.select(
-                # pl.col("ValveOpen"),
-                # # Adds instrument to time columns for later joining
-                # cs.contains("TC").name.map(
-                #         lambda name: name + "_" + inst
-                #         )
-                # )
+            ).drop_nulls(time_col).select(
+                pl.col("ValveOpen"),
+                # Adds instrument to time columns for later joining
+                cs.contains("TC").name.map(
+                        lambda name: name + "_" + inst
+                        )
+                )
         uza_stops[inst][source] = valve_closed.join_asof(
             outliers,
             left_on="ValveClosed",
@@ -260,31 +261,13 @@ for inst, sources in data.items():
             coalesce=False,
             strategy=strat,
             tolerance="10m"
-            ).drop_nulls(time_col)#.select(
-                # pl.col("ValveClosed"), 
-                # # Adds instrument to time columns for later joining
-                # cs.contains("TC").name.map(
-                #         lambda name: name + "_" + inst
-                #         )
-                # )
-        hvplot.show(
-            df.filter(
-                pl.col(var_col).is_between(-20, 150)
-                ).hvplot.scatter(
-                    x=time_col,
-                    y=var_col
-                    ) * uza_starts[inst][source].filter(
-                            pl.col(var_col).is_between(-20, 150)
-                            ).hvplot.scatter(
-                                x=time_col,
-                                y=var_col
-                                ) * uza_stops[inst][source].filter(
-                                        pl.col(var_col).is_between(-20, 150)
-                                        ).hvplot.scatter(
-                                            x=time_col,
-                                            y=var_col
-                                            )
-            )
+            ).drop_nulls(time_col).select(
+                pl.col("ValveClosed"), 
+                # Adds instrument to time columns for later joining
+                cs.contains("TC").name.map(
+                        lambda name: name + "_" + inst
+                        )
+                )
                 
 # Joins the UZA measurement starts/stops for all instruments
 uza_starts_joined = uza_starts["Picarro_G2307"]["Logger"].join(
