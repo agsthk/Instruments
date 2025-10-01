@@ -196,7 +196,7 @@ for inst, sources in data.items():
                         cs.contains("UTC")
                         .dt.convert_time_zone("America/Denver")
                         .name.map(lambda name: name.replace("UTC", "FTC"))
-                        )   
+                        )
         lf = lf.with_columns(
             # Adds dt column based on gap between consecutive measurements
             (cs.contains("FTC") & ~cs.contains("Stop"))
@@ -217,7 +217,6 @@ for inst, sources in data.items():
         data[inst][source] = lf.collect()
 
 # %% Identifies adjusted valve state times from corrected Picarro timestamps
-
 valve_open = data["Picarro_G2307"]["Logger"].filter(
     pl.col("SolenoidValves").ne(0) & pl.col("SolenoidValves").shift(1).eq(0)
     ).select(
@@ -228,6 +227,33 @@ valve_closed = data["Picarro_G2307"]["Logger"].filter(
     ).select(
         pl.col("UTC_DateTime").unique().alias("ValveClosed")
         )
+# Adds the amount of time that the valve is open to the valve open/closed
+# DataFrames
+durations = valve_open.join_asof(
+    valve_closed,
+    left_on="ValveOpen",
+    right_on="ValveClosed",
+    strategy="forward"
+    ).with_columns(
+        pl.col("ValveClosed").sub(pl.col("ValveOpen"))
+        .dt.total_microseconds().truediv(1e6).alias("Duration")
+        )
+valve_open = valve_open.join(
+    durations,
+    on="ValveOpen"
+    ).select(
+        pl.exclude("ValveClosed")
+        ).filter(
+            pl.col("Duration").gt(0)
+            )  
+valve_closed = valve_closed.join(
+    durations,
+    on="ValveClosed"
+    ).select(
+        pl.exclude("ValveOpen")
+        ).filter(
+            pl.col("Duration").gt(0)
+            )         
 # %% Identifies starts and stops of UZA measurements
 uza_starts = {inst: {} for inst in data.keys()}
 uza_stops = {inst: {} for inst in data.keys()}
@@ -278,7 +304,7 @@ for inst, sources in data.items():
             strategy="forward",
             tolerance="10m"
             ).drop_nulls(time_col).select(
-                pl.col("ValveOpen"),
+                pl.col("ValveOpen", "Duration"),
                 # Adds instrument to time columns for later joining
                 cs.contains("TC").name.map(
                         lambda name: name + "_" + inst
@@ -292,32 +318,32 @@ for inst, sources in data.items():
             strategy="forward",
             tolerance="10m"
             ).drop_nulls(time_col).select(
-                pl.col("ValveClosed"), 
+                pl.col("ValveClosed", "Duration"),
                 # Adds instrument to time columns for later joining
                 cs.contains("TC").name.map(
                         lambda name: name + "_" + inst
                         )
                 )
-                
+
 # Joins the UZA measurement starts/stops for all instruments
 uza_starts_joined = uza_starts["Picarro_G2307"]["Logger"].join(
-    uza_starts["2BTech_205_A"]["SD"],
+    uza_starts["2BTech_205_A"]["SD"].select(pl.exclude("Duration")),
     on="ValveOpen",
     how="full",
     coalesce=True
     ).join(
-        uza_starts["ThermoScientific_42i-TL"]["Logger"],
+        uza_starts["ThermoScientific_42i-TL"]["Logger"].select(pl.exclude("Duration")),
         on="ValveOpen",
         how="full",
         coalesce=True
         )
 uza_stops_joined = uza_stops["Picarro_G2307"]["Logger"].join(
-     uza_stops["2BTech_205_A"]["SD"],
+     uza_stops["2BTech_205_A"]["SD"].select(pl.exclude("Duration")),
      on="ValveClosed",
      how="full",
      coalesce=True
      ).join(
-         uza_stops["ThermoScientific_42i-TL"]["Logger"],
+         uza_stops["ThermoScientific_42i-TL"]["Logger"].select(pl.exclude("Duration")),
          on="ValveClosed",
          how="full",
          coalesce=True
@@ -376,6 +402,14 @@ for week in all_weeks:
                     shared_axes=True
                     )
             )
+    if week in data["ThermoScientific_42i-TL"]["Logger"].keys():
+        week_plots.append(
+            data["ThermoScientific_42i-TL"]["Logger"][week].hvplot.scatter(
+                    x="FTC_Start",
+                    y="NO2_ppb",
+                    shared_axes=True
+                    )
+            )
     if week in data["Picarro_G2307"]["Logger"].keys():
         week_plots.append(
             data["Picarro_G2307"]["Logger"][week].hvplot.scatter(
@@ -398,29 +432,56 @@ for week in all_weeks:
         .alias("FTC_Start")
         )
     
-    week_uza_start_diffs = week_uza_starts.select(
-        pl.col("FTC_Start"),
-        (cs.contains("2BTech") & cs.contains("FTC"))
-        .sub(pl.col("FTC_DateTime_Picarro_G2307"))
-        .dt.total_microseconds().truediv(1e6).name.map(lambda name: name.replace("2BTech_205_A", "Diff"))
-        ).drop_nulls(cs.contains("_Diff"))
-    week_uza_stop_diffs = week_uza_stops.select(
-        pl.col("FTC_Start"),
-        (cs.contains("2BTech") & cs.contains("FTC"))
-        .sub(pl.col("FTC_DateTime_Picarro_G2307"))
-        .dt.total_microseconds().truediv(1e6).name.map(lambda name: name.replace("2BTech_205_A", "Diff"))
-        ).drop_nulls(cs.contains("_Diff"))
-    
-    
-    diff_plot = week_uza_start_diffs.hvplot.scatter(
-                x="FTC_Start",
-                y=["FTC_Start_Diff", "FTC_Stop_Diff"],
-                shared_axes=True
-                ) * week_uza_stop_diffs.hvplot.scatter(
-                            x="FTC_Start",
-                            y=["FTC_Start_Diff", "FTC_Stop_Diff"],
-                            shared_axes=True)
-                
+    # week_uza_start_diffs = week_uza_starts.select(
+    #     pl.col("FTC_Start", "Duration"),
+    #     (cs.contains("ThermoScientific_42i") & cs.contains("FTC"))
+    #     .sub(pl.col("FTC_Start_2BTech_205_A"))
+    #     .dt.total_microseconds().truediv(1e6).name.map(lambda name: name.replace("ThermoScientific_42i-TL", "Diff"))
+    #     ).drop_nulls(cs.contains("_Diff")).filter(
+    #         pl.col("FTC_Start_Diff").le(10)
+    #         & pl.col("FTC_Stop_Diff").ge(-10))
+    # week_uza_stop_diffs = week_uza_stops.select(
+    #     pl.col("FTC_Start", "Duration"),
+    #     (cs.contains("ThermoScientific_42i") & cs.contains("FTC"))
+    #     .sub(pl.col("FTC_Start_2BTech_205_A"))
+    #     .dt.total_microseconds().truediv(1e6).name.map(lambda name: name.replace("ThermoScientific_42i-TL", "Diff"))
+    #     ).drop_nulls(cs.contains("_Diff")).filter(
+    #         pl.col("FTC_Start_Diff").le(10)
+    #         & pl.col("FTC_Stop_Diff").ge(-10))
+    # week_uza_start_ddiffs = week_uza_start_diffs.unique("FTC_Start_Diff").with_columns(
+    #     pl.col("FTC_Start_Diff").sub(pl.col("FTC_Start_Diff").shift(1))
+    #     .truediv(
+    #         pl.col("FTC_Start").sub(pl.col("FTC_Start").shift(1))
+    #         .dt.total_microseconds().truediv(1e6)
+    #         )
+    #     .alias("ddiffdt")
+    #     )
+    # week_uza_stop_ddiffs = week_uza_stop_diffs.unique("FTC_Start_Diff").with_columns(
+    #     pl.col("FTC_Start_Diff").sub(pl.col("FTC_Start_Diff").shift(1))
+    #     .truediv(
+    #         pl.col("FTC_Start").sub(pl.col("FTC_Start").shift(1))
+    #         .dt.total_microseconds().truediv(1e6)
+    #         )
+    #     .alias("ddiffdt")
+    #     )
+    # diff_plot = week_uza_start_diffs.hvplot.scatter(
+    #             x="FTC_Start",
+    #             y=["FTC_Start_Diff", "FTC_Stop_Diff"],
+    #             shared_axes=True
+    #             ) * week_uza_stop_diffs.hvplot.scatter(
+    #                         x="FTC_Start",
+    #                         y=["FTC_Start_Diff", "FTC_Stop_Diff"],
+    #                         shared_axes=True)
+    # ddiff_plot = week_uza_start_ddiffs.hvplot.scatter(
+    #                 x="FTC_Start",
+    #                 y="ddiffdt",
+    #                 shared_axes=True
+    #                 ) * week_uza_stop_ddiffs.hvplot.scatter(
+    #                             x="FTC_Start",
+    #                             y="ddiffdt",
+    #                             shared_axes=True)
+                        
     hvplot.show(
-        (week_plot + diff_plot).cols(1)
+        (week_plot * hv.VLines(week_uza_starts["ValveOpen"]) * hv.VLines(week_uza_stops["ValveClosed"]))#+ diff_plot + ddiff_plot).cols(1)
         )
+    

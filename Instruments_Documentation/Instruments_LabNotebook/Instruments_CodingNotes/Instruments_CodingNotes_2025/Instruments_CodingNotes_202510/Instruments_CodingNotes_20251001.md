@@ -33,3 +33,15 @@
 	- -60 through Aug 12
 	- -56 on Aug 12
 - Settled on timestamp corrections
+- Now looking into NOx
+	- There is for sure a drift on the NOx - looks relatively steady slope though
+		- Actually when I look at it relative to O3, doesn't look like there is a drift
+			- Maybe there is a small one
+	- For this instrument, going to set two real timestamps - one at the start, one at the end, and interpolate between those
+		- ~~Actually I'm just not going to change the NOx timestamp at all~~
+- I may revert Picarro timestamp correction to just be a fixed offset - seems to me like it's good enough and then I can leave it
+	- Actually, with the amount of work I did I want to say it's fine how it is
+- Added code to calculate the duration that the valves are open for each open/closed timestamp
+- For Thermo, drift seems to be ~40 us/s
+	- When I try to implement that it DOES NOT work
+- Going back to my original plan - use the timestamps that I decided on with Picarro, don't change Thermo at all
