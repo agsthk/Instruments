@@ -143,28 +143,60 @@ for inst, sources in data.items():
                         .name.map(lambda name: name.replace("UTC", "FTC"))
                         )
         if inst == "Picarro_G2307":
-            # # Corrects drift (estimated)
-            # diff = (9.476
-            #         / ((datetime(2024, 6, 30, 23, 44, 1)
-            #             - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()))
-            # lf = lf.with_columns(
-            #     pl.col("UTC_DateTime").sub(pl.min("UTC_DateTime"))
-            #     .dt.total_microseconds().mul(1 + diff)
-            #     .cast(pl.Int64).cast(pl.String).add("us")
-            #     .alias("Passed")
-            #     ).with_columns(
-            #         pl.min("UTC_DateTime").dt.offset_by(pl.col("Passed"))
-            #         .alias("UTC_DateTime")
-            #         ).with_columns(
-            #             # Converts corrected UTC timestamp to local timestamp
-            #             cs.contains("UTC")
-            #             .dt.convert_time_zone("America/Denver")
-            #             .name.map(lambda name: name.replace("UTC", "FTC"))
-            #             )
-            # Applies constant offset to Picarro time
+            # Timestamps that appear in Picarro_G2307 data and their associated
+            # true timestamp
+            real_ts = {
+                datetime(2024, 2, 13, 16, 41, 48, 416999, tzinfo=pytz.UTC): 
+                    datetime(2024, 2, 13, 16, 40, 52, 416999, tzinfo=pytz.UTC),
+                datetime(2024, 6, 17, 19, 0, 0, 125999, tzinfo=pytz.UTC):
+                    datetime(2024, 6, 17, 18, 59, 4, 125999, tzinfo=pytz.UTC),
+                datetime(2024, 6, 24, 6, 0, 0, 336999, tzinfo=pytz.UTC):
+                    datetime(2024, 6, 24, 5, 58, 40, 336999, tzinfo=pytz.UTC),
+                datetime(2024, 7, 1, 5, 59, 59, 568000, tzinfo=pytz.UTC):
+                    datetime(2024, 7, 1, 5, 58, 40, 568000, tzinfo=pytz.UTC),
+                datetime(2024, 7, 12, 6, 0, 0, 598000, tzinfo=pytz.UTC): 
+                    datetime(2024, 7, 12, 5, 59, 4, 598000, tzinfo=pytz.UTC),
+                datetime(2024, 7, 20, 6, 0, 0, 431000, tzinfo=pytz.UTC): 
+                    datetime(2024, 7, 20, 5, 59, 0, 431000, tzinfo=pytz.UTC),
+                datetime(2024, 7, 22, 17, 46, 28, 713999, tzinfo=pytz.UTC): 
+                    datetime(2024, 7, 22, 17, 45, 38, 713999, tzinfo=pytz.UTC),
+                datetime(2024, 7, 30, 6, 0, 0, 680000, tzinfo=pytz.UTC): 
+                    datetime(2024, 7, 30, 5, 59, 4, 680000, tzinfo=pytz.UTC),
+                datetime(2024, 8, 12, 6, 0, 0, 564999, tzinfo=pytz.UTC): 
+                    datetime(2024, 8, 12, 5, 59, 0, 564999, tzinfo=pytz.UTC),
+                datetime(2024, 8, 12, 16, 32, 50, 684999, tzinfo=pytz.UTC): 
+                    datetime(2024, 8, 12, 16, 31, 54, 684999, tzinfo=pytz.UTC)
+                }
+            for i, (og, new) in enumerate(real_ts.items()):
+                if i == 0:
+                    lf = lf.with_columns(
+                        pl.when(pl.col("UTC_DateTime").eq(og))
+                        .then(new)
+                        .alias("RealTimestamp")
+                        )
+                else:
+                    lf = lf.with_columns(
+                        pl.when(pl.col("UTC_DateTime").eq(og))
+                        .then(new)
+                        .otherwise(pl.col("RealTimestamp"))
+                        .alias("RealTimestamp")
+                        )
             lf = lf.with_columns(
-                cs.contains("DateTime").dt.offset_by("-65s")
-                )
+                pl.from_epoch(
+                    pl.col("RealTimestamp")
+                    .cast(pl.Int64)
+                    .interpolate_by("UTC_DateTime"),
+                    time_unit="us")
+                .dt.replace_time_zone("UTC")
+                .alias("UTC_DateTime")
+                ).select(
+                    ~cs.contains("RealTimestamp")
+                    ).with_columns(
+                        # Converts corrected UTC timestamp to local timestamp
+                        cs.contains("UTC")
+                        .dt.convert_time_zone("America/Denver")
+                        .name.map(lambda name: name.replace("UTC", "FTC"))
+                        )   
         lf = lf.with_columns(
             # Adds dt column based on gap between consecutive measurements
             (cs.contains("FTC") & ~cs.contains("Stop"))
@@ -336,11 +368,13 @@ for week in all_weeks:
         continue
     if week in data["2BTech_205_A"]["SD"].keys():
         week_plots.append(
-            data["2BTech_205_A"]["SD"][week].hvplot.scatter(
-                x="FTC_Start",
-                y="O3_ppb",
-                shared_axes=True
-                )
+            data["2BTech_205_A"]["SD"][week].filter(
+                pl.col("O3_ppb").is_between(-20, 100)
+                ).hvplot.scatter(
+                    x="FTC_Start",
+                    y="O3_ppb",
+                    shared_axes=True
+                    )
             )
     if week in data["Picarro_G2307"]["Logger"].keys():
         week_plots.append(

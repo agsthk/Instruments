@@ -15,3 +15,21 @@
 	- WAYYYYY too much
 - Constant offset of 100s looks reasonable, so expect something within 60 seconds of that
 - August 12, 2024 07:53:22 - with a -65s offset, synced with 2BTech_205_A
+- Thinking I would actually prefer to have it aligned at the start - will be easier to correct drift after
+	- June 10, 2024 08:44:08 aligned with a -56s offset
+		- Looks like it's aligned at August 4 also, but not always aligned between?
+		- Very clearly drifts weeks of June 24, July 1
+			- No or only slight drift other weeks?
+- Consider how to correct when no timestamps aligned - choose true timestamp for several false timestamps and interpolate?
+	- Likely yes
+- Plan is now to identify offsets at several different timestamps and interpolate between those
+	- Through June 17 ~13:00, -56 s offset good
+	- June 30 23:45, should be -67s offset
+		- keep through July 11
+	- -56 s offset good starting July 12
+	- -60s offset July 20
+	- -50s offset July 22
+	- -56 July 30
+	- -60 through Aug 12
+	- -56 on Aug 12
+- Settled on timestamp corrections
