@@ -141,25 +141,25 @@ for inst, sources in data.items():
                         .dt.convert_time_zone("America/Denver")
                         .name.map(lambda name: name.replace("UTC", "FTC"))
                         )
-        # if inst == "Picarro_G2307":
-        #     # Corrects drift (estimated)
-        #     diff = (9.476
-        #             / ((datetime(2024, 6, 30, 23, 44, 1)
-        #                 - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()))
-        #     lf = lf.with_columns(
-        #         pl.col("UTC_DateTime").sub(pl.min("UTC_DateTime"))
-        #         .dt.total_microseconds().truediv(1 + diff)
-        #         .cast(pl.Int64).cast(pl.String).add("us")
-        #         .alias("Passed")
-        #         ).with_columns(
-        #             pl.min("UTC_DateTime").dt.offset_by(pl.col("Passed"))
-        #             .alias("UTC_DateTime")
-        #             ).with_columns(
-        #                 # Converts corrected UTC timestamp to local timestamp
-        #                 cs.contains("UTC")
-        #                 .dt.convert_time_zone("America/Denver")
-        #                 .name.map(lambda name: name.replace("UTC", "FTC"))
-        #                 )
+        if inst == "Picarro_G2307":
+            # Corrects drift (estimated)
+            diff = (9.476
+                    / ((datetime(2024, 6, 30, 23, 44, 1)
+                        - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()))
+            lf = lf.with_columns(
+                pl.col("UTC_DateTime").sub(pl.min("UTC_DateTime"))
+                .dt.total_microseconds().truediv(1 + diff)
+                .cast(pl.Int64).cast(pl.String).add("us")
+                .alias("Passed")
+                ).with_columns(
+                    pl.min("UTC_DateTime").dt.offset_by(pl.col("Passed"))
+                    .alias("UTC_DateTime")
+                    ).with_columns(
+                        # Converts corrected UTC timestamp to local timestamp
+                        cs.contains("UTC")
+                        .dt.convert_time_zone("America/Denver")
+                        .name.map(lambda name: name.replace("UTC", "FTC"))
+                        )
         lf = lf.with_columns(
             # Adds dt column based on gap between consecutive measurements
             (cs.contains("FTC") & ~cs.contains("Stop"))
@@ -230,6 +230,9 @@ for inst, sources in data.items():
                         ).filter(
                            pl.col("Outlier")
                            )
+        var_col = [col for col in df.columns if col in ["O3_ppb", "NO2_ppb", "CH2O_ppb"]][0]
+
+                    
         if inst == "Picarro_G2307":
             strat = "forward"
         else:
@@ -243,13 +246,13 @@ for inst, sources in data.items():
             coalesce=False,
             strategy=strat,
             tolerance="10m"
-            ).drop_nulls(time_col).select(
-                pl.col("ValveOpen"),
-                # Adds instrument to time columns for later joining
-                cs.contains("TC").name.map(
-                        lambda name: name + "_" + inst
-                        )
-                )
+            ).drop_nulls(time_col)#.select(
+                # pl.col("ValveOpen"),
+                # # Adds instrument to time columns for later joining
+                # cs.contains("TC").name.map(
+                #         lambda name: name + "_" + inst
+                #         )
+                # )
         uza_stops[inst][source] = valve_closed.join_asof(
             outliers,
             left_on="ValveClosed",
@@ -257,13 +260,31 @@ for inst, sources in data.items():
             coalesce=False,
             strategy=strat,
             tolerance="10m"
-            ).drop_nulls(time_col).select(
-                pl.col("ValveClosed"), 
-                # Adds instrument to time columns for later joining
-                cs.contains("TC").name.map(
-                        lambda name: name + "_" + inst
-                        )
-                )
+            ).drop_nulls(time_col)#.select(
+                # pl.col("ValveClosed"), 
+                # # Adds instrument to time columns for later joining
+                # cs.contains("TC").name.map(
+                #         lambda name: name + "_" + inst
+                #         )
+                # )
+        hvplot.show(
+            df.filter(
+                pl.col(var_col).is_between(-20, 150)
+                ).hvplot.scatter(
+                    x=time_col,
+                    y=var_col
+                    ) * uza_starts[inst][source].filter(
+                            pl.col(var_col).is_between(-20, 150)
+                            ).hvplot.scatter(
+                                x=time_col,
+                                y=var_col
+                                ) * uza_stops[inst][source].filter(
+                                        pl.col(var_col).is_between(-20, 150)
+                                        ).hvplot.scatter(
+                                            x=time_col,
+                                            y=var_col
+                                            )
+            )
                 
 # Joins the UZA measurement starts/stops for all instruments
 uza_starts_joined = uza_starts["Picarro_G2307"]["Logger"].join(

@@ -2,4 +2,7 @@
 - After some thought, I realized that I don't want to use the valve states that were exported to define UZA start/stop - I want to use the Picarro data
 	- That way when I adjust the Picarro timestamps, I end up with adjusted valve state times which will work better
 	- Easy change to make
-- 
+- Uncommented the code to adjust Picarro time drift, seeing what that does
+	- Added code to plot outliers
+	- After correcting time drift, needed to switch join_asof strategy to forward - seems to move the time to be more real
+	- Correcting the time drift may be the only thing I need to do for the Picarro instrument
