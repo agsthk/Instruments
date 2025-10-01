@@ -9,3 +9,4 @@
 - After checking that the starts and stops were being appropriately identified, reverted the code back to work with joining and plotting differences
 	- Does not appear that I corrected the time drift - maybe need to do the reverse of what I did?
 		- Yes, that fixed it!
+	- Also realized why it should always be a forward join - if Picarro is ahead, then the valve open/closed is inevitably in front of the first/last UZA measurement

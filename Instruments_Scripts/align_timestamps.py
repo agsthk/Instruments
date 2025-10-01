@@ -231,13 +231,6 @@ for inst, sources in data.items():
                         ).filter(
                            pl.col("Outlier")
                            )
-        var_col = [col for col in df.columns if col in ["O3_ppb", "NO2_ppb", "CH2O_ppb"]][0]
-
-                    
-        if inst == "Picarro_G2307":
-            strat = "forward"
-        else:
-            strat = "forward"
         # Identifies which outliers correspond to the first/last UZA
         # measurement for each valve opening/closing
         uza_starts[inst][source] = valve_open.join_asof(
@@ -245,7 +238,7 @@ for inst, sources in data.items():
             left_on="ValveOpen",
             right_on=time_col,
             coalesce=False,
-            strategy=strat,
+            strategy="forward",
             tolerance="10m"
             ).drop_nulls(time_col).select(
                 pl.col("ValveOpen"),
@@ -259,7 +252,7 @@ for inst, sources in data.items():
             left_on="ValveClosed",
             right_on=time_col,
             coalesce=False,
-            strategy=strat,
+            strategy="forward",
             tolerance="10m"
             ).drop_nulls(time_col).select(
                 pl.col("ValveClosed"), 
