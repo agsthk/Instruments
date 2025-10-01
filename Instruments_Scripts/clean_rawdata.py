@@ -11,8 +11,6 @@ import polars.selectors as cs
 import pytz
 from datetime import datetime, timedelta
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
@@ -29,7 +27,10 @@ CLEAN_DATA_DIR = os.path.join(data_dir, "Instruments_CleanData")
 if not os.path.exists(CLEAN_DATA_DIR):
     os.makedirs(CLEAN_DATA_DIR)
 # Full path to automated addition times
-ADD_TIMES_PATH = os.path.join(data_dir, "Instruments_DerivedData", "AdditionValves_DerivedData", "AdditionValves_AutomatedAdditionTimes.csv")
+ADD_TIMES_PATH = os.path.join(data_dir,
+                              "Instruments_DerivedData",
+                              "AdditionValves_DerivedData",
+                              "AdditionValves_AutomatedAdditionTimes.csv")
 add_times = pl.read_csv(ADD_TIMES_PATH).with_columns(
     pl.selectors.contains("UTC").str.to_datetime()
     )
@@ -37,8 +38,12 @@ add_times = {key[0]: df for key, df in
              add_times.partition_by(
                  "Species", as_dict=True, include_key=False
                  ).items()}
-SAMPLING_LOC_DIR = os.path.join(data_dir, "Instruments_ManualData", "Instruments_SamplingLocations")
-AVG_TIME_DIR = os.path.join(data_dir, "Instruments_ManualData", "Instruments_AveragingTimes")
+SAMPLING_LOC_DIR = os.path.join(data_dir,
+                                "Instruments_ManualData",
+                                "Instruments_SamplingLocations")
+AVG_TIME_DIR = os.path.join(data_dir,
+                            "Instruments_ManualData", 
+                            "Instruments_AveragingTimes")
 
 insts = ["2BTech_202",
          "2BTech_205_A",
@@ -56,7 +61,8 @@ sampling_locs = {}
 for sampling_locs_file in os.listdir(SAMPLING_LOC_DIR):
     inst = sampling_locs_file.rsplit("_", 1)[0]
     sampling_locs_path = os.path.join(SAMPLING_LOC_DIR, sampling_locs_file)
-    sampling_locs[inst] = pl.read_csv(sampling_locs_path, null_values="None").with_columns(
+    sampling_locs[inst] = pl.read_csv(sampling_locs_path,
+                                      null_values="None").with_columns(
         UTC_Start=pl.col("FTC_Start").str.to_datetime()
         ).select(
             pl.col("UTC_Start"),
@@ -257,54 +263,65 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         else:
             lf = pl.scan_csv(path)
         lf = lf.with_columns(
-            pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
-            pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
+            pl.selectors.contains("UTC")
+            .str.to_datetime(time_zone="UTC"),
+            pl.selectors.contains("FTC")
+            .str.to_datetime(time_zone="America/Denver")
             )
-        if inst == "2BTech_205_A":
-            # Declares Timestamps known to be synched with real time
-            real_ts = [
-                datetime(2024, 5, 23, 15, 57, 5, tzinfo=pytz.UTC),
-                datetime(2024, 6, 25, 19, 35, 18, tzinfo=pytz.UTC)
-                ]
-            # Given instrument 15 seconds ahead before second sync, determines
-            # extra seconds added by instrument per real second
-            diff = 15 / (real_ts[1] - real_ts[0]).total_seconds()
-            # Approximates an initial synchronized timestamp given instrument
-            # ~1 minute ahead before first sync
-            real_ts = [real_ts[0] - timedelta(seconds=(60 / diff))] + real_ts
-            real_ts = pl.DataFrame(real_ts, schema=["RealTimestamp"])
-            # Calculates time since last known synced timestamp for each
-            # measurement as determined by instrument and converts to real time
-            # passed
-            lf = lf.join_asof(
-                real_ts.lazy(),
-                left_on="UTC_DateTime",
-                right_on="RealTimestamp",
-                strategy="backward"
-                ).with_columns(
-                    cs.contains("UTC").sub(pl.col("RealTimestamp"))
-                    .dt.total_microseconds().truediv((1 + diff))
-                    .cast(pl.Int64).cast(pl.String).add("us")
-                    .name.suffix("_Passed")
-                    )
-            # Determines corrected time from time passed since last synced
-            # timestamp
-            lf = lf.with_columns((
-                pl.col("RealTimestamp").dt.offset_by(pl.col(col))
-                .alias(col.replace("_Passed", ""))
-                for col in cs.expand_selector(lf, cs.contains("_Passed"))
-                )).select(
-                    ~cs.contains("_Passed", "RealTimestamp")
+        if source != "DAQ":
+            if inst == "2BTech_205_A":
+                # Declares Timestamps known to be synched with real time
+                real_ts = [
+                    datetime(2024, 5, 23, 15, 57, 5, tzinfo=pytz.UTC),
+                    datetime(2024, 6, 25, 19, 35, 18, tzinfo=pytz.UTC)
+                    ]
+                # Given instrument 15 seconds ahead before second sync,
+                # determines extra seconds added by instrument per real second
+                diff = 15 / (real_ts[1] - real_ts[0]).total_seconds()
+                # Approximates an initial synchronized timestamp given
+                # instrument ~1 minute ahead before first sync
+                real_ts = [real_ts[0] - timedelta(
+                    seconds=(60 / diff)
+                    )] + real_ts
+                real_ts = pl.DataFrame(real_ts, schema=["RealTimestamp"])
+                # Calculates time since last known synced timestamp for each
+                # measurement as determined by instrument and converts to real
+                # time passed
+                lf = lf.join_asof(
+                    real_ts.lazy(),
+                    left_on="UTC_DateTime",
+                    right_on="RealTimestamp",
+                    strategy="backward"
                     ).with_columns(
-                        # Converts corrected UTC timestamp to local timestamp
-                        cs.contains("UTC")
-                        .dt.convert_time_zone("America/Denver")
-                        .name.map(lambda name: name.replace("UTC", "FTC"))
+                        cs.contains("UTC").sub(pl.col("RealTimestamp"))
+                        .dt.total_microseconds().truediv((1 + diff))
+                        .cast(pl.Int64).cast(pl.String).add("us")
+                        .name.suffix("_Passed")
                         )
-        if inst == "Picarro_G2307":
-            lf = lf.with_columns(
-                pl.col("UTC_DateTime").dt.offset_by("-60s")
-                )
+                # Determines corrected time from time passed since last synced
+                # timestamp
+                lf = lf.with_columns((
+                    pl.col("RealTimestamp").dt.offset_by(pl.col(col))
+                    .alias(col.replace("_Passed", ""))
+                    for col in cs.expand_selector(lf, cs.contains("_Passed"))
+                    )).select(
+                        ~cs.contains("_Passed", "RealTimestamp")
+                        ).with_columns(
+                            # Converts corrected UTC time to local time
+                            cs.contains("UTC")
+                            .dt.convert_time_zone("America/Denver")
+                            .name.map(lambda name: name.replace("UTC", "FTC"))
+                            )
+            if inst == "Picarro_G2307":
+                # Corrects fixed Picarro_G2307 offset
+                lf = lf.with_columns(
+                    cs.contains("DateTime").dt.offset_by("-60s")
+                    )
+            if inst == "LI-COR_LI-840A_B":
+                # Corrects fixed LI-COR_LI-840A_B offset
+                lf = lf.with_columns(
+                    cs.contains("DateTime").dt.offset_by("-12m15s")
+                    )
         if inst in avg_times.keys():
             lf = lf.join_asof(
                     avg_times[inst],
@@ -313,11 +330,16 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                     strategy="backward"
                     )
             lf = lf.select(
-                pl.col("UTC_DateTime").dt.offset_by("-" + pl.col("AveragingTime")).alias("UTC_Start"),
+                pl.col("UTC_DateTime")
+                .dt.offset_by("-" + pl.col("AveragingTime"))
+                .alias("UTC_Start"),
                 pl.col("UTC_DateTime").alias("UTC_Stop"),
-                pl.col("FTC_DateTime").dt.offset_by("-" + pl.col("AveragingTime")).alias("FTC_Start"),
+                pl.col("FTC_DateTime")
+                .dt.offset_by("-" + pl.col("AveragingTime"))
+                .alias("FTC_Start"),
                 pl.col("FTC_DateTime").alias("FTC_Stop"),
-                pl.exclude("UTC_DateTime", "FTC_DateTime", "UTC_Start", "AveragingTime")
+                pl.exclude("UTC_DateTime", "FTC_DateTime",
+                           "UTC_Start", "AveragingTime")
                 )
         if inst in sampling_locs.keys():
             if "UTC_DateTime" in lf.collect_schema().names():
@@ -394,22 +416,32 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                         ~pl.selectors.contains("_Add")
                         )
             lf_room = lf_room.with_columns(
-                pl.col("O3_ppb").sub(pl.col("O3_ppb").shift(-1)).abs().alias("f_diff"),
-                pl.col("O3_ppb").sub(pl.col("O3_ppb").shift(1)).abs().alias("r_diff"),
-                pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(-1)).dt.total_microseconds().truediv(1e6).abs().alias("f_dt"),
-                pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(1)).dt.total_microseconds().truediv(1e6).abs().alias("r_dt"),
-                pl.col("O3_ppb").rolling_median_by(by="UTC_Start", window_size="10m").alias("median")
+                pl.col("O3_ppb").sub(pl.col("O3_ppb").shift(-1)).abs()
+                .alias("f_diff"),
+                pl.col("O3_ppb").sub(pl.col("O3_ppb").shift(1)).abs()
+                .alias("r_diff"),
+                pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(-1))
+                .dt.total_microseconds().truediv(1e6).abs().alias("f_dt"),
+                pl.col("UTC_Start").sub(pl.col("UTC_Start").shift(1))
+                .dt.total_microseconds().truediv(1e6).abs().alias("r_dt"),
+                pl.col("O3_ppb").rolling_median_by(by="UTC_Start",
+                                                   window_size="10m")
+                .alias("median")
                 ).with_columns(
                     pl.col("f_diff").truediv(pl.col("f_dt")).alias("f_d/dt"),
                     pl.col("r_diff").truediv(pl.col("r_dt")).alias("r_d/dt"),
-                    pl.col("O3_ppb").sub(pl.col("median")).abs().alias("abs_diff")
+                    pl.col("O3_ppb").sub(pl.col("median")).abs()
+                    .alias("abs_diff")
                     ).with_columns(
                         pl.mean_horizontal("f_d/dt", "r_d/dt").alias("d/dt"),
-                        pl.col("abs_diff").rolling_median_by(by="UTC_Start", window_size="10m").mul(1.4826).alias("MAD")
+                        pl.col("abs_diff").rolling_median_by(by="UTC_Start",
+                                                             window_size="10m")
+                        .mul(1.4826).alias("MAD")
                         )
             lf_room = lf_room.with_columns(
                 pl.when(
-                    (pl.col("O3_ppb").sub(pl.col("median")).abs().le(pl.col("MAD").mul(3))
+                    (pl.col("O3_ppb").sub(pl.col("median")).abs()
+                     .le(pl.col("MAD").mul(3))
                     | pl.col("d/dt").lt(0.25)
                     | pl.col("KeepDefault"))
                     & pl.col("O3_ppb").gt(-8)
@@ -509,8 +541,10 @@ for inst, sources in wrong_dates.items():
             else:
                 df_i = pl.read_csv(f_path)
             df_i = df_i.with_columns(
-                pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
-                pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
+                pl.selectors.contains("UTC")
+                .str.to_datetime(time_zone="UTC"),
+                pl.selectors.contains("FTC")
+                .str.to_datetime(time_zone="America/Denver")
                 )
             df = pl.concat(
                 [df_i, df],

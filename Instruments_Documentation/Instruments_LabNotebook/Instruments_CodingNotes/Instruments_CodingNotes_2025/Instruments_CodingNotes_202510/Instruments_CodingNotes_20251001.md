@@ -56,3 +56,6 @@
 		- STOP SUBSCRIBING TO THE SUNK COST FALLACY!!!!!!!!!!
 		- And then I can just change the 2024 valve open/close to be offset by -60s :)
 - After making changes, just going to apply them all and create the associated files, then I will check them in another script
+- Just realized that I needed to qualify the offset correction to not happen for the DAQ data
+	- Fixed to only do offset correction for data that needs it
+	- Added offset correction for vent CO2 monitor
