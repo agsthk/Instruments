@@ -149,7 +149,7 @@ for inst, sources in data.items():
                         - datetime(2024, 6, 25, 13, 44, 17)).total_seconds()))
             lf = lf.with_columns(
                 pl.col("UTC_DateTime").sub(pl.min("UTC_DateTime"))
-                .dt.total_microseconds().truediv(1 + diff)
+                .dt.total_microseconds().mul(1 + diff)
                 .cast(pl.Int64).cast(pl.String).add("us")
                 .alias("Passed")
                 ).with_columns(

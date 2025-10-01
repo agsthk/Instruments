@@ -7,3 +7,5 @@
 	- After correcting time drift, needed to switch join_asof strategy to forward - seems to move the time to be more real
 	- Correcting the time drift may be the only thing I need to do for the Picarro instrument
 - After checking that the starts and stops were being appropriately identified, reverted the code back to work with joining and plotting differences
+	- Does not appear that I corrected the time drift - maybe need to do the reverse of what I did?
+		- Yes, that fixed it!
