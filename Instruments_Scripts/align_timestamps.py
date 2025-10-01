@@ -41,24 +41,6 @@ for avg_times_file in os.listdir(AVG_TIME_DIR):
         ).sort(
             by="UTC_Start"
             ).lazy()
-            
-# %% Reads solenoid valve states
-valve_states = pl.read_csv(
-    os.path.join(
-        data_dir,
-        "Instruments_DerivedData",
-        "Picarro_G2307_DerivedData",
-        "Picarro_G2307_SolenoidValveStates.csv"
-        )
-    ).with_columns(
-        pl.selectors.contains("UTC").str.to_datetime()
-        )
-valve_open = valve_states.filter(
-    pl.col("SolenoidValves").eq(1)
-    ).select("UTC_Start").rename({"UTC_Start": "ValveOpen"})
-valve_closed = valve_states.filter(
-    pl.col("SolenoidValves").eq(1)
-    ).select("UTC_Stop").rename({"UTC_Stop": "ValveClosed"})
 
 # %% Data read-in
 data = {inst: {} for inst in insts}
@@ -196,7 +178,18 @@ for inst, sources in data.items():
             .alias("ddt")
             )
         data[inst][source] = lf.collect()
-    
+# %% Identifies adjusted valve state times from corrected Picarro timestamps
+
+valve_open = data["Picarro_G2307"]["Logger"].filter(
+    pl.col("SolenoidValves").ne(0) & pl.col("SolenoidValves").shift(1).eq(0)
+    ).select(
+        pl.col("UTC_DateTime").unique().alias("ValveOpen")
+        )
+valve_closed = data["Picarro_G2307"]["Logger"].filter(
+    pl.col("SolenoidValves").ne(1) & pl.col("SolenoidValves").shift(1).eq(1)
+    ).select(
+        pl.col("UTC_DateTime").unique().alias("ValveClosed")
+        )
 # %% Identifies starts and stops of UZA measurements
 uza_starts = {inst: {} for inst in data.keys()}
 uza_stops = {inst: {} for inst in data.keys()}

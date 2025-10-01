@@ -25,3 +25,16 @@
 					- Mostly worked, but still don't like it much - commenting out the correction for time drift of picarro and continuing with the forward method
 - Joining the UZA measurement times into one dataframe
 - Revised plotting to work with the changes I made
+- Offset of Picarro relative to 2BTech_205_A:
+	- June 10 - June 17: 38 - 70 sec ahead
+	- June 17 - June 18:  25 - 65 sec ahead
+	- June 24 - July 1:  45 - 85 sec ahead
+	- July 1 - July 8: 60 - 90 sec ahead
+	- July 8 - July 15: 0 - 60 sec ahead
+	- July 15 - July 21: 20 - 50 sec ahead
+	- July 22 - July 29: 0 - 50 sec ahead
+	- July 29 - July 31: 0 - 60 sec ahead
+	- Aug 5 - Aug 12: 0-60 sec ahead
+	- Aug 12: 4 - 70 sec ahead
+	- These numbers aren't making a whole lot of sense to me - I feel like it should be around 2 minutes? Just visually speaking
+	- I think 90 seconds is a good guess - apply tomorrow
