@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import hvplot.polars
 import holoviews as hv
+import polars.selectors as cs
 
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
@@ -27,7 +28,7 @@ CAL_DATA_DIR = os.path.join(data_dir, "Instruments_CalibratedData")
 # Full path to automated addition times
 ADD_TIMES_PATH = os.path.join(data_dir, "Instruments_ManualData", "Instruments_ManualExperiments", "ManualAdditionTimes - Copy.csv")
 add_times = pl.read_csv(ADD_TIMES_PATH).with_columns(
-    pl.selectors.contains("UTC").str.to_datetime(time_zone="America/Denver").dt.convert_time_zone("UTC")
+    pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC")
     )
 add_times = {key[0]: df for key, df in 
              add_times.partition_by(
@@ -42,7 +43,7 @@ auto_add_times = {key[0]: df for key, df in
                  "Species", as_dict=True, include_key=False
                  ).items()}
 for key, df in add_times.items():
-    add_times[key] = pl.concat([df, auto_add_times[key]])
+    add_times[key] = pl.concat([df, auto_add_times[key]]).sort(by="UTC_Start")
 
 DOOR_STATUS_PATH = os.path.join(data_dir, "Instruments_DerivedData", "TempRHDoor_DerivedData", "TempRHDoor_DoorStatus.csv")
 door_times = pl.read_csv(DOOR_STATUS_PATH).with_columns(
@@ -52,32 +53,143 @@ door_times = {key[0]: df for key, df in
              door_times.partition_by(
                  "DoorStatus", as_dict=True, include_key=False
                  ).items()}
+# %% Calibrated 2024 data
 
-data = []
+cal_dates_2024 = {"2BTech_205_A": "20240604",
+                  "2BTech_205_B": "20240604",
+                  "Picarro_G2307": "20250625",
+                  "ThermoScientific_42i-TL": "20240708"}
+
+cal_dates_2025 = {"2BTech_205_A": "20250115",
+                  "2BTech_205_B": "20250115",
+                  "Picarro_G2307": "20250625",
+                  "ThermoScientific_42i-TL": "20241216"}
+
+data_2024 = {inst: [] for inst in cal_dates_2024.keys()}
+data_2025 = {inst: [] for inst in cal_dates_2025.keys()}
+
 for root, dirs, files in tqdm(os.walk(CAL_DATA_DIR)):
     for file in tqdm(files):
         if file.startswith("."):
             continue
-        if file.find("2BTech_205_A") == -1:
-            continue
         path = os.path.join(root, file)
-        if path.find("DAQ") == -1:
+        for inst in cal_dates_2024.keys():
+            if path.find(inst) != -1:
+                break
+        if path.find(inst) == -1:
             continue
-        lf = pl.scan_csv(path)
-        lf = lf.with_columns(
-            pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC"),
-            pl.selectors.contains("FTC").str.to_datetime(time_zone="America/Denver")
+        
+        if path.find("DAQ") != -1:
+            if path.find(cal_dates_2025[inst] + "Calibration") != -1:
+                data_2025[inst].append(
+                    pl.scan_csv(path)
+                    )
+        else:
+            if path.find(cal_dates_2024[inst] + "Calibration") != -1:
+                data_2024[inst].append(
+                    pl.scan_csv(path)
+                    )
+            
+for inst, lfs in data_2024.items():
+    data_2024[inst] = {key[0]: df for key, df in pl.concat(lfs).with_columns(
+            cs.contains("UTC").str.to_datetime(time_zone="UTC"),
+            cs.contains("FTC").str.to_datetime(time_zone="America/Denver")
+            ).sort(
+                by=cs.contains("UTC")
+                ).with_columns(
+                    (cs.contains("FTC") & ~cs.contains("Stop"))
+                    .dt.week().alias("Week")
+                    ).collect().partition_by(
+                        by="Week", include_key=False, as_dict=True
+                        ).items()}
+
+                    
+for inst, lfs in data_2025.items():
+    data_2025[inst] = {key[0]: df for key, df in pl.concat(lfs).with_columns(
+            cs.contains("UTC").str.to_datetime(time_zone="UTC"),
+            cs.contains("FTC").str.to_datetime(time_zone="America/Denver")
+            ).sort(
+                by=cs.contains("UTC")
+                ).with_columns(
+                    (cs.contains("FTC") & ~cs.contains("Stop"))
+                    .dt.week().alias("Week")
+                    ).collect().partition_by(
+                        by="Week", include_key=False, as_dict=True
+                        ).items()}
+# %%
+
+data_2025["2BTech_205_A_BG"] = {}
+
+for week, df in data_2025["2BTech_205_A"].items():
+    week_start = df["UTC_Start"].min()
+    week_stop = df["UTC_Stop"].max()
+    week_o3_adds = add_times["O3"].filter(
+        pl.col("UTC_Stop").ge(week_start)
+        & pl.col("UTC_Start").le(week_stop)
+        ).with_columns(
+            pl.col("UTC_Stop").dt.offset_by("2h")
             )
-      
-        df = lf.collect()
-        
-        if df.is_empty():
-            continue
-        data.append(df)
-        
-data = pl.concat(data).sort(by="UTC_Start")
-data = {loc[0]: df for loc, df in data.partition_by("SamplingLocation", include_key=False, as_dict=True).items()}
-#%%
+            
+    if not week_o3_adds.is_empty():
+        data_2025["2BTech_205_A_BG"][week] = df.join_asof(
+            week_o3_adds,
+            on="UTC_Start",
+            strategy="backward",
+            suffix="_Add"
+            ).filter(
+                pl.col("UTC_Start").gt(pl.col("UTC_Stop_Add"))
+                | pl.col("UTC_Stop_Add").is_null()
+                ).select(
+                    pl.exclude("UTC_Stop_Add")
+                    )
+    plot = df.filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).hvplot.scatter(
+                x="UTC_Start",
+                y="O3_ppb",
+                title=str(week)
+                )
+    if not week_o3_adds.is_empty():
+        bg = df.join_asof(
+            week_o3_adds,
+            on="UTC_Start",
+            strategy="backward",
+            suffix="_Add"
+            ).filter(
+                pl.col("UTC_Start").gt(pl.col("UTC_Stop_Add"))
+                | pl.col("UTC_Stop_Add").is_null()
+                )
+        plot = plot * bg.filter(
+                pl.col("SamplingLocation").str.contains("C200")
+                ).hvplot.scatter(
+                    x="UTC_Start",
+                    y="O3_ppb",
+                    title=str(week)
+                    )
+    hvplot.show(
+        plot * hv.VLines(week_o3_adds["UTC_Start"]) * hv.VLines(week_o3_adds["UTC_Stop"])
+        )
+
+# %%
+
+for week, df in data_2025["2BTech_205_A"].items():
+    plot = df.filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).hvplot.scatter(
+                x="FTC_Start",
+                y="O3_ppb",
+                title=str(week)
+                )
+    if week in data_2025["2BTech_205_B"].keys():
+        plot = plot * data_2025["2BTech_205_B"][week].filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).hvplot.scatter(
+                x="FTC_Start",
+                y="O3_ppb",
+                title=str(week)
+                )
+    hvplot.show(plot)
+# %%
 
 for loc, df in data.items():
     fig, ax = plt.subplots(figsize=(10, 8))

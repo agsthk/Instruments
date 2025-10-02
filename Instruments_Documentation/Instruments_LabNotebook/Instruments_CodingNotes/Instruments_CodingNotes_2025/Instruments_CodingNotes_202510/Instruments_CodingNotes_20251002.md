@@ -76,3 +76,7 @@
 - Checking plots with uncertainty and LOD shown to ensure nothing is too weird
 	- All looks good
 	- Side note - 2B NOx data is ridiculous
+# evaluate_leak.py
+- Now that I have the calibrated data, going to try to estimate the magnitude of the leak
+- First, working on getting the ozone background for the 2025 data
+	- Joining with the most recent ozone addition start time, removing data within 2 hours of the associated ozone addition stop time
