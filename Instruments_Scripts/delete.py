@@ -90,7 +90,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
         if file.startswith("."):
             continue
         path = os.path.join(root, file)
-        if path.find("DAQ") == -1:
+        if path.find("DAQ") != -1:
             continue
         for inst in insts:
             if path.find(inst) != -1:
@@ -126,6 +126,44 @@ for inst in insts:
     for df in data[inst].values():
         all_cols += df.columns
         break
+
+# %% 
+for date, df in data["2BTech_205_A"].items():
+    date_plots = df.hvplot.scatter(
+        x="FTC_Start",
+        y="O3_ppb",
+        by="SamplingLocation",
+        title=date
+        )
+    hvplot.show(date_plots)
+
+# %% Check separate datasets against each other
+for date, df in data["2BTech_205_A"].items():
+    date_plots = df.filter(
+        pl.col("SamplingLocation").is_not_null()
+        ).hvplot.scatter(
+            x="FTC_Start",
+            y="O3_ppb"
+            )
+    plot = False
+    if date in data["Picarro_G2307"].keys():
+        date_plots = date_plots * data["Picarro_G2307"][date].filter(
+            pl.col("SamplingLocation").is_not_null()
+            ).hvplot.scatter(
+                x="FTC_DateTime",
+                y="CH2O_ppb"
+                )
+        plot = True
+    if date in data["ThermoScientific_42i-TL"].keys():
+        date_plots = date_plots * data["ThermoScientific_42i-TL"][date].filter(
+            pl.col("SamplingLocation").is_not_null()
+            ).hvplot.scatter(
+                x="FTC_Start",
+                y="NO2_ppb"
+                )
+    if plot:
+        hvplot.show(date_plots)
+    
 
 #%%
 for inst, dfs in tqdm(data.items()):

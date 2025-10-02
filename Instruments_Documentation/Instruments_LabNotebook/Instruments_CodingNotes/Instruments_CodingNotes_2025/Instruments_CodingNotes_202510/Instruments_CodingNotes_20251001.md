@@ -59,3 +59,215 @@
 - Just realized that I needed to qualify the offset correction to not happen for the DAQ data
 	- Fixed to only do offset correction for data that needs it
 	- Added offset correction for vent CO2 monitor
+# delete.py
+- Using this script to check my offset correction
+- Added code to plot O3, CH2O, and NO2 overlayed
+	- Zeros definitely appear to be aligned
+- Checking with "None" sampling location data removed
+	- Looks like it did this correctly for the most part
+- Checking Picarro data by sampling location
+	- Might be something I need to do with zeroing times when the times are repeat times
+	- Also need to think about how I am going to ICARTT the data when the times repeat
+	- Dates with clear events
+		- June 5
+		- June 12 (maybe)
+		- June 13
+		- June 14
+		- June 17 UZA ran out
+		- June 24 UZA back on
+		- July 8
+		- July 15
+		- July 29???
+- 2BTech_205_A data by sampling location
+	- Note that Hampel filter doesn't seem to be removing anything??
+	- Dates with clear events
+		- April 15
+		- April 17
+		- **April 27**
+		- June 5
+		- June 6
+			- Missing zero?
+			- Not all transition points filtered out?
+		- June 7 not all transition points filtered out
+			- May need to adjust the Picarro offset to more closely match with the O3 times when averaging was set to 2 seconds
+				- Don't think it matters with longer averaging time as much, so offset can be more
+		- June 12
+		- June 13
+		- June 17 - UZA runs out
+		- June 24 - UZA back on
+		- June 25 zeros get WEIRD
+		- July 13
+		- July 15
+		- July 19
+		- July 21 - 22 we have zeros not recorded by Picarro
+		- July 26
+		- August 12 - extra zero not recorded?
+- ThermoScientific_42i-TL data by sampling location
+	- Dates with clear events
+		- April 16
+		- April 17?
+		- June 13 some interesting stuff with 1st zero
+		- June 17 - UZA runs out
+		- June 24 - UZA back on
+		- July 11 maybe
+		- July 13 not all transitions filtered out
+		- July 21 - 22 we have zeros not recorded by Picarro
+- Overall not looking too bad!
+- Lab notebook activities
+	- 2/15
+		- 13:57 turned on O3 monitor in C200
+		- Cycled power 15:13
+	- 2/19
+		- 8:37 shut down O3 monitor to move tio instrument room
+		- 9:08 O3 monitor back on
+	- 4/15
+		- Moved O3, Thermo, and 2B NOx to TG rack (times?), installed pump pulling 2.9 LPM (no leak?)
+	- 4/16
+		- Measured flow 07:55
+			- 6.8 LPM before filters
+			- Installed filter
+		- 7:58 adjusted 2B NOx flows
+		- Switched pump critical orifice to pull less
+		- 8:24 removed one filter membrane
+		- 8:34 switched out filter membrane
+		- 8:40 adjusted 2BNOx flow
+	- 4/17
+		- 8:13 turned off instruments to move TG rack
+		- Messing with NOx pump flow, not sure if on line?
+			- NOx on 11:20 I think on line
+			- 12:50 disconnected NOx from sample line
+	- 5/1 - 5/2
+		- Replaced drierite
+	- 5/8
+		- 2B NOx off at some point, before 8:30 then back on
+	- **5/9** 
+		- 8:00, Thermo NOx offline
+		- 10:38:11 limonene addition
+	- 5/10
+		- 13:08 limonene addition
+	- 5/14
+		- 08:28 O3 and 2B NOx monitors off
+		- 13:06 instruments and pumps on
+		- 2 hours later, Thermo off again
+		- Installed CO monitor
+		- 15:20 limonene addition
+	- 5/15
+		- 13:16 methanol addition
+	- 5/16
+		- 10:54, 11:02, 11:08 nicotine sensitivity test
+		- 13:26 urea addition
+	- 5/17
+		- 13:14 D5-siloxane addition
+	- **5/28**
+		- **Bypass pump turned off 13:31, back on when?**
+	- 6/4
+		- 09:32-09:34 removed O3 monitor from TG line for cal, line capped by 09:34
+		- 12:58 - 13:00, reconnected O3 monitor to TG line
+		- 13:19 chlorox wipe
+	- 6/5
+		- Setting up TG line 09:15 - 13:30
+		- 9:15 - 11:10 adding HCHO montior to line, turned on 11:27
+		- 11:12-11:20 Thermo on room air
+	- 6/6
+		- CO cycled ~12:10
+		- 15:00 limonene
+	- 6/7
+		- 14:00 lemon cutting, retrieved 14:10
+	- 6/10
+		- 8:13 shut down HCHO, restarted it 
+	- 6/12
+		- 10:10 limonene
+		- Changed NOx diaphragm pump
+		- NOx on room air 16:20
+	- 6/13
+		- 8:15 -8:20 adjusting 2BNox flows
+		- Thermo nox reconneccted 08:20 - 08:30
+		- Flows adjusted 08:55 - 09:35 (messing with 2B NOx flows until 9:55)
+		- 10:00 d5 siloxane
+		- 11:04 d5 siloxane
+	- 6/18
+		- 10:00 orange peeling, removed 10:10
+		- 15:00 pinesol cleaning, removed 15:08
+	- 6/24
+		- 08:53 CO monitor shut down and disconnected
+		- 08:53 Thermo NOx off to move pump, back on 9:26
+		- Adjusting TG inlet location 14:30 -15:00
+		- 15:30 - 15:30 (?) adjusting TG flows
+	- 6/25
+		- 2BNOx monitor out of room
+		- 08:01 lemon zesting, removed 08:13
+		- 12:10 lemon peeling
+		- 15:29 pinesol cleaning, out 16:08
+	- **6/28**
+		- **9:00 limonene add**
+		- **17:00 limonene?**
+	- 7/2
+		- 10:02 urea
+		- 11:02 caffeine
+		- 12:02 nicotine
+	- 7/3
+		- 9:03 limonene
+	- 7/8
+		- 14:29 - 14:40 removed NOx from TG line for cal
+	- 7/9
+		- 7:37 a pinene
+		- 15:01 a pinene
+	- 7/10
+		- 7:32 a pinene
+		- 16:29 myrcene
+	- 7/11
+		- 8:30 linalool
+		- 13:57 linalool
+	- 7/12
+		- 9:09 limonene
+		- 17:01 limonene
+	- 7/15 overheated!
+		- 14:20 - 14:30 adjusting TG flows
+	- 7/16
+		- 9:01 limonene
+	- 7/17
+		- 9:00 limonene
+	- 7/18
+		- 9:01 limonene
+	- 7/19
+		- 9:01 limonene
+	- **7/21 - 7/22 add zeros!!**
+	- 7/23 smoke outside
+	- 7/24
+		- 08:47 thermo off and drierite replaced, restarted 8:57
+		- 9:000 limonene
+	- 7/25
+		- 9:00 limonene
+	- 7/26
+		- 7:30 myrcene
+		- 15:01 carene
+		- **What's happening ~17:45?**
+	- **What's happening 7/29?**
+	- 7/30
+		- 9:00 13C limonene
+		- **Noise?**
+	- 7/31
+		- 14:30 GUV, off 16:30
+	- 8/1
+		- 9:00 13C limonene
+	- 8/2
+		- GUV
+	- 8/6 overnight ACR not good bc door open
+		- 9:01 limonene
+		- 12:00 - 16:07 GUV
+	- 8/7
+		- 9:01 limonene
+		- 15:00 vent covers removed
+	- 8/8
+		- 9:01 limonene
+		- 12:01 limonene
+		- 15:01 limonene
+	- 8/9
+		- 9:31 limonene
+		- 12:00 limonene
+		- 15:00 limonene
+	- 8/12
+		- 10:21 shut down thermo NOx
+		- 10:32 shut down HCHO
+		- **Missing zero**
+- Come back to this tomorrow, looking at Picarro (and Thermo)
