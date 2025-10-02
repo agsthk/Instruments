@@ -184,12 +184,12 @@ for inst, factors in cal_factors.items():
 zeros = {}
 off_corr = {}
 lod_corr = {}
-
+year = 2024
 for root, dirs, files in os.walk(ZERO_RESULTS_DIR):
     for file in files:
         if file.find(".png") != -1:
             continue
-        if file.find("UZAStatistics") != -1:
+        if file.find("UZAStatistics_" + str(year)) != -1:
             inst = file.rsplit("_", 1)[0]
             path = os.path.join(root, file)
             inst_zeros = pl.read_csv(path)
@@ -200,7 +200,7 @@ for root, dirs, files in os.walk(ZERO_RESULTS_DIR):
                 ).rename(lambda name: name.replace("Mean",
                                                    "Offset").replace("STD",
                                                                      "LOD"))
-        if file.find("OffsetTemperatureCorrelation") != -1:
+        if file.find("OffsetTemperatureCorrelation_" + str(year)) != -1:
             inst = file.rsplit("_", 1)[0]
             path = os.path.join(root, file)
             inst_off_corr = pl.read_csv(path)
@@ -215,7 +215,7 @@ for root, dirs, files in os.walk(ZERO_RESULTS_DIR):
                         ).items()
                         }
             off_corr[inst] = inst_off_corr
-        if file.find("LODTemperatureCorrelation") != -1:
+        if file.find("LODTemperatureCorrelation_" + str(year)) != -1:
             inst = file.rsplit("_", 1)[0]
             path = os.path.join(root, file)
             inst_lod_corr = pl.read_csv(path)
@@ -292,6 +292,8 @@ species = {}
 for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
     for file in tqdm(files):
         if file.startswith("."):
+            continue
+        if file.find(str(year)) == -1:
             continue
         path = os.path.join(root, file)
         # Identifies instrument that produced clean data
