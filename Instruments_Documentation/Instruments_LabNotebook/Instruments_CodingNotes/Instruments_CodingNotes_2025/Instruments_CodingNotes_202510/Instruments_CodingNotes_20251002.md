@@ -66,3 +66,6 @@
 	- Actually within rounding it's basically the same slope, slightly different offset
 	- Not particularly worried about it
 - Trying to modify to prevent exporting if the R2 value is less than 0.01 (O3)
+- Satisfied that I've characterized zeros
+# calibrate_cleandata.py
+- Don't think I really need to make any changes, going to run with current calibration dates, then going to change to cal dates I want to use for Phase I
