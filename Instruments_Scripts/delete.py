@@ -24,6 +24,7 @@ if "Instruments" in os.path.dirname(data_dir):
     data_dir = os.path.dirname(data_dir)
 data_dir = os.path.join(data_dir, "Instruments_Data")
 
+CALIBRATED_DATA_DIR = os.path.join(data_dir, "Instruments_CalibratedData")
 # Full path to directory containing all structured raw data
 STRUCT_DATA_DIR = os.path.join(data_dir, "Instruments_StructuredData")
 # Full path to directory containing all clean raw data
@@ -83,9 +84,15 @@ insts = ["2BTech_202",
          # "TempRHDoor",
          "ThermoScientific_42i-TL"]
 
+cal_dates = {"2BTech_202": "20240118",
+             "2BTech_205_A": "20240604",
+             "2BTech_205_B": "20240604",
+             "2BTech_405nm": "20241216",
+             "Picarro_G2307": "20250625",
+             "ThermoScientific_42i-TL": "20240708"}
 data = {inst: {} for inst in insts}
 
-for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
+for root, dirs, files in tqdm(os.walk(CALIBRATED_DATA_DIR)):
     for file in tqdm(files):
         if file.startswith("."):
             continue
@@ -96,6 +103,8 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
             if path.find(inst) != -1:
                 break
         if path.find(inst) == -1:
+            continue
+        if path.find(cal_dates[inst] + "Calibration") == -1:
             continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
@@ -126,6 +135,50 @@ for inst in insts:
     for df in data[inst].values():
         all_cols += df.columns
         break
+
+# %%
+ebar_kwargs = {'fmt': 'o', # Marker style
+               'linestyle': '', # Turns off lines between points
+               'linewidth': 3, # Width of error bars
+               'capsize': 3, # Length of error bar caps
+               'barsabove': False,
+               "mec": "black"} # Error bars drawn on top of markers
+line_kwargs = {'linewidth': 3,
+               'color': "#D9782D"}
+var = {"2BTech_205_A": "O3_ppb",
+       "2BTech_405nm": "NO2_ppb",
+       "ThermoScientific_42i-TL": "NO2_ppb",
+       "Picarro_G2307": "CH2O_ppb"}
+# %%
+inst = "ThermoScientific_42i-TL"
+for date, df in data[inst].items():
+    df = df.filter(
+        pl.col("SamplingLocation").str.contains("C200")
+        ).with_columns(
+        (pl.col("FTC_Stop").sub(pl.col("FTC_Start")).truediv(2)).alias("t_unc")
+        ).with_columns(
+            pl.col("FTC_Start").add(pl.col("t_unc")).alias("FTC_DateTime")
+            )
+    if df.is_empty():
+        continue
+    fig, ax = plt.subplots(figsize=(8,4))
+    ax.errorbar(
+        x=df["FTC_DateTime"],
+        y=df[var[inst]],
+        xerr=df["t_unc"],
+        yerr=df[var[inst] + "_Uncertainty"],
+        **ebar_kwargs
+        )
+    ax.plot(
+        df["FTC_DateTime"],
+        df[var[inst] + "_LOD"],
+        **line_kwargs
+        )
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator(tz=pytz.timezone("America/Denver")))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M", tz=pytz.timezone("America/Denver")))
+    ax.set_title(date)
+
+
 
 # %% 
 for date, df in data["ThermoScientific_42i-TL"].items():
