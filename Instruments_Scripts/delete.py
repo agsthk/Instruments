@@ -129,7 +129,7 @@ for inst in insts:
 
 # %% 
 for date, df in data["ThermoScientific_42i-TL"].items():
-    if date.find("202406") == -1:
+    if date.find("202405") == -1:
         continue
     date_plots = df.hvplot.scatter(
         x="UTC_Start",

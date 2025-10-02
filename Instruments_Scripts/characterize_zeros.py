@@ -126,11 +126,12 @@ for inst, dfs in uza_stats.items():
 
 temps = ["CellTemp_C", "CavityTemp_C", "InternalTemp_C", "ChamberTemp_C"]
 
+year = 2025
+
 temp_corr = {}
 lod_corr = {}
 for inst, df in uza_stats.items():
     inst_temp_corr = {}
-    year = 2025
     df = df.filter(
         pl.col("UTC_Start").dt.year().eq(year)
         )
@@ -220,14 +221,15 @@ for inst, df in uza_stats.items():
         lodsens, lodoff, unc_lodsens, lodunc_off = perform_odr(x, lod, x_unc, None, [lodreg.slope, lodreg.intercept])
         lodr2 = calc_r2(x, lod, lodsens, lodoff)
         
-        if inst not in lod_corr.keys():
-            lod_corr[inst] = {}
-        
-        lod_corr[inst][var] = {"Slope": lodsens,
-                               "Intercept": lodoff,
-                               "Slope_Uncertainty": unc_lodsens,
-                               "Intercept_Uncertainty": lodunc_off,
-                               "R2": lodr2}
+        if lodr2 > 0.01:
+            if inst not in lod_corr.keys():
+                lod_corr[inst] = {}
+            
+            lod_corr[inst][var] = {"Slope": lodsens,
+                                   "Intercept": lodoff,
+                                   "Slope_Uncertainty": unc_lodsens,
+                                   "Intercept_Uncertainty": lodunc_off,
+                                   "R2": lodr2}
         
         fit_label = ('['
                      + yname
@@ -279,7 +281,7 @@ for inst, df in uza_stats.items():
     direct = os.path.join(ZERO_RESULTS_DIR, folder)
     if not os.path.exists(direct):
         os.makedirs(direct)
-    file = inst + "_UZAStatistics.csv"
+    file = inst + "_UZAStatistics_" + str(year) + ".csv"
     path = os.path.join(direct, file)
     df.write_csv(path)
     if inst in temp_corr.keys():
@@ -292,7 +294,7 @@ for inst, df in uza_stats.items():
                     )
                 )
         inst_corrs = pl.concat(inst_corrs)
-        file = inst + "_OffsetTemperatureCorrelation.csv"
+        file = inst + "_OffsetTemperatureCorrelation_" + str(year) + ".csv"
         path = os.path.join(direct, file)
         inst_corrs.write_csv(path,
                              float_precision=6)
@@ -306,7 +308,7 @@ for inst, df in uza_stats.items():
                     )
                 )
         inst_corrs = pl.concat(inst_corrs)
-        file = inst + "_LODTemperatureCorrelation.csv"
+        file = inst + "_LODTemperatureCorrelation_" + str(year) + ".csv"
         path = os.path.join(direct, file)
         inst_corrs.write_csv(path,
                              float_precision=6)

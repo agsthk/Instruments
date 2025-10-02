@@ -298,8 +298,6 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         date = file.rsplit("_", 1)[-1][:-4]
         if date.find("2024") == -1:
             continue
-        if inst != "2BTech_205_A":
-            continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:

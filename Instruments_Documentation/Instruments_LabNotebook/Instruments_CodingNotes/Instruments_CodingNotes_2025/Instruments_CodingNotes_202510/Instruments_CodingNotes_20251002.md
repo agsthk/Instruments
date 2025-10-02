@@ -55,3 +55,14 @@
 			- -22.9 is July 22
 			- A cutoff of -12 works, even with a later zero that nears -12 - must be gt -12
 			- Making this only apply to 2024 data because I don't want to worry about how it might affect 2025 data
+	- Checking
+		- Picarro zeros still messed up on June 6 and 7 but I'm just not going to care
+			- Only going to share data from June 10 and beyond
+# characterize_zeros.py
+- Running script to characterize zeros for 2024
+- Modified to have the year in the file names so they don't get replaced
+- Thermo correlations are similar between 2024 and 2025 - don't need to compare much
+- 2BTech_205_A actually differs by quite a bit
+	- Actually within rounding it's basically the same slope, slightly different offset
+	- Not particularly worried about it
+- Trying to modify to prevent exporting if the R2 value is less than 0.01 (O3)
