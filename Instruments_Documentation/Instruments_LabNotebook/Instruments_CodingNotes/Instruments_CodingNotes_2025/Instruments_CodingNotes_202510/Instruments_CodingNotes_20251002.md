@@ -14,3 +14,44 @@
 # clean_rawdata.py
 - Revised valve_states to not count solenoid valve states of 1 during period where UZA tank was empty
 	- After checking, looks good!
+- Now need to figure out why Hampel filter appears to not be working
+	- Confirmed that code is filtering outliers for Phase II data
+	- Checking Phase I
+		- March 11, need to add the manual O3 additions or it filters out the start of them - also strict filter with O3 no higher than 150? 200?
+		- March 24, point at -7 should be IDed as outlier
+		- April 15, point at ~24 missed
+		- April 27 several points missed
+		- May 3 point missed
+		- May 4 several points missed
+		- May 5 several points missed
+		- May 7 several points missed
+		- May 8 point missed
+		- May 16 points missed
+		- May 20 point missed
+		- May 21, 22, 23, 29
+		- June 6 have manual? O3 adds to add
+		- June 10 add manual O3 add
+		- Missed points July 2, July 9, July 10, July 11, 13?,
+		- July 23 missing addition? ~16:00?
+		- Missed point July 29, 30, Aug 1, 14
+	- The points that are being missed are very clearly outside of the Hampel filter range - why are they being kept?
+		- Checking d/dt to see if that gives me an answer
+			- That is why - I think I meant to set the d/dt cutoff to 0.025, not 0.25
+			- When I fixed this, looked a lot better
+				- Actually, it definitely depends on averaging time
+				- 10s averaging time (Phase II data) SHOULD be 0.25 cutoff, and 2s averaging time should be 2.5 cutoff, 1 minute should be 0.025 - how to implement?
+					- Calculate averaging time and do a join_asof?
+						- This worked well, checking results but I expect it'll be all good - and this means Phase II data won't change!
+	- What's happening March 20 - interferences?
+	- Logging manual O3 additions
+		- Already logged really, just hadn't been read in - doing now
+	- Increased time offset to 75 seconds for 2024 data to hopefully handle the slightly offset instrument times
+	- Almost there, just need to adjust the manual O3 addition times to prevent cutting out real data
+		- Actually it's the automated additions cutting out real data! Interesting
+		- Going to offset the start time by 1 minute to determine data to keep by default
+	- Final thing is to cut out non-real data from zeros
+		- Only one instance as far as I am aware and it's pretty obvious (-20 ppb reading)
+			- July 19, also have -12 and -14 ppb reading
+			- -22.9 is July 22
+			- A cutoff of -12 works, even with a later zero that nears -12 - must be gt -12
+			- Making this only apply to 2024 data because I don't want to worry about how it might affect 2025 data

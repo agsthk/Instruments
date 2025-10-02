@@ -128,12 +128,12 @@ for inst in insts:
         break
 
 # %% 
-for date, df in data["2BTech_205_A"].items():
+for date, df in data["ThermoScientific_42i-TL"].items():
     if date.find("202406") == -1:
         continue
     date_plots = df.hvplot.scatter(
         x="UTC_Start",
-        y="O3_ppb",
+        y="NOx_ppb",
         by="SamplingLocation",
         title=date
         )

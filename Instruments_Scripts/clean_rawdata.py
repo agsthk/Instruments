@@ -44,6 +44,23 @@ SAMPLING_LOC_DIR = os.path.join(data_dir,
 AVG_TIME_DIR = os.path.join(data_dir,
                             "Instruments_ManualData", 
                             "Instruments_AveragingTimes")
+# Full path to manual addition times
+MAN_ADDS_PATH = os.path.join(data_dir,
+                             "Instruments_ManualData",
+                             "Instruments_ManualExperiments",
+                             "ManualAdditionTimes - Copy.csv")
+man_add_times = pl.read_csv(MAN_ADDS_PATH).with_columns(
+    pl.selectors.contains("UTC").str.to_datetime()
+    )
+man_add_times = {key[0]: df for key, df in 
+             man_add_times.partition_by(
+                 "Species", as_dict=True, include_key=False
+                 ).items()}
+for spec, df in add_times.items():
+    if spec in man_add_times.keys():
+        add_times[spec] = pl.concat(
+            [df, man_add_times[spec]]
+            ).sort(by="UTC_Start")
 
 insts = ["2BTech_202",
          "2BTech_205_A",
@@ -231,8 +248,26 @@ for inst, df in sampling_locs.items():
     
 for inst, df in sampling_locs.items():
     sampling_locs[inst] = df.with_columns(
-        pl.col("UTC_Start").dt.offset_by("60s"),
-        pl.col("UTC_Stop").dt.offset_by("-60s")
+        pl.when(
+            pl.col("UTC_Start").dt.year().eq(2025)
+            )
+        .then(
+            pl.col("UTC_Start").dt.offset_by("60s")
+            )
+        .otherwise(
+            pl.col("UTC_Start").dt.offset_by("75s")
+            )
+        .alias("UTC_Start"),
+        pl.when(
+            pl.col("UTC_Stop").dt.year().eq(2025)
+            )
+        .then(
+            pl.col("UTC_Stop").dt.offset_by("-60s")
+            )
+        .otherwise(
+            pl.col("UTC_Stop").dt.offset_by("-75s")
+            )
+        .alias("UTC_Stop"),
         )
 
 avg_times = {}
@@ -262,6 +297,8 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         _, source = file[:-17].split("_Structured")
         date = file.rsplit("_", 1)[-1][:-4]
         if date.find("2024") == -1:
+            continue
+        if inst != "2BTech_205_A":
             continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
@@ -404,6 +441,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 | pl.col("UTC_Stop").is_between(lf_start, lf_stop)
                 )
             lf_adds = lf_adds.with_columns(
+                pl.col("UTC_Start").dt.offset_by("-1m"),
                 pl.col("UTC_Stop").dt.offset_by("20m")
                 ).lazy()
             lf_room = lf_room.join_asof(
@@ -443,13 +481,26 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                                                              window_size="10m")
                         .mul(1.4826).alias("MAD")
                         )
+            ddtlims = pl.LazyFrame(
+                {"AvgT": [2, 10, 60],
+                 "d/dt_lim": [2.5, 0.25, 0.03]}
+                )
+            lf_room = lf_room.with_columns(
+                pl.col("UTC_Stop").sub(pl.col("UTC_Start"))
+                .dt.total_seconds().alias("AvgT")
+                ).sort(by="AvgT").join_asof(
+                        ddtlims,
+                        on="AvgT",
+                        strategy="nearest",
+                        coalesce=True
+                        ).sort(by="UTC_Start")
             lf_room = lf_room.with_columns(
                 pl.when(
                     (pl.col("O3_ppb").sub(pl.col("median")).abs()
-                     .le(pl.col("MAD").mul(3))
-                    | pl.col("d/dt").lt(0.25)
+                     .lt(pl.col("MAD").mul(3))
+                    | pl.col("d/dt").lt(pl.col("d/dt_lim"))
                     | pl.col("KeepDefault"))
-                    & pl.col("O3_ppb").gt(-8)
+                    & pl.col("O3_ppb").is_between(-8, 150)
                     )
                 .then(pl.col("SamplingLocation"))
                 .otherwise(pl.lit(None))
@@ -468,6 +519,15 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 ).sort(
                     by="UTC_Start"
                     )
+            if date.find("2024") != -1:
+                lf = lf.with_columns(
+                        pl.when(
+                            pl.col("O3_ppb").le(-12)
+                            )
+                        .then(pl.lit(None))
+                        .otherwise(pl.col("SamplingLocation"))
+                        .alias("SamplingLocation")
+                        )                       
         if inst == "2BTech_205_B":
             lf = lf.with_columns(
                 pl.when(pl.col("O3_ppb").is_between(-5, 200))
@@ -488,8 +548,6 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         df = lf.collect()
         if df.is_empty():
             continue
-
-        
         if "FTC_Start" in df.columns:
             part_col = "FTC_Start"
         else:
