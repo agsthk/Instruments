@@ -129,8 +129,10 @@ for inst in insts:
 
 # %% 
 for date, df in data["2BTech_205_A"].items():
+    if date.find("202406") == -1:
+        continue
     date_plots = df.hvplot.scatter(
-        x="FTC_Start",
+        x="UTC_Start",
         y="O3_ppb",
         by="SamplingLocation",
         title=date

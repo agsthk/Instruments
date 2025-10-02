@@ -101,6 +101,11 @@ valve_states = valve_states.select(
         & pl.col("UTC_Stop").lt(datetime(2025, 3, 20, 20, 35, tzinfo=pytz.UTC))
         & pl.col("SolenoidValves").eq(1))
     .then(pl.lit("B203"))
+    .when(
+        pl.col("UTC_Start").gt(datetime(2024, 6, 18, 0, 0, tzinfo=pytz.UTC))
+        & pl.col("UTC_Stop").lt(datetime(2024, 6, 24, 21, 0, tzinfo=pytz.UTC))
+        & pl.col("SolenoidValves").eq(1))
+    .then(pl.lit("C200/B203"))
     .when(pl.col("SolenoidValves").eq(1))
     .then(pl.lit("UZA"))
     .alias("SamplingLocation")
