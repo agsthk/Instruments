@@ -80,3 +80,7 @@
 - Now that I have the calibrated data, going to try to estimate the magnitude of the leak
 - First, working on getting the ozone background for the 2025 data
 	- Joining with the most recent ozone addition start time, removing data within 2 hours of the associated ozone addition stop time
+- Now, going to try to determine the I/V ratio at 10 minute time resolution
+	- May decide to remove data below the LOD - wait to see
+		- Yes remove
+	- Visually, looks like I/V drops from ~0.4 to ~0.1 after leak fixed (yikes)

@@ -129,50 +129,33 @@ for week, df in data_2025["2BTech_205_A"].items():
         ).with_columns(
             pl.col("UTC_Stop").dt.offset_by("2h")
             )
-            
     if not week_o3_adds.is_empty():
-        data_2025["2BTech_205_A_BG"][week] = df.join_asof(
-            week_o3_adds,
-            on="UTC_Start",
-            strategy="backward",
-            suffix="_Add"
-            ).filter(
-                pl.col("UTC_Start").gt(pl.col("UTC_Stop_Add"))
-                | pl.col("UTC_Stop_Add").is_null()
-                ).select(
-                    pl.exclude("UTC_Stop_Add")
-                    )
-    plot = df.filter(
+        data_2025["2BTech_205_A_BG"][week] = df.filter(
             pl.col("SamplingLocation").str.contains("C200")
-            ).hvplot.scatter(
-                x="UTC_Start",
-                y="O3_ppb",
-                title=str(week)
-                )
-    if not week_o3_adds.is_empty():
-        bg = df.join_asof(
-            week_o3_adds,
-            on="UTC_Start",
-            strategy="backward",
-            suffix="_Add"
-            ).filter(
-                pl.col("UTC_Start").gt(pl.col("UTC_Stop_Add"))
-                | pl.col("UTC_Stop_Add").is_null()
-                )
-        plot = plot * bg.filter(
-                pl.col("SamplingLocation").str.contains("C200")
-                ).hvplot.scatter(
-                    x="UTC_Start",
-                    y="O3_ppb",
-                    title=str(week)
-                    )
-    hvplot.show(
-        plot * hv.VLines(week_o3_adds["UTC_Start"]) * hv.VLines(week_o3_adds["UTC_Stop"])
-        )
+            ).join_asof(
+                week_o3_adds,
+                on="UTC_Start",
+                strategy="backward",
+                suffix="_Add"
+                ).filter(
+                    pl.col("UTC_Start").gt(pl.col("UTC_Stop_Add"))
+                    | pl.col("UTC_Stop_Add").is_null()
+                    ).select(
+                        pl.exclude("UTC_Stop_Add")
+                        )
 
 # %%
 
-for week, df in data_2025["2BTech_205_A"].items():
+for week, df in data_2025["2BTech_205_A_BG"].items():
+    
+    bg_o3 = df.filter(
+        pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+        ).group_by_dynamic(
+            "FTC_Start", every="10m"
+            ).agg(
+                pl.col("O3_ppb").mean()
+                )
+    
     plot = df.filter(
             pl.col("SamplingLocation").str.contains("C200")
             ).hvplot.scatter(
@@ -181,13 +164,30 @@ for week, df in data_2025["2BTech_205_A"].items():
                 title=str(week)
                 )
     if week in data_2025["2BTech_205_B"].keys():
-        plot = plot * data_2025["2BTech_205_B"][week].filter(
+        vent_o3 = data_2025["2BTech_205_B"][week].filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).group_by_dynamic(
+                "FTC_Start", every="10m"
+                ).agg(
+                    pl.col("O3_ppb").mean()
+                    )
+        io_o3 = bg_o3.join(
+            vent_o3,
+            on="FTC_Start",
+            suffix="_Vent"
+            ).with_columns(
+                pl.col("O3_ppb").truediv(pl.col("O3_ppb_Vent")).alias("IO")
+                )
+        plot = ((plot * data_2025["2BTech_205_B"][week].filter(
             pl.col("SamplingLocation").str.contains("C200")
             ).hvplot.scatter(
                 x="FTC_Start",
                 y="O3_ppb",
                 title=str(week)
-                )
+                )) + io_o3.hvplot.scatter(
+                    x="FTC_Start",
+                    y="IO"
+                    )).cols(1)
     hvplot.show(plot)
 # %%
 
