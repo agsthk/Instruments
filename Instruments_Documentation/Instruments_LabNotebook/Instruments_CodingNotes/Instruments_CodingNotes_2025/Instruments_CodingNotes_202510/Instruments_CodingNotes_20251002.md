@@ -88,3 +88,16 @@
 - Instead of removing data during the addition period, just going to make it null and then interpolate
 	- Checked and this gives the same result with I/O ratio
 - Did interpolation, now going to do background subtraction and see what that looks like
+- Quick look at the plots:
+	- **Need to take a closer look at NOx - doesn't look like the offset was corrected at all?**
+	- During leak
+		- Jan 21 18:00 - Jan 27 04:00 representative of decays under normal NOx
+	- Leak fixed
+		- Jan 27 22:00, Jan 28 02:00, Jan 29 02:00 representative of decays under normal NOx
+			- Jan 30 on as well, but not interested in going much beyond Jan 29
+	- Comparison:
+		- Divide at Jan 27 12:00 MT
+		- For during leak, use Jan 27 02:00, Jan 26 at 14:00 18:00 10:00 6:00 (gives a full day with normal NO)
+		- For after leak fixed, use 
+# calibrate_cleandata.py
+- Moving back to this because I fear I may not have applied the offset ever
