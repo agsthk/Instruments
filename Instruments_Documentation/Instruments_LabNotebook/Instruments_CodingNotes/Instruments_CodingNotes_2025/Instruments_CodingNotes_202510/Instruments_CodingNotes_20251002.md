@@ -84,3 +84,6 @@
 	- May decide to remove data below the LOD - wait to see
 		- Yes remove
 	- Visually, looks like I/V drops from ~0.4 to ~0.1 after leak fixed (yikes)
+- Going to interpolate background O3 to get a background during decays rather than using the I/O ratio (later will compare, but WAY later)
+- Instead of removing data during the addition period, just going to make it null and then interpolate
+	- Checked and this gives the same result with I/O ratio

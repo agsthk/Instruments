@@ -137,13 +137,18 @@ for week, df in data_2025["2BTech_205_A"].items():
                 on="UTC_Start",
                 strategy="backward",
                 suffix="_Add"
-                ).filter(
-                    pl.col("UTC_Start").gt(pl.col("UTC_Stop_Add"))
-                    | pl.col("UTC_Stop_Add").is_null()
+                ).with_columns(
+                    pl.when(
+                        pl.col("UTC_Start").le(pl.col("UTC_Stop_Add"))
+                        )
+                    .then(pl.lit(None))
+                    .otherwise(pl.col("O3_ppb"))
+                    .alias("O3_ppb")
                     ).select(
                         pl.exclude("UTC_Stop_Add")
                         )
 
+data_2025["2BTech_205_A_BG"][15]
 # %%
 
 for week, df in data_2025["2BTech_205_A_BG"].items():
