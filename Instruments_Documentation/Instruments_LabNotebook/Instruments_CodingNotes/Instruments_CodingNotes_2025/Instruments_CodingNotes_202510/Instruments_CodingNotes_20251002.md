@@ -106,3 +106,16 @@
 - Identified which additions I want to use for the before and after comparison
 - Determined the concentration before the addition, the highest concentration reached, and the difference between the two for each addition I will use for comparison
 - Plotted figures with pre and post leak fix side by side
+- Values
+	- With leak (starting conc, max conc, difference)
+		- 16.36606263470769, 70.19246940329097, 53.82640676858328
+		- 18.95081317322362, 74.87713298588744, 55.92631981266382
+		- 15.223231397824279, 67.9477347699635, 52.724503372139225
+		- 13.293326306337956, 67.9477347699635, 54.65440846362554
+		- 7.982151935477574, 64.43423708301613, 56.452085147538554
+	- Fixed
+		- 4.607179246940328, 106.1082235365306, 101.50104428959027
+		- 6.011319003551906, 107.0841951162382, 101.0728761126863
+		- 0.06418895817237658, 95.56773047568855, 95.50354151751617
+	- Cross at 30-40 ppb
+		- Overlayed to check that, seems about right

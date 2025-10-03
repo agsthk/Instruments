@@ -257,10 +257,11 @@ for week, df in data_2025["2BTech_205_A"].items():
                 y="O3_ppb",
                 xlabel="Seconds from addition start",
                 ylabel="[O3] (ppb)",
-                title="Before leak fixed",
+                title="Overlayed",
                 width=400,
                 height=600,
-                grid=True
+                grid=True,
+                color="blue"
                 )
             )
         pre_add = df.filter(
@@ -292,7 +293,8 @@ for week, df in data_2025["2BTech_205_A"].items():
                 title="After leak fixed",
                 width=400,
                 height=600,
-                grid=True
+                grid=True,
+                color="red"
                 )
             )
         pre_add = df.filter(
@@ -322,7 +324,7 @@ for i, plot in enumerate(post_plots):
         post_plot = post_plot * plot
 
 hvplot.show(
-    (pre_plot + post_plot).cols(2)
+    (pre_plot * post_plot)#.cols(2)
     )
         
 # %%
