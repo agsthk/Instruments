@@ -453,13 +453,125 @@ for week, df in data_2024["2BTech_205_A"].items():
     hvplot.show(
         df.filter(
             pl.col("SamplingLocation").str.contains("C200")
-            ).hvplot.scatter(
-                x="FTC_Start",
-                y="O3_ppb",
-                title=str(week)
-                )
+            ).with_columns(
+                pl.col("FTC_Start").dt.time().alias("FTC_Time")
+                ).hvplot.scatter(
+                    x="FTC_Start",
+                    y="O3_ppb",
+                    title=str(week)
+                    )
         )
-    
+# %%
+# Possible dates leak was introduced
+leak_intro = datetime(2024, 6, 13, 9, 0, 0, tzinfo=pytz.timezone("America/Denver"))
+# leak_intro = datetime(2024, 6, 24, 15, 0, 0, tzinfo=pytz.timezone("America/Denver"))
+# Start of pre leak intro comparison
+comp_start = (leak_intro - timedelta(days=3)).replace(hour=0)
+# End of post leak intro comparison
+comp_stop = (leak_intro + timedelta(days=4)).replace(hour=0)
+
+pre_leak = []
+post_leak = []
+
+for week, df in data_2024["2BTech_205_A"].items():
+    week_start = df["UTC_Start"].min()
+    week_stop = df["UTC_Stop"].max()
+    if week_stop < comp_start or week_start > comp_stop:
+        continue
+    week_o3_adds = add_times["O3"].filter(
+        pl.col("UTC_Stop").ge(week_start)
+        & pl.col("UTC_Start").le(week_stop)
+        ).with_columns(
+            pl.col("UTC_Stop").dt.offset_by("2h")
+            )
+    if not week_o3_adds.is_empty():
+        df = df.filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).join_asof(
+                week_o3_adds,
+                on="UTC_Start",
+                strategy="backward",
+                suffix="_Add"
+                ).with_columns(
+                    pl.when(
+                        pl.col("UTC_Start").le(pl.col("UTC_Stop_Add"))
+                        )
+                    .then(pl.lit(None))
+                    .otherwise(pl.col("O3_ppb"))
+                    .alias("O3_ppb")
+                    ).select(
+                        pl.exclude("UTC_Stop_Add")
+                        )
+    pre_leak.append(df.filter(
+        pl.col("FTC_Stop").ge(comp_start) & pl.col("FTC_Start").le(leak_intro)
+        ))
+    post_leak.append(df.filter(
+        pl.col("FTC_Stop").ge(leak_intro) & pl.col("FTC_Start").le(comp_stop)
+        ))
+    # hvplot.show(
+    #     df.filter(
+    #         pl.col("SamplingLocation").str.contains("C200")
+    #         ).with_columns(
+    #             pl.col("FTC_Start").dt.time().alias("FTC_Time")
+    #             ).hvplot.scatter(
+    #                 x="FTC_Time",
+    #                 y="O3_ppb",
+    #                 title=str(week)
+    #                 )
+    #     )
+
+pre_leak = pl.concat(pre_leak).with_columns(
+    pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+    pl.col("FTC_Start").dt.date().alias("FTC_Date")
+    )
+post_leak = pl.concat(post_leak).with_columns(
+    pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+    pl.col("FTC_Start").dt.date().alias("FTC_Date")
+    )
+
+
+hvplot.show(
+    ((pre_leak.hvplot.scatter(
+        x="FTC_Time",
+        y="O3_ppb",
+        by="FTC_Date",
+        xlabel="Local time",
+        ylabel="Background [O3] (ppb)",
+        title="Before leak introduced",
+        width=600,
+        height=400,
+        grid=True,
+        xlim=(pre_leak["FTC_Time"].min(), pre_leak["FTC_Time"].max()),
+        ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+        shared_axes=False
+        ))+ (post_leak.hvplot.scatter(
+            x="FTC_Time",
+            y="O3_ppb",
+            by="FTC_Date",
+            xlabel="Local time",
+            ylabel="Background [O3] (ppb)",
+            title="After leak introduced",
+            width=600,
+            height=400,
+            grid=True,
+            xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+            ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+            shared_axes=False
+            ) * post_leak.hvplot.line(
+                x="FTC_Time",
+                y="O3_ppb_LOD",
+                xlabel="Local time",
+                ylabel="Background [O3] (ppb)",
+                title="After leak introduced",
+                width=600,
+                height=400,
+                grid=True,
+                xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+                ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+                shared_axes=False,
+                color="Black"))).cols(2)
+    )
+
 
 # %%
 for week, df in data_2024["2BTech_205_A_BG"].items():

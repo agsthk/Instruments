@@ -122,3 +122,13 @@
 - Now going to see what the background looks like
 	- Looks different, but not sure I can quantify - after, mostly below LOD
 - Tried to compare Phase I backgrounds but I am confusion
+	- I think I introduced leak June 13? Not sure, 24th also possible?
+	- 100% leaking by 7/15 - didn't measure any flow (or maybe not?)
+	- April 15 was when I set up the TG line, pump flow was 2.9 lpm on air
+	- Spring, had pump pulling 1.44 LPM on its own and that was good, so anything higher should be fine?
+	- Could have introduced in on 5/14, but I don't think so
+	- 5/28 overflow pump was off
+	- 6/5 pump was pulling plenty
+	- HAD to have been the 13th, had pump pulling only 0.7 on room air - but that was higher than the 0.178 I measured Jan 27
+	- Could also have been 6/24 - I have no measurements but know I adjusted flows
+	- Best guess is the 13th, other option is the 24th - was definitely fine prior to the 13th
