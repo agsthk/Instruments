@@ -623,20 +623,20 @@ for week, df in data_2024["2BTech_205_A"].items():
         pl.col("FTC_Stop").ge(leak_intro) & pl.col("FTC_Start").le(comp_stop) & ~pl.col("FTC_Start").dt.day().eq(14)
         ))
     
-    if week in data_2024["ThermoScientific_42i-TL"].keys():
-        nox_df = data_2024["ThermoScientific_42i-TL"][week]
-        pre_leak_nox.append(nox_df.filter(
-            pl.col("FTC_Stop").ge(comp_start) & pl.col("FTC_Start").le(leak_intro)
-            & pl.col("SamplingLocation").str.contains("B203")
-            ).with_columns(
-                pl.col("NO_ppb").add(pl.col("NO2_ppb")).alias("NOx_ppb")
-                ))
-        post_leak_nox.append(nox_df.filter(
-            pl.col("FTC_Stop").ge(leak_intro) & pl.col("FTC_Start").le(comp_stop)
-            & pl.col("SamplingLocation").str.contains("B203")
-            ).with_columns(
-                pl.col("NO_ppb").add(pl.col("NO2_ppb")).alias("NOx_ppb")
-                ))
+    # if week in data_2024["ThermoScientific_42i-TL"].keys():
+    #     nox_df = data_2024["ThermoScientific_42i-TL"][week]
+    #     pre_leak_nox.append(nox_df.filter(
+    #         pl.col("FTC_Stop").ge(comp_start) & pl.col("FTC_Start").le(leak_intro)
+    #         & pl.col("SamplingLocation").str.contains("B203")
+    #         ).with_columns(
+    #             pl.col("NO_ppb").add(pl.col("NO2_ppb")).alias("NOx_ppb")
+    #             ))
+    #     post_leak_nox.append(nox_df.filter(
+    #         pl.col("FTC_Stop").ge(leak_intro) & pl.col("FTC_Start").le(comp_stop)
+    #         & pl.col("SamplingLocation").str.contains("B203")
+    #         ).with_columns(
+    #             pl.col("NO_ppb").add(pl.col("NO2_ppb")).alias("NOx_ppb")
+    #             ))
     # hvplot.show(
     #     df.filter(
     #         pl.col("SamplingLocation").str.contains("C200")
@@ -649,36 +649,62 @@ for week, df in data_2024["2BTech_205_A"].items():
     #                 )
     #     )
 
-pre_leak_nox = pl.concat(pre_leak_nox).with_columns(
-    pl.col("FTC_Start").dt.time().alias("FTC_Time"),
-    pl.col("FTC_Start").dt.date().alias("FTC_Date")
-    )
-# .filter(
-#         pl.col("NO_ppb").ge(pl.col("NO_ppb_LOD"))
-#         )
-post_leak_nox = pl.concat(post_leak_nox).with_columns(
-    pl.col("FTC_Start").dt.time().alias("FTC_Time"),
-    pl.col("FTC_Start").dt.date().alias("FTC_Date")
-    )
-# .filter(
-#         pl.col("NO_ppb").ge(pl.col("NO_ppb_LOD"))
-#         )
+# pre_leak_nox = pl.concat(pre_leak_nox).with_columns(
+#     pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+#     pl.col("FTC_Start").dt.date().alias("FTC_Date")
+#     )
+# # .filter(
+# #         pl.col("NO_ppb").ge(pl.col("NO_ppb_LOD"))
+# #         )
+# post_leak_nox = pl.concat(post_leak_nox).with_columns(
+#     pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+#     pl.col("FTC_Start").dt.date().alias("FTC_Date")
+#     )
+# # .filter(
+# #         pl.col("NO_ppb").ge(pl.col("NO_ppb_LOD"))
+# #         )
 
 pre_leak = pl.concat(pre_leak).with_columns(
-    pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+    pl.col("FTC_Start").dt.replace(day=13).alias("FTC_Time"),
     pl.col("FTC_Start").dt.date().alias("FTC_Date")
     )
 # .filter(
 #         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
 #         )
 post_leak = pl.concat(post_leak).with_columns(
-    pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+    pl.col("FTC_Start").dt.replace(day=13).alias("FTC_Time"),
     pl.col("FTC_Start").dt.date().alias("FTC_Date")
     )
 # .filter(
 #         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
 #         )
 
+compare = pre_leak.sort(by="FTC_Time").drop_nulls().group_by_dynamic(
+    "FTC_Time",
+    every="30m"
+    ).agg(pl.col("O3_ppb").median()).join(
+        post_leak.sort(by="FTC_Time").drop_nulls().group_by_dynamic(
+            "FTC_Time",
+            every="30m"
+            ).agg(pl.col("O3_ppb").median()),
+        on="FTC_Time",
+        suffix="_After"
+        ).with_columns(
+            pl.col("O3_ppb_After").sub(pl.col("O3_ppb")).alias("Diff")
+            ).with_columns(
+                pl.col("Diff").truediv(pl.col("O3_ppb_After")).alias("Bias")
+                )
+            
+hvplot.show(
+    (compare.hvplot.scatter(
+        x="FTC_Time",
+        y=["O3_ppb", "O3_ppb_After"]
+        ) + compare.hvplot.scatter(
+            x="FTC_Time",
+            y="Bias"
+            )).cols(1)
+    )
+            
 pre_leak_plot = pre_leak.hvplot.scatter(
     x="FTC_Time",
     y="O3_ppb",
@@ -735,35 +761,35 @@ post_leak_lod_plot = post_leak.hvplot.line(
     shared_axes=False,
     by="FTC_Date")
 
-pre_leak_nox_plot = pre_leak_nox.hvplot.scatter(
-    x="FTC_Time",
-    y="NOx_ppb",
-    by="FTC_Date",
-    xlabel="Local time",
-    ylabel="[NO] (ppb) in instrument room",
-    title="Before leak introduced",
-    width=600,
-    height=400,
-    grid=True,
-    xlim=(pre_leak_nox["FTC_Time"].min(), pre_leak_nox["FTC_Time"].max()),
-    ylim=(pre_leak_nox["NOx_ppb"].min()-5, post_leak_nox["NOx_ppb"].max()+5),
-    shared_axes=False
-    )
+# pre_leak_nox_plot = pre_leak_nox.hvplot.scatter(
+#     x="FTC_Time",
+#     y="NOx_ppb",
+#     by="FTC_Date",
+#     xlabel="Local time",
+#     ylabel="[NO] (ppb) in instrument room",
+#     title="Before leak introduced",
+#     width=600,
+#     height=400,
+#     grid=True,
+#     xlim=(pre_leak_nox["FTC_Time"].min(), pre_leak_nox["FTC_Time"].max()),
+#     ylim=(pre_leak_nox["NOx_ppb"].min()-5, post_leak_nox["NOx_ppb"].max()+5),
+#     shared_axes=False
+#     )
 
-post_leak_nox_plot = post_leak_nox.hvplot.scatter(
-    x="FTC_Time",
-    y="NOx_ppb",
-    by="FTC_Date",
-    xlabel="Local time",
-    ylabel="[NO] (ppb) in instrument room",
-    title="After leak introduced",
-    width=600,
-    height=400,
-    grid=True,
-    xlim=(pre_leak_nox["FTC_Time"].min(), pre_leak_nox["FTC_Time"].max()),
-    ylim=(pre_leak_nox["NOx_ppb"].min()-5, post_leak_nox["NOx_ppb"].max()+5),
-    shared_axes=False
-    )
+# post_leak_nox_plot = post_leak_nox.hvplot.scatter(
+#     x="FTC_Time",
+#     y="NOx_ppb",
+#     by="FTC_Date",
+#     xlabel="Local time",
+#     ylabel="[NO] (ppb) in instrument room",
+#     title="After leak introduced",
+#     width=600,
+#     height=400,
+#     grid=True,
+#     xlim=(pre_leak_nox["FTC_Time"].min(), pre_leak_nox["FTC_Time"].max()),
+#     ylim=(pre_leak_nox["NOx_ppb"].min()-5, post_leak_nox["NOx_ppb"].max()+5),
+#     shared_axes=False
+#     )
 
 hvplot.show(
     ((pre_leak_plot * pre_leak_lod_plot)
