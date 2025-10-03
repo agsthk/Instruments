@@ -46,3 +46,23 @@
 		- THEY ALL PASSED!!!!!!!!!!
 - Uploaded ICARTT files - I'M FREEEEEEEEEE
 	- Still need to do ACRs and Aranet sensor ICARTT and occupancy but overall I'M BASICALLY FREEEEEE
+# combine_aranet.py
+- Created script to combine the two aranet sensor measurements I have into one larger file
+- Have it read in the clean Aranet data and concatenate by sensor
+	- Identify unique, sort by the start time
+	- Clean data has the averaging time accounted for
+- Have it rename the measurement columns with the sensor ID
+- Join on the start times
+	- Get the appropriate corresponding stop times and local times and remove duplicate columns ("\_right")
+- Export the joined file to Aranet4_CleanData/Aranet4_CleanLoggerData - wait
+- Can't join on start times because they aren't the exact same :(
+- Okay looking at the data and the times repeat???
+	- it gives the temperature twice :/ once in C and once in F, everything else repeats
+		- Only 1FB20 does that actually? and it's not always in right order
+	- Also 1F16F has temperature in F for sure - need to convert it
+	- What I'm going to do is sort by the temperature within a repeat time and drop the larger one (F)
+	- And for the other one just going to convert it
+		- They vary actually - just going to sort, drop the F if it's duplicate, then convert if temp > 45
+- To get them on same times, going to round datetime
+- Then join on rounded datetime
+- Then split by date and export split datasets
