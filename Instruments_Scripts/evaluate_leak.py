@@ -200,17 +200,31 @@ for week, df in data_2025["2BTech_205_A_BG"].items():
             ).with_columns(
                 pl.col("O3_ppb").truediv(pl.col("O3_ppb_Vent")).alias("IO")
                 )
-        plot = ((plot * data_2025["2BTech_205_B"][week].filter(
+        # plot = ((plot * data_2025["2BTech_205_B"][week].filter(
+        #     pl.col("SamplingLocation").str.contains("C200")
+        #     ).hvplot.scatter(
+        #         x="FTC_Start",
+        #         y="O3_ppb",
+        #         title=str(week)
+        #         )) + io_o3.hvplot.scatter(
+        #             x="FTC_Start",
+        #             y="IO"
+        #             )).cols(1)
+    if week in data_2025["ThermoScientific_42i-TL"].keys():
+        plot = (plot + data_2025["ThermoScientific_42i-TL"][week].filter(
             pl.col("SamplingLocation").str.contains("C200")
             ).hvplot.scatter(
                 x="FTC_Start",
-                y="O3_ppb",
-                title=str(week)
-                )) + io_o3.hvplot.scatter(
-                    x="FTC_Start",
-                    y="IO"
-                    )).cols(1)
+                y=["NO_ppb", "NO2_ppb"]
+                )
+                ).cols(1)
+        
     hvplot.show(plot)
+# %%
+data_2025["ThermoScientific_42i-TL"][week]["NO_ppb", 'NO_ppb_Offset']
+
+
+data_2025["2BTech_205_A"][week]["O3_ppb", 'O3_ppb_Offset']
 # %%
 
 for loc, df in data.items():

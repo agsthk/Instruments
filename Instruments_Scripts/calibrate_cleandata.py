@@ -513,7 +513,7 @@ for root, dirs, files in tqdm(os.walk(CLEAN_DATA_DIR)):
                      cal_sensitivities[inst].to_dict(as_series=False).items()}
         for spec, sens in inst_sens.items():
             lf = lf.with_columns(
-                pl.col(spec).truediv(sens)
+                pl.col(spec).sub(pl.col(spec + "_Offset")).truediv(sens)
                 )
         # Calculates uncertainties from noise to signal regressions
         snr_specs = {"_".join(col.split("_")[:2])
