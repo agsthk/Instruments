@@ -163,10 +163,27 @@ for week, df in data_2025["2BTech_205_A_BG"].items():
     
     plot = df.filter(
             pl.col("SamplingLocation").str.contains("C200")
+            ).with_columns(
+                pl.col("O3_ppb").interpolate_by("FTC_Start")
+                ).hvplot.scatter(
+                    x="FTC_Start",
+                    y="O3_ppb",
+                    title=str(week)
+                    )
+    bg_sub = data_2025["2BTech_205_A"][week].join(
+        df.with_columns(
+            pl.col("O3_ppb").interpolate_by("FTC_Start")
+            ),
+        on="FTC_Start",
+        suffix="_Background"
+        ).with_columns(
+            pl.col("O3_ppb").sub(pl.col("O3_ppb_Background")).alias("BG_Sub_O3_ppb")
+            )
+    plot = plot * bg_sub.filter(
+            pl.col("SamplingLocation").str.contains("C200")
             ).hvplot.scatter(
                 x="FTC_Start",
-                y="O3_ppb",
-                title=str(week)
+                y="BG_Sub_O3_ppb"
                 )
     if week in data_2025["2BTech_205_B"].keys():
         vent_o3 = data_2025["2BTech_205_B"][week].filter(

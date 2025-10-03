@@ -87,3 +87,4 @@
 - Going to interpolate background O3 to get a background during decays rather than using the I/O ratio (later will compare, but WAY later)
 - Instead of removing data during the addition period, just going to make it null and then interpolate
 	- Checked and this gives the same result with I/O ratio
+- Did interpolation, now going to do background subtraction and see what that looks like
