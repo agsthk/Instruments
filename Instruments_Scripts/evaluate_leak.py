@@ -821,6 +821,121 @@ hvplot.show(
 #     )
 
 
+# %% CH2O
+# Possible dates leak was introduced
+leak_intro = datetime(2024, 6, 13, 9, 0, 0, tzinfo=pytz.timezone("America/Denver"))
+# leak_intro = datetime(2024, 6, 24, 15, 0, 0, tzinfo=pytz.timezone("America/Denver"))
+# Start of pre leak intro comparison
+comp_start = (leak_intro - timedelta(days=3)).replace(hour=0)
+# End of post leak intro comparison
+comp_stop = (leak_intro + timedelta(days=4)).replace(hour=0)
+
+pre_leak = []
+post_leak = []
+
+pre_leak_nox = []
+post_leak_nox = []
+
+for week, df in data_2024["Picarro_G2307"].items():
+    week_start = df["FTC_DateTime"].min()
+    week_stop = df["FTC_DateTime"].max()
+    if week_stop < comp_start or week_start > comp_stop:
+        continue
+    df = df.filter(
+        pl.col("SamplingLocation").str.contains("C200")
+        )
+    pre_leak.append(
+        df.filter(
+            pl.col("FTC_DateTime").is_between(comp_start, leak_intro)
+            )
+        )
+    post_leak.append(
+        df.filter(
+            pl.col("FTC_DateTime").is_between(leak_intro, comp_stop)
+            )
+        )
+# pre_leak = pl.concat(pre_leak).drop_nulls()
+# post_leak = pl.concat(post_leak).drop_nulls()
+
+
+pre_leak = pl.concat(pre_leak).with_columns(
+    pl.col("FTC_DateTime").dt.time().alias("FTC_Time"),
+    pl.col("FTC_DateTime").dt.date().alias("FTC_Date")
+    ).filter(
+        pl.col("CH2O_ppb").ge(pl.col("CH2O_ppb_LOD"))
+        )
+post_leak = pl.concat(post_leak).with_columns(
+    pl.col("FTC_DateTime").dt.time().alias("FTC_Time"),
+    pl.col("FTC_DateTime").dt.date().alias("FTC_Date")
+    ).filter(
+        pl.col("CH2O_ppb").ge(pl.col("CH2O_ppb_LOD"))
+        )
+
+pre_leak_plot = pre_leak.hvplot.scatter(
+    x="FTC_Time",
+    y="CH2O_ppb",
+    by="FTC_Date",
+    xlabel="Local time",
+    ylabel="Background [CH2O] (ppb)",
+    title="Before leak introduced",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(pre_leak["FTC_Time"].min(), pre_leak["FTC_Time"].max()),
+    ylim=(pre_leak["CH2O_ppb"].min()-5, post_leak["CH2O_ppb"].max()+5),
+    shared_axes=False
+    )
+pre_leak_lod_plot = pre_leak.hvplot.line(
+    x="FTC_Time",
+    y="CH2O_ppb_LOD",
+    xlabel="Local time",
+    ylabel="Background [CH2O] (ppb)",
+    title="Before leak introduced",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+    ylim=(pre_leak["CH2O_ppb"].min()-5, post_leak["CH2O_ppb"].max()+5),
+    shared_axes=False,
+    by="FTC_Date")
+
+post_leak_plot = post_leak.hvplot.scatter(
+    x="FTC_Time",
+    y="CH2O_ppb",
+    by="FTC_Date",
+    xlabel="Local time",
+    ylabel="Background [CH2O] (ppb)",
+    title="After leak introduced",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+    ylim=(pre_leak["CH2O_ppb"].min()-5, post_leak["CH2O_ppb"].max()+5),
+    shared_axes=False
+    )
+post_leak_lod_plot = post_leak.hvplot.line(
+    x="FTC_Time",
+    y="CH2O_ppb_LOD",
+    xlabel="Local time",
+    ylabel="Background [CH2O] (ppb)",
+    title="After leak introduced",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+    ylim=(pre_leak["CH2O_ppb"].min()-5, post_leak["CH2O_ppb"].max()+5),
+    shared_axes=False,
+    by="FTC_Date")
+
+
+hvplot.show(
+    ((pre_leak_plot * pre_leak_lod_plot)
+     + (post_leak_plot * post_leak_lod_plot)).cols(2)
+     # + (pre_leak_nox_plot)
+     # + (post_leak_nox_plot)
+    )
+
+
 # %%
 for week, df in data_2024["2BTech_205_A_BG"].items():
     
@@ -891,3 +1006,216 @@ for week, df in data_2024["2BTech_205_A_BG"].items():
                 ).cols(1)
         
     hvplot.show(plot)
+# %% Background comparisons - NOx
+check_start = leak_fixed - timedelta(days=2)
+check_stop = leak_fixed + timedelta(days=2)
+pre_leak = []
+post_leak = []
+
+for week, df in data_2025["ThermoScientific_42i-TL"].items():
+    week_start = df["FTC_Start"].min()
+    week_stop = df["FTC_Stop"].max()
+    if week_stop < check_start or week_start > check_stop:
+        continue
+    df = df.filter(
+        pl.col("SamplingLocation").str.contains("C200")
+        )
+    pre_leak.append(
+        df.filter(
+            pl.col("FTC_Start").is_between(check_start, leak_fixed)
+            )
+        )
+    post_leak.append(
+        df.filter(
+            pl.col("FTC_Stop").is_between(leak_fixed, check_stop)
+            )
+        )
+# pre_leak = pl.concat(pre_leak).drop_nulls()
+# post_leak = pl.concat(post_leak).drop_nulls()
+
+
+pre_leak = pl.concat(pre_leak).with_columns(
+    pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+    pl.col("FTC_Start").dt.date().alias("FTC_Date")
+    )
+# .filter(
+#         pl.col("NO_ppb").ge(pl.col("NO_ppb_LOD"))
+#         )
+post_leak = pl.concat(post_leak).with_columns(
+    pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+    pl.col("FTC_Start").dt.date().alias("FTC_Date")
+    )
+# .filter(
+#         pl.col("NO_ppb").ge(pl.col("NO_ppb_LOD"))
+#         )
+
+pre_leak_plot = pre_leak.hvplot.scatter(
+    x="FTC_Time",
+    y="NO_ppb",
+    by="FTC_Date",
+    xlabel="Local time",
+    ylabel="Background [NO] (ppb)",
+    title="Before leak fixed",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(pre_leak["FTC_Time"].min(), pre_leak["FTC_Time"].max()),
+    ylim=(post_leak["NO_ppb"].min()-5, pre_leak["NO_ppb"].max()+5),
+    shared_axes=False
+    )
+pre_leak_lod_plot = pre_leak.hvplot.line(
+    x="FTC_Time",
+    y="NO_ppb_LOD",
+    xlabel="Local time",
+    ylabel="Background [NO] (ppb)",
+    title="Before leak fixed",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+    ylim=(post_leak["NO_ppb"].min()-5, pre_leak["NO_ppb"].max()+5),
+    shared_axes=False,
+    by="FTC_Date")
+
+post_leak_plot = post_leak.hvplot.scatter(
+    x="FTC_Time",
+    y="NO_ppb",
+    by="FTC_Date",
+    xlabel="Local time",
+    ylabel="Background [NO] (ppb)",
+    title="After leak fixed",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+    ylim=(pre_leak["NO_ppb"].min()-5, pre_leak["NO_ppb"].max()+5),
+    shared_axes=False
+    )
+post_leak_lod_plot = post_leak.hvplot.line(
+    x="FTC_Time",
+    y="NO_ppb_LOD",
+    xlabel="Local time",
+    ylabel="Background [NO] (ppb)",
+    title="After leak fixed",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+    ylim=(pre_leak["NO_ppb"].min()-5, pre_leak["NO_ppb"].max()+5),
+    shared_axes=False,
+    by="FTC_Date")
+
+
+
+hvplot.show(
+    ((pre_leak_plot * pre_leak_lod_plot)
+     + (post_leak_plot * post_leak_lod_plot)).cols(2)
+     # + (pre_leak_nox_plot)
+     # + (post_leak_nox_plot)
+    )
+    
+# %% Background comparisons - HCHO
+check_start = leak_fixed - timedelta(days=2)
+check_stop = leak_fixed + timedelta(days=2)
+pre_leak = []
+post_leak = []
+
+for week, df in data_2025["Picarro_G2307"].items():
+    week_start = df["FTC_DateTime"].min()
+    week_stop = df["FTC_DateTime"].max()
+    if week_stop < check_start or week_start > check_stop:
+        continue
+    df = df.filter(
+        pl.col("SamplingLocation").str.contains("C200")
+        )
+    pre_leak.append(
+        df.filter(
+            pl.col("FTC_DateTime").is_between(check_start, leak_fixed)
+            )
+        )
+    post_leak.append(
+        df.filter(
+            pl.col("FTC_DateTime").is_between(leak_fixed, check_stop)
+            )
+        )
+# pre_leak = pl.concat(pre_leak).drop_nulls()
+# post_leak = pl.concat(post_leak).drop_nulls()
+
+
+pre_leak = pl.concat(pre_leak).with_columns(
+    pl.col("FTC_DateTime").dt.time().alias("FTC_Time"),
+    pl.col("FTC_DateTime").dt.date().alias("FTC_Date")
+    ).filter(
+        pl.col("CH2O_ppb").ge(pl.col("CH2O_ppb_LOD"))
+        )
+post_leak = pl.concat(post_leak).with_columns(
+    pl.col("FTC_DateTime").dt.time().alias("FTC_Time"),
+    pl.col("FTC_DateTime").dt.date().alias("FTC_Date")
+    ).filter(
+        pl.col("CH2O_ppb").ge(pl.col("CH2O_ppb_LOD"))
+        )
+
+pre_leak_plot = pre_leak.hvplot.scatter(
+    x="FTC_Time",
+    y="CH2O_ppb",
+    by="FTC_Date",
+    xlabel="Local time",
+    ylabel="Background [CH2O] (ppb)",
+    title="Before leak fixed",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(pre_leak["FTC_Time"].min(), pre_leak["FTC_Time"].max()),
+    ylim=(post_leak["CH2O_ppb"].min()-5, pre_leak["CH2O_ppb"].max()+5),
+    shared_axes=False
+    )
+pre_leak_lod_plot = pre_leak.hvplot.line(
+    x="FTC_Time",
+    y="CH2O_ppb_LOD",
+    xlabel="Local time",
+    ylabel="Background [CH2O_ppb] (ppb)",
+    title="Before leak fixed",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+    ylim=(post_leak["CH2O_ppb"].min()-5, pre_leak["CH2O_ppb"].max()+5),
+    shared_axes=False,
+    by="FTC_Date")
+
+post_leak_plot = post_leak.hvplot.scatter(
+    x="FTC_Time",
+    y="CH2O_ppb",
+    by="FTC_Date",
+    xlabel="Local time",
+    ylabel="Background [CH2O_ppb] (ppb)",
+    title="After leak fixed",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+    ylim=(pre_leak["CH2O_ppb"].min()-5, pre_leak["CH2O_ppb"].max()+5),
+    shared_axes=False
+    )
+post_leak_lod_plot = post_leak.hvplot.line(
+    x="FTC_Time",
+    y="CH2O_ppb_LOD",
+    xlabel="Local time",
+    ylabel="Background [O3] (ppb)",
+    title="After leak fixed",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+    ylim=(pre_leak["CH2O_ppb"].min()-5, pre_leak["CH2O_ppb"].max()+5),
+    shared_axes=False,
+    by="FTC_Date")
+
+
+
+hvplot.show(
+    ((pre_leak_plot * pre_leak_lod_plot)
+     + (post_leak_plot * post_leak_lod_plot)).cols(2)
+     # + (pre_leak_nox_plot)
+     # + (post_leak_nox_plot)
+    )

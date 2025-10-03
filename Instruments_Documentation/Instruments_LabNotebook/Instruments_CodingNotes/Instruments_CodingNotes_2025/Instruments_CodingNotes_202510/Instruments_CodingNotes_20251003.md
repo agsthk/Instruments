@@ -25,3 +25,12 @@
 - In the future, I do want to split this by campaign, but not worth it for now I think
 - Thinking about the campaign headers - some need different (pre vs post leak introduced/fixed) - since changes happened in the middle of the day, revising campaign start/stop to be timestamps rather than just dates
 	- Modified to take full timestamps
+- Ran for all non-leak periods and added to Teams after checking ICARTT scanner
+- Now it's just the leak
+- Before I talk to Megan, want some pre-post leak from Phase II for formaldehyde and NOx
+# evaluate_leak.py
+- Basically just repeating the code for comparing the ozone, but with the formaldehyde and NOx
+- After talking to Megan, going to do a couple things
+	- Use the phase II decays to estimate upper bias (median of peak concentrations for 5 minutes after max reached)
+	- Use phase I background to estimate lower bias
+		- Afternoon and nighttime
