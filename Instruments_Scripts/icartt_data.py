@@ -38,16 +38,33 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
     header_path = os.path.join(ICARTT_HEADER_DIR, header_file)
     with open(header_path, "r") as file:
         header = yaml.load(file, Loader=yaml.Loader)
+    camp_start = datetime.strptime(header["Campaign Start"], "%Y%m%d").replace(
+        hour=0, minute=0, second=0, tzinfo=pytz.timezone("America/Denver")
+        )
+    camp_stop = datetime.strptime(header["Campaign Stop"], "%Y%m%d").replace(
+        hour=23, minute=59, second=59, tzinfo=pytz.timezone("America/Denver")
+        )
     inst_icartt_data_dir = os.path.join(ICARTT_DATA_DIR,
                                         inst + "_ICARTTData",
                                         inst + "_ICARTTData_" + header["REVISION"])
     if not os.path.exists(inst_icartt_data_dir):
         os.makedirs(inst_icartt_data_dir)
     if "Calibration" in header.keys():
-        continue
-        inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
-                                         inst + "_CalibratedData",
-                                         inst + "_CalibratedDAQData")
+        # continue
+        if camp_start.year == 2025:
+            inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
+                                             inst + "_CalibratedData",
+                                             inst + "_CalibratedDAQData")
+        elif camp_start.year == 2024:
+            inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
+                                             inst + "_CalibratedData")
+            if (inst + "_CalibratedSDData") in os.listdir(inst_cal_data_dir):
+                inst_cal_data_dir = os.path.join(inst_cal_data_dir,
+                                                 inst + "_CalibratedSDData")
+            else:
+                inst_cal_data_dir = os.path.join(inst_cal_data_dir,
+                                                 inst + "_CalibratedLoggerData")
+        
         cal_date = header["Calibration"]
         correct_cal_files = [file for file in os.listdir(inst_cal_data_dir)
                              if (file.find(cal_date + "Calibration") != -1)]
@@ -57,12 +74,7 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
         inst_cal_data_dir = os.path.join(inst_cal_data_dir,
                                          os.listdir(inst_cal_data_dir)[0])
         correct_cal_files = [file for file in os.listdir(inst_cal_data_dir)]
-    camp_start = datetime.strptime(header["Campaign Start"], "%Y%m%d").replace(
-        hour=0, minute=0, second=0, tzinfo=pytz.timezone("America/Denver")
-        )
-    camp_stop = datetime.strptime(header["Campaign Stop"], "%Y%m%d").replace(
-        hour=23, minute=59, second=59, tzinfo=pytz.timezone("America/Denver")
-        )
+
     # Gets all data collected between campaign start and stop
     camp_files = []
     for file in correct_cal_files:

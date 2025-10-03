@@ -338,8 +338,8 @@ for week, df in data_2025["2BTech_205_A"].items():
         continue
     
     week_o3_adds = add_times["O3"].filter(
-        pl.col("UTC_Stop").ge(week_start)
-        & pl.col("UTC_Start").le(week_stop)
+        pl.col("UTC_Stop").dt.convert_time_zone("America/Denver").ge(week_start)
+        & pl.col("UTC_Start").dt.convert_time_zone("America/Denver").le(week_stop)
         ).with_columns(
             pl.col("UTC_Stop").dt.offset_by("2h")
             )
@@ -371,22 +371,24 @@ for week, df in data_2025["2BTech_205_A"].items():
             pl.col("FTC_Start").is_between(leak_fixed, check_stop)
             )
         )
-pre_leak = pl.concat(pre_leak).drop_nulls()
-post_leak = pl.concat(post_leak).drop_nulls()
+# pre_leak = pl.concat(pre_leak).drop_nulls()
+# post_leak = pl.concat(post_leak).drop_nulls()
 
 
 pre_leak = pl.concat(pre_leak).with_columns(
     pl.col("FTC_Start").dt.time().alias("FTC_Time"),
     pl.col("FTC_Start").dt.date().alias("FTC_Date")
-    ).filter(
-        pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
-        )
+    )
+# .filter(
+#         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+#         )
 post_leak = pl.concat(post_leak).with_columns(
     pl.col("FTC_Start").dt.time().alias("FTC_Time"),
     pl.col("FTC_Start").dt.date().alias("FTC_Date")
-    ).filter(
-        pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
-        )
+    )
+# .filter(
+#         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+#         )
 
 pre_leak_plot = pre_leak.hvplot.scatter(
     x="FTC_Time",
