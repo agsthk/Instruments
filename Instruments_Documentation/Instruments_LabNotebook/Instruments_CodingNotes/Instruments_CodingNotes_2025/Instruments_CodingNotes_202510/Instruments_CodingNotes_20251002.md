@@ -105,3 +105,4 @@
 # evaluate_leak.py
 - Identified which additions I want to use for the before and after comparison
 - Determined the concentration before the addition, the highest concentration reached, and the difference between the two for each addition I will use for comparison
+- Plotted figures with pre and post leak fix side by side

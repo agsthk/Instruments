@@ -237,12 +237,32 @@ post_leak_adds = post_leak_adds[0:2] + [post_leak_adds[3]]
 # %%
 pre_leak_conds = []
 post_leak_conds = []
+pre_plots = []
+post_plots = []
 for week, df in data_2025["2BTech_205_A"].items():
     week_start = df["UTC_Start"].min()
     week_stop = df["UTC_Stop"].max()
     if week_stop < pre_leak_adds[0] or week_start > post_leak_adds[-1]:
         continue
     for add in pre_leak_adds:
+        pre_plot = df.filter(
+            pl.col("UTC_Stop").ge(add - timedelta(minutes=5))
+            & pl.col("UTC_Start").le(add + timedelta(hours=2))
+            ).with_columns(
+                pl.col("UTC_Start").sub(add).dt.total_microseconds().truediv(1e6)
+                )
+        pre_plots.append(
+            pre_plot.hvplot.scatter(
+                x="UTC_Start",
+                y="O3_ppb",
+                xlabel="Seconds from addition start",
+                ylabel="[O3] (ppb)",
+                title="Before leak fixed",
+                width=400,
+                height=600,
+                grid=True
+                )
+            )
         pre_add = df.filter(
             pl.col("UTC_Stop").ge(add - timedelta(minutes=5))
             & pl.col("UTC_Start").le(add)
@@ -257,6 +277,24 @@ for week, df in data_2025["2BTech_205_A"].items():
         post_conc = post_add["O3_ppb"].max()
         pre_leak_conds.append([pre_conc, post_conc, post_conc - pre_conc])
     for add in post_leak_adds:
+        post_plot = df.filter(
+            pl.col("UTC_Stop").ge(add - timedelta(minutes=5))
+            & pl.col("UTC_Start").le(add + timedelta(hours=2))
+            ).with_columns(
+                pl.col("UTC_Start").sub(add).dt.total_microseconds().truediv(1e6)
+                )
+        post_plots.append(
+            post_plot.hvplot.scatter(
+                x="UTC_Start",
+                y="O3_ppb",
+                xlabel="Seconds from addition start",
+                ylabel="[O3] (ppb)",
+                title="After leak fixed",
+                width=400,
+                height=600,
+                grid=True
+                )
+            )
         pre_add = df.filter(
             pl.col("UTC_Stop").ge(add - timedelta(minutes=5))
             & pl.col("UTC_Start").le(add)
@@ -271,7 +309,22 @@ for week, df in data_2025["2BTech_205_A"].items():
         post_conc = post_add["O3_ppb"].max()
         post_leak_conds.append([pre_conc, post_conc, post_conc - pre_conc])
 
+for i, plot in enumerate(pre_plots):
+    if i == 0:
+        pre_plot = plot
+    else:
+        pre_plot = pre_plot * plot
+        
+for i, plot in enumerate(post_plots):
+    if i == 0:
+        post_plot = plot
+    else:
+        post_plot = post_plot * plot
 
+hvplot.show(
+    (pre_plot + post_plot).cols(2)
+    )
+        
 # %%
 
 for loc, df in data.items():
