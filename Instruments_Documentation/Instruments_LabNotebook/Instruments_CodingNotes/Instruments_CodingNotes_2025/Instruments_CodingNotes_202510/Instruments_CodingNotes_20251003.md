@@ -19,3 +19,9 @@
 - Need to fix directory identification for calibrated data to not look in DAQ folder for phase I
 - Moving determination of campaign start and stop to be earlier to use for selection of directories
 - Revised to look in DAQ directory for 2025 data, and for 2024 data look in SD if it exists and Logger if it doesn't
+- Okay R0 data for Phase II does appear to be zero corrected actually?? Checking git to see why the correction was missing when I ran calibration script for phase I data
+	- oh wait jk this was overwritten using the updated cal files, what I uploaded was NOT corrected
+		- Double checked and that is indeed true!
+- In the future, I do want to split this by campaign, but not worth it for now I think
+- Thinking about the campaign headers - some need different (pre vs post leak introduced/fixed) - since changes happened in the middle of the day, revising campaign start/stop to be timestamps rather than just dates
+	- Modified to take full timestamps

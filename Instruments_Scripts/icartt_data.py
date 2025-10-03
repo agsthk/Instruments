@@ -38,11 +38,11 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
     header_path = os.path.join(ICARTT_HEADER_DIR, header_file)
     with open(header_path, "r") as file:
         header = yaml.load(file, Loader=yaml.Loader)
-    camp_start = datetime.strptime(header["Campaign Start"], "%Y%m%d").replace(
-        hour=0, minute=0, second=0, tzinfo=pytz.timezone("America/Denver")
+    camp_start = datetime.strptime(header["Campaign Start"], "%Y%m%d%H%M%S").replace(
+        tzinfo=pytz.timezone("America/Denver")
         )
-    camp_stop = datetime.strptime(header["Campaign Stop"], "%Y%m%d").replace(
-        hour=23, minute=59, second=59, tzinfo=pytz.timezone("America/Denver")
+    camp_stop = datetime.strptime(header["Campaign Stop"], "%Y%m%d%H%M%S").replace(
+        tzinfo=pytz.timezone("America/Denver")
         )
     inst_icartt_data_dir = os.path.join(ICARTT_DATA_DIR,
                                         inst + "_ICARTTData",
