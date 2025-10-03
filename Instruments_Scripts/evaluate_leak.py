@@ -380,21 +380,61 @@ for week, df in data_2025["2BTech_205_A"].items():
 # post_leak = pl.concat(post_leak).drop_nulls()
 
 
+# pre_leak = pl.concat(pre_leak).with_columns(
+#     pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+#     pl.col("FTC_Start").dt.date().alias("FTC_Date")
+#     )
+# # .filter(
+# #         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+# #         )
+# post_leak = pl.concat(post_leak).with_columns(
+#     pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+#     pl.col("FTC_Start").dt.date().alias("FTC_Date")
+#     )
+# .filter(
+#         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+#         )
 pre_leak = pl.concat(pre_leak).with_columns(
-    pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+    pl.col("FTC_Start").dt.replace(day=13).alias("FTC_Time"),
     pl.col("FTC_Start").dt.date().alias("FTC_Date")
     )
 # .filter(
 #         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
 #         )
 post_leak = pl.concat(post_leak).with_columns(
-    pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+    pl.col("FTC_Start").dt.replace(day=13).alias("FTC_Time"),
     pl.col("FTC_Start").dt.date().alias("FTC_Date")
     )
 # .filter(
 #         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
 #         )
 
+compare = pre_leak.sort(by="FTC_Time").drop_nulls().group_by_dynamic(
+    "FTC_Time",
+    every="60m"
+    ).agg(pl.col("O3_ppb").median()).join(
+        post_leak.sort(by="FTC_Time").drop_nulls().group_by_dynamic(
+            "FTC_Time",
+            every="60m"
+            ).agg(pl.col("O3_ppb").median()),
+        on="FTC_Time",
+        suffix="_After"
+        ).with_columns(
+            pl.col("O3_ppb").sub(pl.col("O3_ppb_After")).alias("Diff")
+            ).with_columns(
+                pl.col("Diff").truediv(pl.col("O3_ppb")).alias("Bias")
+                )
+med_bias = compare["Bias"].median()
+            
+hvplot.show(
+    (compare.hvplot.scatter(
+        x="FTC_Time",
+        y=["O3_ppb", "O3_ppb_After"]
+        ) + compare.hvplot.scatter(
+            x="FTC_Time",
+            y="Bias"
+            )).cols(1)
+    )
 pre_leak_plot = pre_leak.hvplot.scatter(
     x="FTC_Time",
     y="O3_ppb",
@@ -681,11 +721,11 @@ post_leak = pl.concat(post_leak).with_columns(
 
 compare = pre_leak.sort(by="FTC_Time").drop_nulls().group_by_dynamic(
     "FTC_Time",
-    every="30m"
+    every="60m"
     ).agg(pl.col("O3_ppb").median()).join(
         post_leak.sort(by="FTC_Time").drop_nulls().group_by_dynamic(
             "FTC_Time",
-            every="30m"
+            every="60m"
             ).agg(pl.col("O3_ppb").median()),
         on="FTC_Time",
         suffix="_After"
@@ -694,6 +734,7 @@ compare = pre_leak.sort(by="FTC_Time").drop_nulls().group_by_dynamic(
             ).with_columns(
                 pl.col("Diff").truediv(pl.col("O3_ppb_After")).alias("Bias")
                 )
+med_bias = compare["Bias"].median()
             
 hvplot.show(
     (compare.hvplot.scatter(
@@ -890,19 +931,59 @@ for week, df in data_2024["Picarro_G2307"].items():
 # pre_leak = pl.concat(pre_leak).drop_nulls()
 # post_leak = pl.concat(post_leak).drop_nulls()
 
-
 pre_leak = pl.concat(pre_leak).with_columns(
-    pl.col("FTC_DateTime").dt.time().alias("FTC_Time"),
+    pl.col("FTC_DateTime").dt.replace(day=13).alias("FTC_Time"),
     pl.col("FTC_DateTime").dt.date().alias("FTC_Date")
-    ).filter(
-        pl.col("CH2O_ppb").ge(pl.col("CH2O_ppb_LOD"))
-        )
+    )
+# .filter(
+#         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+#         )
 post_leak = pl.concat(post_leak).with_columns(
-    pl.col("FTC_DateTime").dt.time().alias("FTC_Time"),
+    pl.col("FTC_DateTime").dt.replace(day=13).alias("FTC_Time"),
     pl.col("FTC_DateTime").dt.date().alias("FTC_Date")
-    ).filter(
-        pl.col("CH2O_ppb").ge(pl.col("CH2O_ppb_LOD"))
-        )
+    )
+# .filter(
+#         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+#         )
+
+compare = pre_leak.sort(by="FTC_Time").drop_nulls().group_by_dynamic(
+    "FTC_Time",
+    every="60m"
+    ).agg(pl.col("CH2O_ppb").median()).join(
+        post_leak.sort(by="FTC_Time").drop_nulls().group_by_dynamic(
+            "FTC_Time",
+            every="60m"
+            ).agg(pl.col("CH2O_ppb").median()),
+        on="FTC_Time",
+        suffix="_After"
+        ).with_columns(
+            pl.col("CH2O_ppb").sub(pl.col("CH2O_ppb_After")).alias("Diff")
+            ).with_columns(
+                pl.col("Diff").truediv(pl.col("CH2O_ppb_After")).alias("Bias")
+                )
+med_bias = compare["Bias"].median()
+            
+hvplot.show(
+    (compare.hvplot.scatter(
+        x="FTC_Time",
+        y=["CH2O_ppb", "CH2O_ppb_After"]
+        ) + compare.hvplot.scatter(
+            x="FTC_Time",
+            y="Bias"
+            )).cols(1)
+    )
+# pre_leak = pl.concat(pre_leak).with_columns(
+#     pl.col("FTC_DateTime").dt.time().alias("FTC_Time"),
+#     pl.col("FTC_DateTime").dt.date().alias("FTC_Date")
+#     ).filter(
+#         pl.col("CH2O_ppb").ge(pl.col("CH2O_ppb_LOD"))
+#         )
+# post_leak = pl.concat(post_leak).with_columns(
+#     pl.col("FTC_DateTime").dt.time().alias("FTC_Time"),
+#     pl.col("FTC_DateTime").dt.date().alias("FTC_Date")
+#     ).filter(
+#         pl.col("CH2O_ppb").ge(pl.col("CH2O_ppb_LOD"))
+#         )
 
 pre_leak_plot = pre_leak.hvplot.scatter(
     x="FTC_Time",
@@ -1148,7 +1229,7 @@ hvplot.show(
     )
     
 # %% Background comparisons - HCHO
-check_start = leak_fixed - timedelta(days=2)
+check_start = leak_fixed - timedelta(days=1)
 check_stop = leak_fixed + timedelta(days=2)
 pre_leak = []
 post_leak = []
@@ -1173,20 +1254,60 @@ for week, df in data_2025["Picarro_G2307"].items():
         )
 # pre_leak = pl.concat(pre_leak).drop_nulls()
 # post_leak = pl.concat(post_leak).drop_nulls()
-
-
 pre_leak = pl.concat(pre_leak).with_columns(
-    pl.col("FTC_DateTime").dt.time().alias("FTC_Time"),
+    pl.col("FTC_DateTime").dt.replace(day=13).alias("FTC_Time"),
     pl.col("FTC_DateTime").dt.date().alias("FTC_Date")
-    ).filter(
-        pl.col("CH2O_ppb").ge(pl.col("CH2O_ppb_LOD"))
-        )
+    )
+# .filter(
+#         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+#         )
 post_leak = pl.concat(post_leak).with_columns(
-    pl.col("FTC_DateTime").dt.time().alias("FTC_Time"),
+    pl.col("FTC_DateTime").dt.replace(day=13).alias("FTC_Time"),
     pl.col("FTC_DateTime").dt.date().alias("FTC_Date")
-    ).filter(
-        pl.col("CH2O_ppb").ge(pl.col("CH2O_ppb_LOD"))
-        )
+    )
+# .filter(
+#         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+#         )
+
+compare = pre_leak.sort(by="FTC_Time").drop_nulls().group_by_dynamic(
+    "FTC_Time",
+    every="60m"
+    ).agg(pl.col("CH2O_ppb").median()).join(
+        post_leak.sort(by="FTC_Time").drop_nulls().group_by_dynamic(
+            "FTC_Time",
+            every="60m"
+            ).agg(pl.col("CH2O_ppb").median()),
+        on="FTC_Time",
+        suffix="_After"
+        ).with_columns(
+            pl.col("CH2O_ppb").sub(pl.col("CH2O_ppb_After")).alias("Diff")
+            ).with_columns(
+                pl.col("Diff").truediv(pl.col("CH2O_ppb")).alias("Bias")
+                )
+med_bias = compare["Bias"].median()
+            
+hvplot.show(
+    (compare.hvplot.scatter(
+        x="FTC_Time",
+        y=["CH2O_ppb", "CH2O_ppb_After"]
+        ) + compare.hvplot.scatter(
+            x="FTC_Time",
+            y="Bias"
+            )).cols(1)
+    )
+
+# pre_leak = pl.concat(pre_leak).with_columns(
+#     pl.col("FTC_DateTime").dt.time().alias("FTC_Time"),
+#     pl.col("FTC_DateTime").dt.date().alias("FTC_Date")
+#     ).filter(
+#         pl.col("CH2O_ppb").ge(pl.col("CH2O_ppb_LOD"))
+#         )
+# post_leak = pl.concat(post_leak).with_columns(
+#     pl.col("FTC_DateTime").dt.time().alias("FTC_Time"),
+#     pl.col("FTC_DateTime").dt.date().alias("FTC_Date")
+#     ).filter(
+#         pl.col("CH2O_ppb").ge(pl.col("CH2O_ppb_LOD"))
+#         )
 
 pre_leak_plot = pre_leak.hvplot.scatter(
     x="FTC_Time",

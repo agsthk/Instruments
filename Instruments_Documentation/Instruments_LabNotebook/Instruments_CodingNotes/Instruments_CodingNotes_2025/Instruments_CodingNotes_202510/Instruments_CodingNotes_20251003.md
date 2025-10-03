@@ -35,3 +35,8 @@
 		- 75% is what I'm settling on :)
 	- Use phase I background to estimate lower bias
 		- Afternoon and nighttime
+		- Did a grouped median for every 30 minutes and found that the median bias was ~40% of the reported value
+			- Also that when I changed the window size
+			- When I checked the phase II bias, it's about 90% (harder to say, but that's what I'm going with)
+	- For Picarro (Phase II), 70% is what we're going with
+	- Not estimating for NOx because it's too variable
