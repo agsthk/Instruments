@@ -32,5 +32,6 @@
 - Basically just repeating the code for comparing the ozone, but with the formaldehyde and NOx
 - After talking to Megan, going to do a couple things
 	- Use the phase II decays to estimate upper bias (median of peak concentrations for 5 minutes after max reached)
+		- 75% is what I'm settling on :)
 	- Use phase I background to estimate lower bias
 		- Afternoon and nighttime
