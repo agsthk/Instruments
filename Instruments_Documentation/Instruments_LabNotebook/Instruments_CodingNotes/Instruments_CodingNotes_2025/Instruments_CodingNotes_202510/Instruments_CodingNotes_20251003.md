@@ -40,3 +40,9 @@
 			- When I checked the phase II bias, it's about 90% (harder to say, but that's what I'm going with)
 	- For Picarro (Phase II), 70% is what we're going with
 	- Not estimating for NOx because it's too variable
+- Now, going to add the biases that I have determined to the ICARTT headers and create the ICARTT files :)))))))
+	- Took a hot second to make sure the YAML files were what I wanted, but I think it's all good
+	- Running through ICARTT checker, then will post
+		- THEY ALL PASSED!!!!!!!!!!
+- Uploaded ICARTT files - I'M FREEEEEEEEEE
+	- Still need to do ACRs and Aranet sensor ICARTT and occupancy but overall I'M BASICALLY FREEEEEE
