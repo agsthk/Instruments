@@ -257,11 +257,10 @@ for week, df in data_2025["2BTech_205_A"].items():
                 y="O3_ppb",
                 xlabel="Seconds from addition start",
                 ylabel="[O3] (ppb)",
-                title="Overlayed",
+                title="Before leak fixed",
                 width=400,
                 height=600,
-                grid=True,
-                color="blue"
+                grid=True
                 )
             )
         pre_add = df.filter(
@@ -293,8 +292,7 @@ for week, df in data_2025["2BTech_205_A"].items():
                 title="After leak fixed",
                 width=400,
                 height=600,
-                grid=True,
-                color="red"
+                grid=True
                 )
             )
         pre_add = df.filter(
@@ -324,11 +322,75 @@ for i, plot in enumerate(post_plots):
         post_plot = post_plot * plot
 
 hvplot.show(
-    (pre_plot * post_plot)#.cols(2)
+    (pre_plot + post_plot).cols(2)
     )
         
-# %%
+# %% Background comparisons
+check_start = leak_fixed - timedelta(days=2)
+check_stop = leak_fixed + timedelta(days=2)
+pre_leak = []
+post_leak = []
 
+for week, df in data_2025["2BTech_205_A_BG"].items():
+    week_start = df["UTC_Start"].min()
+    week_stop = df["UTC_Stop"].max()
+    if week_stop < check_start or week_start > check_stop:
+        continue
+    pre_leak.append(
+        df.filter(
+            pl.col("FTC_Stop").is_between(check_start, leak_fixed)
+            )
+        )
+    post_leak.append(
+        df.filter(
+            pl.col("FTC_Start").is_between(leak_fixed, check_stop)
+            )
+        )
+pre_leak = pl.concat(pre_leak).drop_nulls()
+post_leak = pl.concat(post_leak).drop_nulls()
+
+hvplot.show(
+    ((pre_leak.hvplot.scatter(
+        x="FTC_Start",
+        y="O3_ppb",
+        xlabel="Local time",
+        ylabel="Background [O3] (ppb)",
+        title="Before leak fixed",
+        width=600,
+        height=400,
+        grid=True,
+        xlim=(pre_leak["FTC_Start"].min(), pre_leak["FTC_Start"].max()),
+        ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+        shared_axes=False
+        ))+ (post_leak.hvplot.scatter(
+            x="FTC_Start",
+            y="O3_ppb",
+            xlabel="Local time",
+            ylabel="Background [O3] (ppb)",
+            title="After leak fixed",
+            width=600,
+            height=400,
+            grid=True,
+            xlim=(post_leak["FTC_Start"].min(), post_leak["FTC_Start"].max()),
+            ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+            shared_axes=False
+            ) * post_leak.hvplot.line(
+                x="FTC_Start",
+                y="O3_ppb_LOD",
+                xlabel="Local time",
+                ylabel="Background [O3] (ppb)",
+                title="After leak fixed",
+                width=600,
+                height=400,
+                grid=True,
+                xlim=(post_leak["FTC_Start"].min(), post_leak["FTC_Start"].max()),
+                ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+                shared_axes=False,
+                color="Black"))).cols(2)
+    )
+
+
+# %%
 for loc, df in data.items():
     fig, ax = plt.subplots(figsize=(10, 8))
     for add_start in add_times["O3"]["UTC_Start"]:
