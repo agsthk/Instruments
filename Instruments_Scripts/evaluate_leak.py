@@ -391,109 +391,143 @@ hvplot.show(
 
 
 # %%
-for loc, df in data.items():
-    fig, ax = plt.subplots(figsize=(10, 8))
-    for add_start in add_times["O3"]["UTC_Start"]:
-        if add_start < datetime(2025, 1, 24, tzinfo=pytz.UTC) or add_start > datetime(2025, 2, 1, tzinfo=pytz.UTC):
-            continue
-        add_stop = add_start + timedelta(hours=3)
-        add_start_2 = add_start - timedelta(minutes=15)
-        temp_df = df.filter(
-            pl.col("UTC_Start").is_between(add_start_2, add_stop)
-            | pl.col("UTC_Stop").is_between(add_start_2, add_stop)
+
+data_2024["2BTech_205_A_BG"] = {}
+
+for week, df in data_2024["2BTech_205_A"].items():
+    week_start = df["UTC_Start"].min()
+    week_stop = df["UTC_Stop"].max()
+    week_o3_adds = add_times["O3"].filter(
+        pl.col("UTC_Stop").ge(week_start)
+        & pl.col("UTC_Start").le(week_stop)
+        ).with_columns(
+            pl.col("UTC_Stop").dt.offset_by("2h")
             )
-        if temp_df.is_empty():
-            continue
-        temp_df = temp_df.with_columns(
-            pl.col("UTC_Start").sub(add_start).dt.total_seconds()
-            )
-        
-        pre_add = temp_df.filter(
-            pl.col("UTC_Start").lt(0)
-            )["O3_ppb"].mean()
-        post_add = temp_df.filter(
-            pl.col("UTC_Start").gt(8000)
-            )["O3_ppb"].mean()
-        
-        temp_df = temp_df.with_columns(
-            pl.when(pl.col("UTC_Start").lt(0))
-            .then(pre_add)
-            .when(pl.col("UTC_Start").gt(8000))
-            .then(post_add)
-            .alias("BG_O3")
-            ).with_columns(
-                pl.col("BG_O3").interpolate_by("UTC_Start")
+    if not week_o3_adds.is_empty():
+        data_2024["2BTech_205_A_BG"][week] = df.filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).join_asof(
+                week_o3_adds,
+                on="UTC_Start",
+                strategy="backward",
+                suffix="_Add"
                 ).with_columns(
-                    pl.col("O3_ppb").sub(pl.col("BG_O3"))
-                    )
-        max_o3 = temp_df["O3_ppb"].max()
-        ax.plot(temp_df["UTC_Start"], temp_df["O3_ppb"],
-                label=(add_start.strftime("%Y-%m-%d %H:%M") + " Max O3 = " + f"{max_o3:.2f}")
-                )
-    ax.set_title(loc)
-    ax.set_xlabel("Seconds from addition start")
-    ax.set_ylabel("Background-subtracted O3 (ppb, linear interpolation used)")
-    ax.legend(bbox_to_anchor=(1.1, 1.05))
+                    pl.when(
+                        pl.col("UTC_Start").le(pl.col("UTC_Stop_Add"))
+                        )
+                    .then(pl.lit(None))
+                    .otherwise(pl.col("O3_ppb"))
+                    .alias("O3_ppb")
+                    ).select(
+                        pl.exclude("UTC_Stop_Add")
+                        )
 
-#%%
-
-colors = {"C200": "red",
-          "C200/B203": "blue"}
-fig, ax = plt.subplots(figsize=(10, 8))
-for loc, df in data.items():
-    for add_start in add_times["O3"]["UTC_Start"]:
-        if add_start < datetime(2025, 1, 25, tzinfo=pytz.UTC) or add_start > datetime(2025, 2, 1, tzinfo=pytz.UTC):
-            continue
-        add_stop = add_start + timedelta(hours=3)
-        add_start_2 = add_start - timedelta(minutes=15)
-        temp_df = df.filter(
-            pl.col("UTC_Start").is_between(add_start_2, add_stop)
-            | pl.col("UTC_Stop").is_between(add_start_2, add_stop)
+# %%
+for week, df in data_2024["2BTech_205_A"].items():
+    week_start = df["UTC_Start"].min()
+    week_stop = df["UTC_Stop"].max()
+    week_o3_adds = add_times["O3"].filter(
+        pl.col("UTC_Stop").ge(week_start)
+        & pl.col("UTC_Start").le(week_stop)
+        ).with_columns(
+            pl.col("UTC_Stop").dt.offset_by("2h")
             )
-        if temp_df.is_empty():
-            continue
-        temp_df = temp_df.with_columns(
-            pl.col("UTC_Start").sub(add_start).dt.total_seconds()
-            )
-        
-        pre_add = temp_df.filter(
-            pl.col("UTC_Start").lt(0)
-            )["O3_ppb"].mean()
-        post_add = temp_df.filter(
-            pl.col("UTC_Start").gt(8000)
-            )["O3_ppb"].mean()
-
-        temp_df = temp_df.with_columns(
-            pl.when(pl.col("UTC_Start").lt(0))
-            .then(pre_add)
-            .when(pl.col("UTC_Start").gt(8000))
-            .then(post_add)
-            .alias("BG_O3")
-            ).with_columns(
-                pl.col("BG_O3").interpolate_by("UTC_Start")
-                ).with_columns(
-                    pl.col("O3_ppb").sub(pl.col("BG_O3"))
-                    )
-        max_o3 = temp_df["O3_ppb"].max()
-        
-        temp_df = temp_df.with_columns(
-            pl.col("O3_ppb").truediv(max_o3)
-            )
-                
-        max_o3 = temp_df["O3_ppb"].max()
-        ax.plot(temp_df["UTC_Start"], temp_df["O3_ppb"],
-                color=colors[loc],
-                label=(add_start.strftime("%Y-%m-%d %H:%M"))
-                )
-    ax.set_title("Normalized O3 Decay")
-    ax.set_xlabel("Seconds from addition start")
-    ax.set_ylabel("Normalized O3 (linear interpolation used)")
-    ax.legend(bbox_to_anchor=(1.1, 1.05))
-    
-    
-#%%
-fig, ax = plt.subplots(figsize=(10, 8))
-for loc, df in data.items():
-    for add_start in add_times["O3"]["UTC_Start"]:
+    if not week_o3_adds.is_empty():
         df = df.filter(
-            pl.col("UTC_Start"))
+            pl.col("SamplingLocation").str.contains("C200")
+            ).join_asof(
+                week_o3_adds,
+                on="UTC_Start",
+                strategy="backward",
+                suffix="_Add"
+                ).with_columns(
+                    pl.when(
+                        pl.col("UTC_Start").le(pl.col("UTC_Stop_Add"))
+                        )
+                    .then(pl.lit(None))
+                    .otherwise(pl.col("O3_ppb"))
+                    .alias("O3_ppb")
+                    ).select(
+                        pl.exclude("UTC_Stop_Add")
+                        )
+    hvplot.show(
+        df.filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).hvplot.scatter(
+                x="FTC_Start",
+                y="O3_ppb",
+                title=str(week)
+                )
+        )
+    
+
+# %%
+for week, df in data_2024["2BTech_205_A_BG"].items():
+    
+    bg_o3 = df.filter(
+        pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+        ).group_by_dynamic(
+            "FTC_Start", every="10m"
+            ).agg(
+                pl.col("O3_ppb").mean()
+                )
+    
+    plot = df.filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).with_columns(
+                pl.col("O3_ppb").interpolate_by("FTC_Start")
+                ).hvplot.scatter(
+                    x="FTC_Start",
+                    y="O3_ppb",
+                    title=str(week)
+                    )
+    bg_sub = data_2024["2BTech_205_A"][week].join(
+        df.with_columns(
+            pl.col("O3_ppb").interpolate_by("FTC_Start")
+            ),
+        on="FTC_Start",
+        suffix="_Background"
+        ).with_columns(
+            pl.col("O3_ppb").sub(pl.col("O3_ppb_Background")).alias("BG_Sub_O3_ppb")
+            )
+    plot = plot * bg_sub.filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).hvplot.scatter(
+                x="FTC_Start",
+                y="BG_Sub_O3_ppb"
+                )
+    if week in data_2024["2BTech_205_B"].keys():
+        vent_o3 = data_2024["2BTech_205_B"][week].filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).group_by_dynamic(
+                "FTC_Start", every="10m"
+                ).agg(
+                    pl.col("O3_ppb").mean()
+                    )
+        io_o3 = bg_o3.join(
+            vent_o3,
+            on="FTC_Start",
+            suffix="_Vent"
+            ).with_columns(
+                pl.col("O3_ppb").truediv(pl.col("O3_ppb_Vent")).alias("IO")
+                )
+        # plot = ((plot * data_2025["2BTech_205_B"][week].filter(
+        #     pl.col("SamplingLocation").str.contains("C200")
+        #     ).hvplot.scatter(
+        #         x="FTC_Start",
+        #         y="O3_ppb",
+        #         title=str(week)
+        #         )) + io_o3.hvplot.scatter(
+        #             x="FTC_Start",
+        #             y="IO"
+        #             )).cols(1)
+    if week in data_2024["ThermoScientific_42i-TL"].keys():
+        plot = (plot + data_2024["ThermoScientific_42i-TL"][week].filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).hvplot.scatter(
+                x="FTC_Start",
+                y=["NO_ppb", "NO2_ppb"]
+                )
+                ).cols(1)
+        
+    hvplot.show(plot)

@@ -29,14 +29,14 @@ if not os.path.exists(CALIBRATED_DATA_DIR):
 # Full path to directory containing zero results
 ZERO_RESULTS_DIR = os.path.join(data_dir, "Instruments_DerivedData")
 # Year to calibrate data for
-year = 2025
+year = 2024
 # Date to use calibration factor from
 cal_dates = {"2BTech_202": "20240118",
-             "2BTech_205_A": "20250115",
-             "2BTech_205_B": "20250115",
+             "2BTech_205_A": "20240604",
+             "2BTech_205_B": "20240604",
              "2BTech_405nm": "20241216",
              "Picarro_G2307": "20250625",
-             "ThermoScientific_42i-TL": "20241216"}
+             "ThermoScientific_42i-TL": "20240708"}
 
 # %% Calibration results (calibration factors, LODs, and SNRs)
 # Gets results of all performed calibrations
