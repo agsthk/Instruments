@@ -101,3 +101,7 @@
 		- For after leak fixed, use 
 # calibrate_cleandata.py
 - Moving back to this because I fear I may not have applied the offset ever
+- Will need to update these ICARTT files - R1 now!
+# evaluate_leak.py
+- Identified which additions I want to use for the before and after comparison
+- Determined the concentration before the addition, the highest concentration reached, and the difference between the two for each addition I will use for comparison

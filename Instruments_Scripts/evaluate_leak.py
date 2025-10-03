@@ -220,11 +220,58 @@ for week, df in data_2025["2BTech_205_A_BG"].items():
                 ).cols(1)
         
     hvplot.show(plot)
+    
+# %% Identifies additions under normal NOx just before and after leak fixed
+leak_fixed = datetime(2025, 1, 27, 12, 0, 0, tzinfo=pytz.timezone("America/Denver"))
+pre_leak_adds = []
+post_leak_adds = []
+for add in add_times["O3"]["UTC_Start"]:
+    if add < leak_fixed:
+        pre_leak_adds.append(add)
+    else:
+        post_leak_adds.append(add)
+pre_leak_adds.sort()
+post_leak_adds.sort()
+pre_leak_adds = pre_leak_adds[-6:-1]
+post_leak_adds = post_leak_adds[0:2] + [post_leak_adds[3]]
 # %%
-data_2025["ThermoScientific_42i-TL"][week]["NO_ppb", 'NO_ppb_Offset']
+pre_leak_conds = []
+post_leak_conds = []
+for week, df in data_2025["2BTech_205_A"].items():
+    week_start = df["UTC_Start"].min()
+    week_stop = df["UTC_Stop"].max()
+    if week_stop < pre_leak_adds[0] or week_start > post_leak_adds[-1]:
+        continue
+    for add in pre_leak_adds:
+        pre_add = df.filter(
+            pl.col("UTC_Stop").ge(add - timedelta(minutes=5))
+            & pl.col("UTC_Start").le(add)
+            )
+        if pre_add.is_empty():
+            continue
+        pre_conc = pre_add["O3_ppb"].mean()
+        post_add = df.filter(
+            pl.col("UTC_Stop").ge(add)
+            & pl.col("UTC_Start").le(add + timedelta(minutes=10))
+            )
+        post_conc = post_add["O3_ppb"].max()
+        pre_leak_conds.append([pre_conc, post_conc, post_conc - pre_conc])
+    for add in post_leak_adds:
+        pre_add = df.filter(
+            pl.col("UTC_Stop").ge(add - timedelta(minutes=5))
+            & pl.col("UTC_Start").le(add)
+            )
+        if pre_add.is_empty():
+            continue
+        pre_conc = pre_add["O3_ppb"].mean()
+        post_add = df.filter(
+            pl.col("UTC_Stop").ge(add)
+            & pl.col("UTC_Start").le(add + timedelta(minutes=10))
+            )
+        post_conc = post_add["O3_ppb"].max()
+        post_leak_conds.append([pre_conc, post_conc, post_conc - pre_conc])
 
 
-data_2025["2BTech_205_A"][week]["O3_ppb", 'O3_ppb_Offset']
 # %%
 
 for loc, df in data.items():
