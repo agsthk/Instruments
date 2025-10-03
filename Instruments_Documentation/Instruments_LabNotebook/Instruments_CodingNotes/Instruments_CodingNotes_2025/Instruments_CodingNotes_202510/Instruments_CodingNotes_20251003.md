@@ -66,3 +66,7 @@
 - To get them on same times, going to round datetime
 - Then join on rounded datetime
 - Then split by date and export split datasets
+# icartt_data.py
+- Shouldn't be changing the script as far as I can tell, but need to create a header input for the Aranet data
+- Realized that averaging times are NOT 1 minute - measures 1 time every second
+	- Going to fix that in the combining script because I don't want to deal with it otherwise

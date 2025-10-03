@@ -25,7 +25,7 @@ for root, dirs, files in os.walk(CLEAN_DATA_DIR):
     for file in files:
         if file.startswith("."):
             continue
-        if file.find("Aranet") == -1:
+        if file.find("Aranet") == -1 or file.find("Aranet4_Clean") != -1:
             continue
         inst = file.split("_Clean")[0]
         if inst not in data.keys():
@@ -87,11 +87,16 @@ for i, (inst, df) in enumerate(data.items()):
          and (col + "_right") in joined.columns)
         ).select(
             ~cs.contains("_right")
-            ).sort(
-                by="UTC_Start"
-                ).with_columns(
-                    pl.col("UTC_Start").dt.date().alias("Date")
-                    )
+            ).with_columns(
+                # Fixes averaging time issue - not averaged over 1 minute
+                cs.contains("Stop").dt.offset_by("-1s")
+                .name.map(lambda name: name.replace("Stop", "Start"))
+                          ).sort(
+                              by="UTC_Start"
+                              ).with_columns(
+                                  pl.col("UTC_Start").dt.date().alias("Date")
+                                  )
+                                  
 # Splits joined dataset by FTC date
 joined = {key[0].strftime("%Y%m%d"): df for key, df in joined.partition_by(
     "Date", as_dict=True, include_key=False
