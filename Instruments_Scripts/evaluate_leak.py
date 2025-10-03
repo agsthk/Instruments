@@ -617,10 +617,10 @@ for week, df in data_2024["2BTech_205_A"].items():
                         pl.exclude("UTC_Stop_Add")
                         )
     pre_leak.append(df.filter(
-        pl.col("FTC_Stop").ge(comp_start) & pl.col("FTC_Start").le(leak_intro)
+        pl.col("FTC_Stop").ge(comp_start) & pl.col("FTC_Start").le(leak_intro) & ~pl.col("FTC_Start").dt.day().eq(12)
         ))
     post_leak.append(df.filter(
-        pl.col("FTC_Stop").ge(leak_intro) & pl.col("FTC_Start").le(comp_stop)
+        pl.col("FTC_Stop").ge(leak_intro) & pl.col("FTC_Start").le(comp_stop) & ~pl.col("FTC_Start").dt.day().eq(14)
         ))
     
     if week in data_2024["ThermoScientific_42i-TL"].keys():
@@ -667,15 +667,17 @@ post_leak_nox = pl.concat(post_leak_nox).with_columns(
 pre_leak = pl.concat(pre_leak).with_columns(
     pl.col("FTC_Start").dt.time().alias("FTC_Time"),
     pl.col("FTC_Start").dt.date().alias("FTC_Date")
-    ).filter(
-        pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
-        )
+    )
+# .filter(
+#         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+#         )
 post_leak = pl.concat(post_leak).with_columns(
     pl.col("FTC_Start").dt.time().alias("FTC_Time"),
     pl.col("FTC_Start").dt.date().alias("FTC_Date")
-    ).filter(
-        pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
-        )
+    )
+# .filter(
+#         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+#         )
 
 pre_leak_plot = pre_leak.hvplot.scatter(
     x="FTC_Time",
