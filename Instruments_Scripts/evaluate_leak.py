@@ -331,11 +331,36 @@ check_stop = leak_fixed + timedelta(days=2)
 pre_leak = []
 post_leak = []
 
-for week, df in data_2025["2BTech_205_A_BG"].items():
-    week_start = df["UTC_Start"].min()
-    week_stop = df["UTC_Stop"].max()
+for week, df in data_2025["2BTech_205_A"].items():
+    week_start = df["FTC_Start"].min()
+    week_stop = df["FTC_Stop"].max()
     if week_stop < check_start or week_start > check_stop:
         continue
+    
+    week_o3_adds = add_times["O3"].filter(
+        pl.col("UTC_Stop").ge(week_start)
+        & pl.col("UTC_Start").le(week_stop)
+        ).with_columns(
+            pl.col("UTC_Stop").dt.offset_by("2h")
+            )
+    if not week_o3_adds.is_empty():
+        df = df.filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).join_asof(
+                week_o3_adds,
+                on="UTC_Start",
+                strategy="backward",
+                suffix="_Add"
+                ).with_columns(
+                    pl.when(
+                        pl.col("UTC_Start").le(pl.col("UTC_Stop_Add"))
+                        )
+                    .then(pl.lit(None))
+                    .otherwise(pl.col("O3_ppb"))
+                    .alias("O3_ppb")
+                    ).select(
+                        pl.exclude("UTC_Stop_Add")
+                        )
     pre_leak.append(
         df.filter(
             pl.col("FTC_Stop").is_between(check_start, leak_fixed)
@@ -349,45 +374,124 @@ for week, df in data_2025["2BTech_205_A_BG"].items():
 pre_leak = pl.concat(pre_leak).drop_nulls()
 post_leak = pl.concat(post_leak).drop_nulls()
 
-hvplot.show(
-    ((pre_leak.hvplot.scatter(
-        x="FTC_Start",
-        y="O3_ppb",
-        xlabel="Local time",
-        ylabel="Background [O3] (ppb)",
-        title="Before leak fixed",
-        width=600,
-        height=400,
-        grid=True,
-        xlim=(pre_leak["FTC_Start"].min(), pre_leak["FTC_Start"].max()),
-        ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
-        shared_axes=False
-        ))+ (post_leak.hvplot.scatter(
-            x="FTC_Start",
-            y="O3_ppb",
-            xlabel="Local time",
-            ylabel="Background [O3] (ppb)",
-            title="After leak fixed",
-            width=600,
-            height=400,
-            grid=True,
-            xlim=(post_leak["FTC_Start"].min(), post_leak["FTC_Start"].max()),
-            ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
-            shared_axes=False
-            ) * post_leak.hvplot.line(
-                x="FTC_Start",
-                y="O3_ppb_LOD",
-                xlabel="Local time",
-                ylabel="Background [O3] (ppb)",
-                title="After leak fixed",
-                width=600,
-                height=400,
-                grid=True,
-                xlim=(post_leak["FTC_Start"].min(), post_leak["FTC_Start"].max()),
-                ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
-                shared_axes=False,
-                color="Black"))).cols(2)
+
+pre_leak = pl.concat(pre_leak).with_columns(
+    pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+    pl.col("FTC_Start").dt.date().alias("FTC_Date")
+    ).filter(
+        pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+        )
+post_leak = pl.concat(post_leak).with_columns(
+    pl.col("FTC_Start").dt.time().alias("FTC_Time"),
+    pl.col("FTC_Start").dt.date().alias("FTC_Date")
+    ).filter(
+        pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+        )
+
+pre_leak_plot = pre_leak.hvplot.scatter(
+    x="FTC_Time",
+    y="O3_ppb",
+    by="FTC_Date",
+    xlabel="Local time",
+    ylabel="Background [O3] (ppb)",
+    title="Before leak fixed",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(pre_leak["FTC_Time"].min(), pre_leak["FTC_Time"].max()),
+    ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+    shared_axes=False
     )
+pre_leak_lod_plot = pre_leak.hvplot.line(
+    x="FTC_Time",
+    y="O3_ppb_LOD",
+    xlabel="Local time",
+    ylabel="Background [O3] (ppb)",
+    title="Before leak fixed",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+    ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+    shared_axes=False,
+    by="FTC_Date")
+
+post_leak_plot = post_leak.hvplot.scatter(
+    x="FTC_Time",
+    y="O3_ppb",
+    by="FTC_Date",
+    xlabel="Local time",
+    ylabel="Background [O3] (ppb)",
+    title="After leak fixed",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+    ylim=(pre_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+    shared_axes=False
+    )
+post_leak_lod_plot = post_leak.hvplot.line(
+    x="FTC_Time",
+    y="O3_ppb_LOD",
+    xlabel="Local time",
+    ylabel="Background [O3] (ppb)",
+    title="After leak fixed",
+    width=600,
+    height=400,
+    grid=True,
+    xlim=(post_leak["FTC_Time"].min(), post_leak["FTC_Time"].max()),
+    ylim=(pre_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+    shared_axes=False,
+    by="FTC_Date")
+
+
+
+hvplot.show(
+    ((pre_leak_plot * pre_leak_lod_plot)
+     + (post_leak_plot * post_leak_lod_plot)).cols(2)
+     # + (pre_leak_nox_plot)
+     # + (post_leak_nox_plot)
+    )
+
+# hvplot.show(
+#     ((pre_leak.hvplot.scatter(
+#         x="FTC_Start",
+#         y="O3_ppb",
+#         xlabel="Local time",
+#         ylabel="Background [O3] (ppb)",
+#         title="Before leak fixed",
+#         width=600,
+#         height=400,
+#         grid=True,
+#         xlim=(pre_leak["FTC_Start"].min(), pre_leak["FTC_Start"].max()),
+#         ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+#         shared_axes=False
+#         ))+ (post_leak.hvplot.scatter(
+#             x="FTC_Start",
+#             y="O3_ppb",
+#             xlabel="Local time",
+#             ylabel="Background [O3] (ppb)",
+#             title="After leak fixed",
+#             width=600,
+#             height=400,
+#             grid=True,
+#             xlim=(post_leak["FTC_Start"].min(), post_leak["FTC_Start"].max()),
+#             ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+#             shared_axes=False
+#             ) * post_leak.hvplot.line(
+#                 x="FTC_Start",
+#                 y="O3_ppb_LOD",
+#                 xlabel="Local time",
+#                 ylabel="Background [O3] (ppb)",
+#                 title="After leak fixed",
+#                 width=600,
+#                 height=400,
+#                 grid=True,
+#                 xlim=(post_leak["FTC_Start"].min(), post_leak["FTC_Start"].max()),
+#                 ylim=(post_leak["O3_ppb"].min()-5, pre_leak["O3_ppb"].max()+5),
+#                 shared_axes=False,
+#                 color="Black"))).cols(2)
+#     )
 
 
 # %%
@@ -556,17 +660,15 @@ post_leak_nox = pl.concat(post_leak_nox).with_columns(
 pre_leak = pl.concat(pre_leak).with_columns(
     pl.col("FTC_Start").dt.time().alias("FTC_Time"),
     pl.col("FTC_Start").dt.date().alias("FTC_Date")
-    )
-# .filter(
-#         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
-#         )
+    ).filter(
+        pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+        )
 post_leak = pl.concat(post_leak).with_columns(
     pl.col("FTC_Start").dt.time().alias("FTC_Time"),
     pl.col("FTC_Start").dt.date().alias("FTC_Date")
-    )
-# .filter(
-#         pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
-#         )
+    ).filter(
+        pl.col("O3_ppb").ge(pl.col("O3_ppb_LOD"))
+        )
 
 pre_leak_plot = pre_leak.hvplot.scatter(
     x="FTC_Time",
