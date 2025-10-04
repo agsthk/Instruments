@@ -74,3 +74,4 @@
 - Failed - missing values not filled
 	- That's because I only had the missing values going for the continuous data - moving it outside of that if block to see if that fixes it
 	- It didn't because data type is "string" I guess - changed it to fill if it isn't a datetime variable and that worked
+- Done for today - next thing I need to do is the air change rates which should be easy enough - finish over the weekend?
