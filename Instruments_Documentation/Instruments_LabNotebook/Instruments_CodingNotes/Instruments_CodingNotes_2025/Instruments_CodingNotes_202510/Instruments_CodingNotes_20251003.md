@@ -70,3 +70,7 @@
 - Shouldn't be changing the script as far as I can tell, but need to create a header input for the Aranet data
 - Realized that averaging times are NOT 1 minute - measures 1 time every second
 	- Going to fix that in the combining script because I don't want to deal with it otherwise
+- Finished creating ICARTT header, now going to ICARTT it
+- Failed - missing values not filled
+	- That's because I only had the missing values going for the continuous data - moving it outside of that if block to see if that fixes it
+	- It didn't because data type is "string" I guess - changed it to fill if it isn't a datetime variable and that worked

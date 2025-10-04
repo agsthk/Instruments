@@ -157,13 +157,14 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
                     .dt.convert_time_zone("America/Denver")
                     .alias("FTC_DateTime")
                     )
-        # Fills missing values with appropriate flag
-        camp_data = camp_data.with_columns(
-            [pl.col(dvar).fill_null(float(chars["missingflag"]))
-             for dvar, chars in header["dvars"].items()
-             if camp_data[dvar].dtype == pl.Float64()
-             or camp_data[dvar].dtype == pl.Int64()]
-            )
+    # Fills missing values with appropriate flag
+    camp_data = camp_data.with_columns(
+        [pl.col(dvar).fill_null(float(chars["missingflag"]))
+         for dvar, chars in header["dvars"].items()
+         if dvar.find("TC") == -1]
+         # if camp_data[dvar].dtype == pl.Float64()
+         # or camp_data[dvar].dtype == pl.Int64()]
+        )
     # Splits campaign data by ISO week
     camp_data = camp_data.with_columns(
         (cs.contains("FTC") & ~cs.contains("Stop")).dt.week().alias("Week")
