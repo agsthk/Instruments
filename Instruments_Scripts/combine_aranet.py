@@ -71,7 +71,7 @@ for i, (inst, df) in enumerate(data.items()):
     else:
         joined = joined.join(
             df,
-            on="UTC_Start",
+            on="UTC_DateTime",
             how="full",
             coalesce=True
             )
@@ -89,9 +89,10 @@ for i, (inst, df) in enumerate(data.items()):
                 cs.contains("Stop").dt.offset_by("-1s")
                 .name.map(lambda name: name.replace("Stop", "Start"))
                           ).sort(
-                              by="UTC_Start"
+                              by="UTC_DateTime"
                               ).with_columns(
-                                  pl.col("UTC_Start").dt.date().alias("Date")
+                                  pl.col("SamplingLocation").fill_null("C200"),
+                                  pl.col("FTC_DateTime").dt.date().alias("Date")
                                   )
                                   
 # Splits joined dataset by FTC date

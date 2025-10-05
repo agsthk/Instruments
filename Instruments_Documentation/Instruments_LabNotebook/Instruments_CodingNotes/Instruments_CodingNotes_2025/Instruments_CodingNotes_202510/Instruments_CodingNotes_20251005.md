@@ -6,4 +6,4 @@
 - Since I changed to not determine averaging times (there isn't any), want to modify this script to work with that
 - Removing rounding
 - Also changing the temperature to use Fahrenheit if available since that apparently gives better precision?
-- 
+- Since not rounding times, joining now gives a lot of nulls - filling null sampling locations
