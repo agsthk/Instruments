@@ -7,3 +7,7 @@
 - Removing rounding
 - Also changing the temperature to use Fahrenheit if available since that apparently gives better precision?
 - Since not rounding times, joining now gives a lot of nulls - filling null sampling locations
+- Now that I have the changes, going to run the ICARTT creator and hopefully it will work
+	- Changed the ICARTT inputs to remove extra variables and make the data interval code 1
+- Glad I did this also because I had accidentally split by UTC date instead of Fort Collins date oops
+- Hopefully no one downloaded this data (highly doubt it)
