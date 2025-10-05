@@ -8,7 +8,6 @@ Created on Fri Oct  3 16:58:06 2025
 import os
 import polars as pl
 import polars.selectors as cs
-import hvplot.polars
 
 # Declares full path to Instruments_Data/ directory
 data_dir = os.getcwd()
@@ -38,16 +37,14 @@ for root, dirs, files in os.walk(CLEAN_DATA_DIR):
 for inst, dfs in data.items():
     data[inst] = pl.concat(dfs).with_columns(
         # Rounds times to standardize
-        cs.contains("UTC").str.to_datetime(time_zone="UTC")
-        .dt.round("1m"),
+        cs.contains("UTC").str.to_datetime(time_zone="UTC"),
         cs.contains("FTC").str.to_datetime(time_zone="America/Denver")
-        .dt.round("1m")
-        ).sort("UTC_Start",
+        ).sort(cs.contains("UTC"),
                "RoomTemp_C").unique(
                    # Drops rows that report fahrenheit temperature if preceding
                    # row reports celcius temperature
                    ~cs.contains("RoomTemp_C"),
-                   keep="first"
+                   keep="last"
                    ).with_columns(
                        # Converts faherenheit temperatures to celcius
                        pl.when(
