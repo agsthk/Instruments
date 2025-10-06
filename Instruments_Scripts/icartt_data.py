@@ -71,8 +71,9 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
     else:
         inst_cal_data_dir = os.path.join(CLEAN_DATA_DIR,
                                            inst + "_CleanData")
-        inst_cal_data_dir = os.path.join(inst_cal_data_dir,
-                                         os.listdir(inst_cal_data_dir)[0])
+        if os.listdir(inst_cal_data_dir)[0].find(".csv") == -1:
+            inst_cal_data_dir = os.path.join(inst_cal_data_dir,
+                                             os.listdir(inst_cal_data_dir)[0])
         correct_cal_files = [file for file in os.listdir(inst_cal_data_dir)]
 
     # Gets all data collected between campaign start and stop
@@ -83,12 +84,14 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
             )
         if file_date >= camp_start and file_date <= camp_stop:
             path = os.path.join(inst_cal_data_dir, file)
-            camp_files.append(pl.scan_csv(path).with_columns(
+            data = pl.scan_csv(path).with_columns(
                 cs.contains("UTC").str.to_datetime(time_zone="UTC")
                 .dt.round(every="100ms"),
                 cs.contains("FTC").str.to_datetime(time_zone="America/Denver")
                 .dt.round(every="100ms")
-                ).select(
+                )
+            if "SamplingLocation" in data.collect_schema().names():
+                data = data.select(
                     # Keeps only the variables described in the ICARTT header
                     # and SamplingLocation
                     pl.col(
@@ -96,15 +99,27 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
                         + list(header["dvars"].keys())
                         + ["SamplingLocation"]
                         )
-                    ))
+                    )
+            else:
+                data = data.select(
+                    # Keeps only the variables described in the ICARTT header
+                    # and SamplingLocation
+                    pl.col(
+                        [header["ivar"]["shortname"]]
+                        + list(header["dvars"].keys())
+                        )
+                    )
+            camp_files.append(data)
     camp_data = pl.concat(camp_files, how="diagonal_relaxed")
-    # Removes non-C200 data
-    camp_data = camp_data.filter(
-        pl.col("SamplingLocation").str.contains("C200")
-        ).select(
-            pl.exclude("SamplingLocation")
-            ).collect()
-
+    if "SamplingLocation" in camp_data.collect_schema().names():
+        # Removes non-C200 data
+        camp_data = camp_data.filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).select(
+                pl.exclude("SamplingLocation")
+                ).collect()
+    else:
+        camp_data = camp_data.collect()
     # Shift start times so that they don't overlap with previous intervals
     start_cols = [col for col in camp_data.columns if col.find("Start") != -1]
     for start_col in start_cols:
