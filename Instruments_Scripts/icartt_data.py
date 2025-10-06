@@ -37,7 +37,9 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
     inst = header_file.split("_ICARTTInputs")[0]
     header_path = os.path.join(ICARTT_HEADER_DIR, header_file)
     with open(header_path, "r") as file:
-        header = yaml.load(file, Loader=yaml.Loader)
+        header = yaml.load(file, Loader=yaml.Loader) 
+    if header["Complete"]:
+        continue
     camp_start = datetime.strptime(header["Campaign Start"], "%Y%m%d%H%M%S").replace(
         tzinfo=pytz.timezone("America/Denver")
         )
