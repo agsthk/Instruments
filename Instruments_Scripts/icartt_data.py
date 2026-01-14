@@ -72,8 +72,15 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
                              if (file.find(cal_date + "Calibration") != -1)]
     else:
         inst_cal_data_dir = os.path.join(CLEAN_DATA_DIR,
-                                           inst + "_CleanData")
-        if os.listdir(inst_cal_data_dir)[0].find(".csv") == -1:
+                                         inst + "_CleanData")
+        os.listdir(inst_cal_data_dir)
+        if camp_start.year == 2026:
+            for source in ["Hub", "Logger"]:
+                if (inst + "_Clean" + source + "Data") in os.listdir(inst_cal_data_dir):
+                    break
+            inst_cal_data_dir = os.path.join(inst_cal_data_dir,
+                                             inst + "_Clean" + source + "Data")
+        elif os.listdir(inst_cal_data_dir)[0].find(".csv") == -1:
             inst_cal_data_dir = os.path.join(inst_cal_data_dir,
                                              os.listdir(inst_cal_data_dir)[0])
         correct_cal_files = [file for file in os.listdir(inst_cal_data_dir)]

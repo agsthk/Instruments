@@ -24,3 +24,7 @@
 	- Changed hub read in to read FTC_DateTime as a string first, then convert
 	- It was still doing it because it was overwriting the timestamp with the monitor date and time since there was no UTC_DateTime column
 		- Manually added a UTC_DateTime column in the read in function by converting the FTC_DateTime to get around this
+# icartt_data.py
+- Back to this to try to handle clean data from trace gas hub
+- If there aren't any calibrations in the header (there aren't), if campaign starts in 2026, then try Hub first and if that doesn't exist then try Logger
+	- This made it work (at least for now)
