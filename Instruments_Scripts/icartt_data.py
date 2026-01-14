@@ -182,122 +182,44 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
          # if camp_data[dvar].dtype == pl.Float64()
          # or camp_data[dvar].dtype == pl.Int64()]
         )
-# %%
-    col = "A"
-    pl.DataFrame(
-        [0.382, 8.382, 03.3, 00003., 5, 74, 0007.3, 839124, 33, 83.1724, 8361.0003],
-        schema="A"
-        ).with_columns(
-            pl.col(col).cast(pl.String).str.find("[1-9]").cast(pl.Int64)
-            .sub(pl.col(col).cast(pl.String).str.find("\.").cast(pl.Int64))
-            .add(1)
-            .name.prefix("Exp_")
-            ).with_columns(
-                pl.when(pl.col("Exp_" + col).le(0))
-                .then(pl.col("Exp_" + col).add(1))
-                .otherwise(pl.col("Exp_" + col))
-                ).with_columns(
-                    pl.lit(10.0).pow(pl.col("Exp_" + col)).alias("Exp_" + col)
-                    ).with_columns(
-                        pl.col(col).mul(pl.col("Exp_" + col)).round(0).truediv(pl.col("Exp_" + col)).name.suffix("Rounded")
-                        ).with_columns(
-                            pl.col())
-
-    col = "O3_ppb_Uncertainty"
-    camp_data.with_columns(
-        pl.col(col).cast(pl.String).str.find("[1-9]").cast(pl.Int64)
-        .sub(pl.col(col).cast(pl.String).str.find("\.").cast(pl.Int64))
-        .add(1)
-        .name.prefix("Exp_")
-        ).with_columns(
-            pl.when(pl.col("Exp_" + col).le(0))
-            .then(pl.col("Exp_" + col).add(1))
-            .otherwise(pl.col("Exp_" + col))
-            ).with_columns(
-                pl.lit(10.0).pow(pl.col("Exp_" + col)).alias("Exp_" + col)
-                ).with_columns(
-                    pl.col(col).mul(pl.col("Exp_" + col)).round(0)
-                    .truediv(pl.col("Exp_" + col)).name.suffix("Rounded"),
-                    pl.col(col.replace("_Uncertainty", ""))
-                    .mul(pl.col("Exp_" + col)).round(0)
-                    .truediv(pl.col("Exp_" + col)).name.suffix("Rounded")
+    # Rounds values to appropriate precision based on uncertainties
+    for col in camp_data.columns:
+        if col.find("_Uncertainty") != -1:
+            camp_data = camp_data.with_columns(
+                # Index of first non-zero digit
+                pl.col(col).cast(pl.String).str.find("[1-9]").cast(pl.Int64)
+                .sub(
+                    # Index of decimal point
+                    pl.col(col).cast(pl.String).str.find("\.").cast(pl.Int64)
                     )
-    
-    
-    
-        .alias("N_Nonzero"),
-        pl.col(col).cast(pl.String).str.find(".").cast(pl.Int64).alias("N_Dec")
-        ).with_columns(
-            pl.when(pl.col("N_Nonzero").gt(pl.col("N_Dec")))
-            .then(pl.col("N_Dec").sub(pl.col("N_Nonzero")))
-            .when(pl.col("N_Nonzero").lt(pl.col("N_Dec")))
-            .then(pl.col("N_Dec").sub(pl.col("N_Nonzero")).sub(1))
-            # .when(pl.col("N_Dec").is_null())
-            # .then(pl.col(col).cast(pl.String).str.len_chars().sub(pl.col("N_Nonzero")).sub(2))
-            .alias("Exp")
-            ).with_columns(
-                pl.col(col).truediv(pl.lit(10.0).pow(pl.col("Exp"))).round(0).mul(pl.lit(10.0).pow(pl.col("Exp")))
-                .alias("TwoSig")
-                )
-                
-        # pl.when(
-        #     pl.col(col).cast(pl.String).str.find(".").is_null()
-        #     )
-        # .then(
-        #     pl.col(col).cast(pl.String).str.len_chars()
-        #     )
-        # .otherwise(
-        #     pl.col(col))
-        # .alias(col + "_Exp")
-        # )
-    #         cs.contains("Uncertainty")
-            
-            
-            
-    #         .split(".")
-    #     .name.prefix("String_")
-    #     ).with_columns(
-    #         pl.when(cs.contains("String_").list.len().eq(1))
-    #         .then(cs.contains("String_").list.get(0))
-    #         .name.suffix("_Int"),
-    #         pl.when(cs.contains("String_").list.len().eq(2))
-    #         .then(cs.contains("String_").list.get(-1).str.find("[1-9]"))
-    #         .name.suffix("_Dec"),
-    #         )
-    # .list.get(-1)
-    #     .str.find("[1-9]")
-        
-        # )
-# %%
-    camp_data.with_columns(
-        # Rounds uncertainty columns to 2 significant digits
-        cs.contains("Uncertainty").sub(0.03).round_sig_figs(2)
-        ).with_columns(
-            # Converts rounded uncertainty to strings
-            cs.contains("Uncertainty").cast(pl.String).name.prefix("String_")
-            ).with_columns(
-                # If the rounded uncertainty contains a decimal, counts number
-                # of digits beyond decimal
-                pl.when(cs.contains("String_").str.contains("."))
-                .then(cs.contains("String_")
-                      .str.split(".")
-                      .list.get(-1)
-                      .str.len_chars()
-                      )
-                )
-                
-                )
-        
-        ndec = cs.contains("Uncertainty")
-        .round_sig_figs(2)
-        .cast(pl.String)
-        .str.split(".")
-        .list.get(-1)
-        .str.len_chars()
-        ).with_columns(
-            rounded=pl.col("O3_ppb").mul(pl.lit(10).pow(pl.col("ndec"))).round(0).truediv(pl.lit(10).pow(pl.col("ndec")))
-            )
-# %%
+                # Accounts for rounding to two significant digits
+                .add(1)
+                .alias("Factor")
+                ).with_columns(
+                    # Handles when first non-zero digit is before decimal
+                    pl.when(pl.col("Factor").le(0))
+                    .then(pl.col("Factor").add(1))
+                    .otherwise(pl.col("Factor"))
+                    ).with_columns(
+                        # Factor to multiply then divide by
+                        pl.lit(10.0).pow(pl.col("Factor")).alias("Factor")
+                        ).with_columns(
+                            # Scales value to have final significant digit
+                            # before decimal
+                            pl.col(col2).mul(pl.col("Factor"))
+                            # Rounds scaled value to desired number of
+                            # significant digits
+                            .round(0)
+                            # Un-scales value after rounding
+                            .truediv(pl.col("Factor"))
+                            # Repeats rounding to same precision for all
+                            # columns associated with given uncertainty
+                            for col2 in camp_data.columns 
+                            if col2.find(col.replace("_Uncertainty", "")) != -1
+                            ).select(
+                                pl.exclude("Factor")
+                                )
+    # %%
     # Splits campaign data by ISO week
     camp_data = camp_data.with_columns(
         (cs.contains("FTC") & ~cs.contains("Stop")).dt.week().alias("Week")
