@@ -219,7 +219,6 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
                             ).select(
                                 pl.exclude("Factor")
                                 )
-    # %%
     # Splits campaign data by ISO week
     camp_data = camp_data.with_columns(
         (cs.contains("FTC") & ~cs.contains("Stop")).dt.week().alias("Week")

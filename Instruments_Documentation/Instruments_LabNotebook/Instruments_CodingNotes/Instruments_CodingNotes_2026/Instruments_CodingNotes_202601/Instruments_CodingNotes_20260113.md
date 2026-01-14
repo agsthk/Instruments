@@ -6,3 +6,6 @@
 	- The round_sig_figs function actually isn't great because if I round to 2 sig figs and the second significant digit is a 0, it drops it
 - Figured out a way that multiplies by ten to some power, rounds to integer, then divides by 10 to the same power
 	- The power is determined by the difference in position between the first non-zero digit and the decimal point
+- Ran updated script on ozone data and it appeared to work
+	- Additional problem: after adjusting ICARTT timestamps, some of them are reading as 0.6999999999999 or something like that, so maybe I want to fix that
+		- Probably not as important?
