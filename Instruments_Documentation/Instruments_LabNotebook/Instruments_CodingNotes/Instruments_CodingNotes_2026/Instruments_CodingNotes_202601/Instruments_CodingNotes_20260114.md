@@ -18,3 +18,5 @@
 	- Corrected slight issue with the fixed uncertainty rounding that was causing a random 3 to appear as the 17th digit after the decimal (after real rounding, rounded to 10 decimal places)
 # structure_rawdata.py
 - Revised not to overwrite existing structured files
+- Added raw input parameters for new instruments and hub instruments (under Hub key)
+- Created a read_hubdata function that is essentially the same as read_DAQ data except it doesn't need to handle extra header lines and it adds a warm up column that is all zeros (not strictly good, but can't think of a great way to determine when warm up starts and also I don't care that much)

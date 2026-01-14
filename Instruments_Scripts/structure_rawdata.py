@@ -73,6 +73,16 @@ def read_daqdata(path, schema):
         data = pl.from_pandas(data, schema_overrides=schema)
     return data
 
+def read_hubdata(path, schema): 
+    data = pl.read_csv(path,
+                       has_header=False,
+                       schema=schema,
+                       ignore_errors=True,
+                       skip_rows=1,
+                       truncate_ragged_lines=True)
+    data = data.drop_nulls()
+    return data
+
 def read_2bdata(path, schema):
     i = 0
     while i < 2:
@@ -192,6 +202,8 @@ def read_picarro(path, schema):
 def read_rawdata(path, inst, source, schema):
     if source == "DAQ":
         data = read_daqdata(path, schema)
+    elif source == "Hub":
+        data = read_hubdata(path, schema)
     elif inst == "Picarro_G2307":
         data = read_picarro(path, schema)
     elif inst.find("2BTech") != -1:
@@ -396,7 +408,7 @@ for inst in data.keys():
             dfs.append(define_datetime(df, inst))
         concat_df = pl.concat(dfs).unique().sort("UTC_DateTime")
         if inst == "ThermoScientific_42i-TL":
-            if source == "DAQ":
+            if source in ["DAQ", "Hub"]:
                 concat_df.insert_column(
                     7,
                     pl.col("NO_ppb").add(pl.col("NO2_ppb")).alias("NOx_ppb")
@@ -406,8 +418,12 @@ for inst in data.keys():
                     6,
                     pl.col("NOx_ppb").sub(pl.col("NO_ppb")).alias("NO2_ppb")
                     )
-        if source != "DAQ":
+        if source not in ["DAQ", "Hub"]:
             concat_df = define_warmup(concat_df, inst)
+        if source == "Hub":
+            concat_df = concat_df.with_columns(
+                pl.lit(0).alias("WarmUp")
+                )
         data[inst][source] = split_by_date(concat_df)
         
 #%%
