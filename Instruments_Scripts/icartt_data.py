@@ -200,6 +200,9 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
                     .round(0)
                     # Un-scales value after rounding
                     .mul(chars["precision"])
+                    # Handles odd phenomenon of the 17th digit after the 
+                    # decimal being nonzero
+                    .round(10)
                     )
     # Rounds values to appropriate precision based on uncertainties
     for col in camp_data.columns:

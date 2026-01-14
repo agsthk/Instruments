@@ -15,3 +15,4 @@
 		- Using percent uncertainty to calculate an uncertainty column, which will be dropped after rounding
 		- Realized that the rounding is also rounding missing values, so moved missing values filling after precision functions
 		- I don't necessarily know that the LI-COR data actually got changed in any way, I think it was already reporting to appropriate precision most likely - but that's fine, I'll upload them anyway
+	- Corrected slight issue with the fixed uncertainty rounding that was causing a random 3 to appear as the 17th digit after the decimal (after real rounding, rounded to 10 decimal places)
