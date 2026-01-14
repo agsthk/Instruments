@@ -182,6 +182,24 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
          # if camp_data[dvar].dtype == pl.Float64()
          # or camp_data[dvar].dtype == pl.Int64()]
         )
+    # Columns that were created as intermediates
+    drop_cols = []
+    # Rounds values to appropriate precision based on manual input
+    for dvar, chars in header["dvars"].items():
+        if "precision" in chars.keys():
+            if isinstance(chars["precision"], str):
+                print(chars["precision"])
+            else:
+                camp_data = camp_data.with_columns(
+                    pl.col(dvar)
+                    # Scales so last significant digit is in ones place
+                    .truediv(chars["precision"])
+                    # Rounds to ones place
+                    .round(0)
+                    # Un-scales value after rounding
+                    .mul(chars["precision"])
+                    )
+            
     # Rounds values to appropriate precision based on uncertainties
     for col in camp_data.columns:
         if col.find("_Uncertainty") != -1:
@@ -333,4 +351,8 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
                              fname)
         with open(fpath, "w+") as file:
             file.write(header_with_data)
+        # Changes complete to True after creating ICARTT files
+        header["Complete"] = True
+        with open(header_path, "w+") as file:
+            yaml.dump(header, file, sort_keys=False)
 

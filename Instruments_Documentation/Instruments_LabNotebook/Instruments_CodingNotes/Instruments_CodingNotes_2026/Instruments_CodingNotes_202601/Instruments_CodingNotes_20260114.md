@@ -1,3 +1,14 @@
 # icartt_data.py
 - Continuing work to fix precision, but first going to fix timestamp precision because I expect that to be relatively straightforward
 - Added rounding to 1 decimal place when converting from datetime to seconds since midnight, and that worked
+- Precision
+	- Testing that it works for data with time-based uncertainty columns
+		- Generated new ICARTT input files for 2BTech_205_A, 2BTech_205_B, ThermoScientific_42i-TL, AirChangeRates (although ACR I probably would like to fix to include ACRs calculated using Aranet sensors, which are currently omitted due to higher uncertainty relative to LI-COR)
+		- For all of these, passed ICARTT scanner, quick looks show they did what I wanted
+	- Challenge is now what to do with files that don't have (or don't only have) time-based uncertainty columns - Picarro, Aranet, LI-COR, TempRHDoor
+		- Best bet is to probably put it in the ICARTT input file somewhere
+		- Adding precision key to dependent variables where it'll need to be manual
+		- Straightforward application if the uncertainty is constant, for percentage based, may need something else
+		- Good on TempRHDoor, Picarro, just need to figure out LI-COR with the percentage and Aranet with no reported uncertainty (maybe Aranet doesn't need that?)
+			- Aranet doesn't need a revision, no calibrations and it reports the precision it has
+		- Briefly, decided to update header files after ICARTT files have been created such that complete == True and I don't have to change it manually
