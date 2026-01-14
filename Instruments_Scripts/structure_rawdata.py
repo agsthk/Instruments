@@ -80,6 +80,15 @@ def read_hubdata(path, schema):
                        ignore_errors=True,
                        skip_rows=1,
                        truncate_ragged_lines=True)
+    data = data.with_columns(
+        pl.col("FTC_DateTime").str.to_datetime("%m/%d/%Y %H:%M:%S")
+        .dt.replace_time_zone("America/Denver")
+        )
+    data.insert_column(
+        0,
+        pl.col("FTC_DateTime").dt.convert_time_zone("UTC")
+        .alias("UTC_DateTime")
+        )
     data = data.drop_nulls()
     return data
 
@@ -244,7 +253,7 @@ def read_rawdata(path, inst, source, schema):
                            schema=schema,
                            ignore_errors=True,
                            skip_rows=1)
-    data = data.drop_nulls()
+    # data = data.drop_nulls()
     return data
 
 def define_datetime(df, inst):
@@ -375,6 +384,8 @@ for subdir in os.listdir(RAW_DATA_DIR):
     for subdir2 in os.listdir(path):
         path2 = os.path.join(path, subdir2)
         inst, source = subdir2[:-4].split("_Raw")
+        # if inst != "2BTech_202" or source != "Hub":
+        #     continue
         schema = schemas[inst][source]
         if inst not in data.keys():
             data[inst] = {}
@@ -388,7 +399,7 @@ for subdir in os.listdir(RAW_DATA_DIR):
         for file in os.listdir(path2):
             path3 = os.path.join(path2, file)
             data[inst][source].append(read_rawdata(path3, inst, source, schema))
-
+data
 for inst in data.keys():
     for source in data[inst].keys():
         dfs = []

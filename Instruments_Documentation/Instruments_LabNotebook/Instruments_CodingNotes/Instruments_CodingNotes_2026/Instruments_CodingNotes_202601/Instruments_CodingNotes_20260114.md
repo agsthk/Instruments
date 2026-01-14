@@ -20,3 +20,7 @@
 - Revised not to overwrite existing structured files
 - Added raw input parameters for new instruments and hub instruments (under Hub key)
 - Created a read_hubdata function that is essentially the same as read_DAQ data except it doesn't need to handle extra header lines and it adds a warm up column that is all zeros (not strictly good, but can't think of a great way to determine when warm up starts and also I don't care that much)
+- The hub data is offset by an hour after structuring? Has to do with reading in string values
+	- Changed hub read in to read FTC_DateTime as a string first, then convert
+	- It was still doing it because it was overwriting the timestamp with the monitor date and time since there was no UTC_DateTime column
+		- Manually added a UTC_DateTime column in the read in function by converting the FTC_DateTime to get around this
