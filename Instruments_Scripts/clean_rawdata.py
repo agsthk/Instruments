@@ -64,14 +64,16 @@ for spec, df in add_times.items():
 
 insts = ["2BTech_202",
          "2BTech_205_A",
-         "2BTech_205_B",
-         "2BTech_405nm",
+         # "2BTech_205_B",
+         # "2BTech_405nm",
+         "Aranet4_1F15B",
          "Aranet4_1F16F",
+         "Aranet4_1F168",
          "Aranet4_1FB20",
-         "LI-COR_LI-840A_A",
-         "LI-COR_LI-840A_B",
-         "Picarro_G2307",
-         "TempRHDoor",
+         # "LI-COR_LI-840A_A",
+         # "LI-COR_LI-840A_B",
+         # "Picarro_G2307",
+         # "TempRHDoor",
          "ThermoScientific_42i-TL"]
 
 sampling_locs = {}
@@ -296,7 +298,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             continue
         _, source = file[:-17].split("_Structured")
         date = file.rsplit("_", 1)[-1][:-4]
-        if date.find("2024") == -1:
+        if date.find("2022") != -1:
             continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
@@ -308,7 +310,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             pl.selectors.contains("FTC")
             .str.to_datetime(time_zone="America/Denver")
             )
-        if source != "DAQ":
+        if source not in ["DAQ", "Hub"]:
             if inst == "2BTech_205_A":
                 # Declares Timestamps known to be synched with real time
                 real_ts = [
@@ -533,6 +535,13 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 .otherwise(pl.lit(None))
                 .alias("SamplingLocation")
                 )
+        if inst == "2BTech_202":
+            lf = lf.with_columns(
+                pl.when(pl.col("O3_ppb").is_between(-5, 200))
+                .then(pl.col("SamplingLocation"))
+                .otherwise(pl.lit(None))
+                .alias("SamplingLocation")
+                )
         if inst.find("LI-COR") != -1:
             lf = lf.with_columns(
                 pl.when(pl.col("CO2_ppm").is_between(0, 20000))
@@ -575,7 +584,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
         if source not in data[inst].keys():
             data[inst][source] = {}
         data[inst][source][date] = df
-        #%%
+# data["2BTech_205_A"].keys()
         f_name = inst + "_Clean" + source + "Data_" + path[-12:-4] + ".csv"
         f_dir = os.path.join(CLEAN_DATA_DIR,
                              inst + "_CleanData",
@@ -584,7 +593,8 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             os.makedirs(f_dir)
         path = os.path.join(f_dir,
                             f_name)
-        df.write_csv(path)
+        if not os.path.exists(path):
+            df.write_csv(path)
 #%%
 for inst, sources in wrong_dates.items():
     for source, dates in sources.items():
