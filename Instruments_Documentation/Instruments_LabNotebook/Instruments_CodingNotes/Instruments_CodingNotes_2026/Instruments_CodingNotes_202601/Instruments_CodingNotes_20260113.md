@@ -1,0 +1,8 @@
+# icartt_data.py
+- Need to fix precision here - report uncertainties to 2 significant figures, use those to determine precision on readings
+- Creating R3 files for 2BTech_205_A for CITRUS
+- There is a round_sig_figs function in polars which is epic, using that when we have uncertainty columns
+	- Then I think the next step is to determine precision from the sig figs but that is a bit more challenging
+	- The round_sig_figs function actually isn't great because if I round to 2 sig figs and the second significant digit is a 0, it drops it
+- Figured out a way that multiplies by ten to some power, rounds to integer, then divides by 10 to the same power
+	- The power is determined by the difference in position between the first non-zero digit and the decimal point
