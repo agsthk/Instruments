@@ -12,3 +12,6 @@
 		- Good on TempRHDoor, Picarro, just need to figure out LI-COR with the percentage and Aranet with no reported uncertainty (maybe Aranet doesn't need that?)
 			- Aranet doesn't need a revision, no calibrations and it reports the precision it has
 		- Briefly, decided to update header files after ICARTT files have been created such that complete == True and I don't have to change it manually
+		- Using percent uncertainty to calculate an uncertainty column, which will be dropped after rounding
+		- Realized that the rounding is also rounding missing values, so moved missing values filling after precision functions
+		- I don't necessarily know that the LI-COR data actually got changed in any way, I think it was already reporting to appropriate precision most likely - but that's fine, I'll upload them anyway

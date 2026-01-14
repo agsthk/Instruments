@@ -174,21 +174,23 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
                     .dt.convert_time_zone("America/Denver")
                     .alias("FTC_DateTime")
                     )
-    # Fills missing values with appropriate flag
-    camp_data = camp_data.with_columns(
-        [pl.col(dvar).fill_null(float(chars["missingflag"]))
-         for dvar, chars in header["dvars"].items()
-         if dvar.find("TC") == -1]
-         # if camp_data[dvar].dtype == pl.Float64()
-         # or camp_data[dvar].dtype == pl.Int64()]
-        )
     # Columns that were created as intermediates
     drop_cols = []
     # Rounds values to appropriate precision based on manual input
     for dvar, chars in header["dvars"].items():
         if "precision" in chars.keys():
+            # Uncertainty calculation from percent uncertainty
             if isinstance(chars["precision"], str):
-                print(chars["precision"])
+                perc_unc = float(chars["precision"].split("%")[0]) / 100
+                # Calculates uncertainty as percentage of measurement as new 
+                # temporary column
+                camp_data = camp_data.with_columns(
+                    pl.col(dvar).mul(perc_unc).abs()
+                    .alias(dvar + "_Uncertainty")
+                    )
+                # Adds temporary column name to drop_cols
+                drop_cols.append(dvar + "_Uncertainty")
+            # Fixed uncertainty precision
             else:
                 camp_data = camp_data.with_columns(
                     pl.col(dvar)
@@ -199,7 +201,6 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
                     # Un-scales value after rounding
                     .mul(chars["precision"])
                     )
-            
     # Rounds values to appropriate precision based on uncertainties
     for col in camp_data.columns:
         if col.find("_Uncertainty") != -1:
@@ -237,6 +238,18 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
                             ).select(
                                 pl.exclude("Factor")
                                 )
+    # Drops columns created as intermediates
+    camp_data = camp_data.select(
+        pl.exclude(drop_cols)
+        )
+    # Fills missing values with appropriate flag
+    camp_data = camp_data.with_columns(
+        [pl.col(dvar).fill_null(float(chars["missingflag"]))
+         for dvar, chars in header["dvars"].items()
+         if dvar.find("TC") == -1]
+         # if camp_data[dvar].dtype == pl.Float64()
+         # or camp_data[dvar].dtype == pl.Int64()]
+        )
     # Splits campaign data by ISO week
     camp_data = camp_data.with_columns(
         (cs.contains("FTC") & ~cs.contains("Stop")).dt.week().alias("Week")
