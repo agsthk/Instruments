@@ -311,9 +311,9 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
         # date
         df = df.with_columns(
             cs.contains("UTC").sub(utc_start).dt.total_microseconds()
-            .truediv(1e6),
+            .truediv(1e6).round(1),
             cs.contains("FTC").sub(ftc_start).dt.total_microseconds()
-            .truediv(1e6)
+            .truediv(1e6).round(1)
             )
         # Gets collection and revision date from start and stop times
         df_header = df_header.replace(
