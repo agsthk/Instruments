@@ -422,5 +422,6 @@ for inst in data.keys():
                 os.makedirs(f_dir)
             path = os.path.join(f_dir,
                                 f_name)
-            df.write_csv(path)
+            if not os.path.exists(path):
+                df.write_csv(path)
 
