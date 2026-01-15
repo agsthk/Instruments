@@ -57,6 +57,10 @@ for header_file in os.listdir(ICARTT_HEADER_DIR):
             inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
                                              inst + "_CalibratedData",
                                              inst + "_CalibratedDAQData")
+        elif camp_start.year == 2026:
+            inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
+                                             inst + "_CalibratedData",
+                                             inst + "_CalibratedHubData")
         elif camp_start.year == 2024:
             inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
                                              inst + "_CalibratedData")
