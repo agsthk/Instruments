@@ -6,3 +6,5 @@
 # derive_occupancy.py
 - Creating this script to try to transform door status into occupancy status - use a combination of the door sensor, CO2 measurements, and lab notes
 - Read in DoorStatus file, LI-COR files, and Aranet files
+- Split by month for plotting purpose
+- 
