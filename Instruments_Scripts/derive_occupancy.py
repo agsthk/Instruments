@@ -53,10 +53,10 @@ for root, dirs, files in os.walk(LICOR_DATA_DIR):
 licor = pl.concat(licor, how="diagonal_relaxed").collect().sort(
     by=cs.contains("UTC")
     )
-# Splits LI-COR CO2 files by month
+# Splits LI-COR CO2 files by week
 licor = {key[0]: df for key, df in licor.with_columns(
-    pl.col("FTC_DateTime").dt.strftime("%Y%m").alias("Month")
-    ).partition_by("Month", as_dict=True, include_key=False).items()}
+    pl.col("FTC_DateTime").dt.strftime("%Y%W").alias("Week")
+    ).partition_by("Week", as_dict=True, include_key=False).items()}
 # Reads in Aranet CO2 files
 aranet = []
 for root, dirs, files in os.walk(ARANET_DATA_DIR):
@@ -77,10 +77,10 @@ aranet = pl.concat(aranet, how="diagonal_relaxed").collect().sort(
         ((~cs.contains("DateTime", "Location")) & cs.by_dtype(pl.String))
         .cast(pl.Float64)
         )
-# Splits Aranet CO2 files by month
+# Splits Aranet CO2 files by week
 aranet = {key[0]: df for key, df in aranet.with_columns(
-    pl.col("FTC_DateTime").dt.strftime("%Y%m").alias("Month")
-    ).partition_by("Month", as_dict=True, include_key=False).items()}
+    pl.col("FTC_DateTime").dt.strftime("%Y%W").alias("Week")
+    ).partition_by("Week", as_dict=True, include_key=False).items()}
 
 # Reads in DoorStatus file
 doorstatus = pl.scan_csv(door_path).with_columns(
@@ -95,32 +95,25 @@ doorstatus = pl.scan_csv(door_path).with_columns(
                 by=cs.contains("UTC")
                 ).collect()
 doorstatus = {key[0]: df for key, df in doorstatus.with_columns(
-    pl.col("FTC_DateTime").dt.strftime("%Y%m").alias("Month")
-    ).partition_by("Month", as_dict=True, include_key=False).items()}
+    pl.col("FTC_DateTime").dt.strftime("%Y%W").alias("Week")
+    ).partition_by("Week", as_dict=True, include_key=False).items()}
 # %%
 
-# All months with any data from any source
-all_months = licor.keys() | aranet.keys() | doorstatus.keys()
-
-for month in all_months:
-    month_plot_exists = False
-    for dfs, timecol, varcol in zip(
-            [licor, aranet, doorstatus], 
-            ["FTC_DateTime", "FTC_DateTime", "FTC_DateTime"],
-            ["CO2_ppm", "CO2_ppm", "DoorStatus"]):
-        if month in dfs.keys():
-            temp_plot = dfs[month].hvplot.line(
-                x=timecol,
-                y=[col for col in dfs[month].columns if col.find(varcol) != -1],
+for week, df in doorstatus.items():
+    if week.find("2023") == -1:
+        continue
+    if week in licor.keys():
+        door_open = df.filter(pl.col("DoorStatus").eq(1))
+        door_closed = df.filter(pl.col("DoorStatus").eq(0))
+        week_plot = (
+            hv.VLines(door_open["FTC_DateTime"]).opts(color="green")
+            * hv.VLines(door_closed["FTC_DateTime"]).opts(color="red")
+            )
+        week_plot = week_plot * licor[week].filter(
+            pl.col("CO2_ppm").is_between(0, 5000)
+            ).hvplot.line(
+                x="FTC_DateTime",
+                y="CO2_ppm"
                 )
-            if not month_plot_exists:
-                month_plot = temp_plot
-                month_plot_exists = True
-            else:
-                month_plot = month_plot + temp_plot
-                len(month_plot)
-    try:
-        hvplot.show(month_plot.cols(1))
-    except:
-        hvplot.show(month_plot)
-    # break
+        hvplot.show(week_plot)
+
