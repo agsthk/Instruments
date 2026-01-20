@@ -100,7 +100,9 @@ doorstatus = {key[0]: df for key, df in doorstatus.with_columns(
 # %%
 
 for week, df in doorstatus.items():
-    if week.find("2023") == -1:
+    if week.find("2024") == -1:
+        continue
+    if int(week[-2:]) < 10 or int(week[-2:]) > 15:
         continue
     if week in licor.keys():
         door_open = df.filter(pl.col("DoorStatus").eq(1))
