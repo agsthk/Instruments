@@ -105,23 +105,21 @@ doorstatus = {key[0]: df for key, df in doorstatus.with_columns(
     ).partition_by("Week", as_dict=True, include_key=False).items()}
 # %%
 
-for week, df in doorstatus.items():
-    if week.find("2025") == -1:
+for week, df in aranet.items():
+    if week.find("2026") == -1:
         continue
-    if int(week[-2:]) < 6:# or int(week[-2:]) > 35:
-        continue
+    
+    co2_cols = [col for col in df.columns if col.find("RH") != -1]
+    
+    week_plot = df.hvplot.scatter(
+        x="UTC_DateTime",
+        y=co2_cols
+        )
     if week in licor.keys():
-        door_open = df.filter(pl.col("DoorStatus").eq(1))
-        door_closed = df.filter(pl.col("DoorStatus").eq(0))
-        week_plot = (
-            hv.VLines(door_open["UTC_DateTime"]).opts(color="green")
-            * hv.VLines(door_closed["UTC_DateTime"]).opts(color="red")
+        week_plot = week_plot * licor[week].hvplot.scatter(
+            x="UTC_DateTime",
+            y="CO2_ppm"
             )
-        week_plot = week_plot * licor[week].filter(
-            pl.col("CO2_ppm").is_between(0, 5000)
-            ).hvplot.line(
-                x="UTC_DateTime",
-                y="CO2_ppm"
-                )
-        hvplot.show(week_plot)
+    hvplot.show(week_plot)
+
 
