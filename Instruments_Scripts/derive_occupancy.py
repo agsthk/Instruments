@@ -52,7 +52,9 @@ for root, dirs, files in os.walk(LICOR_DATA_DIR):
 # Concatenates LI-COR CO2 files
 licor = pl.concat(licor, how="diagonal_relaxed").collect().sort(
     by=cs.contains("UTC")
-    )
+    ).with_columns(
+        cs.contains("DateTime").dt.replace_time_zone(None)
+        )
 # Splits LI-COR CO2 files by week
 licor = {key[0]: df for key, df in licor.with_columns(
     pl.col("FTC_DateTime").dt.strftime("%Y%W").alias("Week")
@@ -76,7 +78,9 @@ aranet = pl.concat(aranet, how="diagonal_relaxed").collect().sort(
         # Casts numeric string type columns to float
         ((~cs.contains("DateTime", "Location")) & cs.by_dtype(pl.String))
         .cast(pl.Float64)
-        )
+        ).with_columns(
+            cs.contains("DateTime").dt.replace_time_zone(None)
+            )
 # Splits Aranet CO2 files by week
 aranet = {key[0]: df for key, df in aranet.with_columns(
     pl.col("FTC_DateTime").dt.strftime("%Y%W").alias("Week")
@@ -91,30 +95,32 @@ doorstatus = pl.scan_csv(door_path).with_columns(
         ).with_columns(
             cs.contains("Start")
             .name.map(lambda x: x.replace("Start", "DateTime"))
-            ).sort(
-                by=cs.contains("UTC")
-                ).collect()
+            ).with_columns(
+                cs.contains("DateTime").dt.replace_time_zone(None)
+                ).sort(
+                    by=cs.contains("UTC")
+                    ).collect()
 doorstatus = {key[0]: df for key, df in doorstatus.with_columns(
     pl.col("FTC_DateTime").dt.strftime("%Y%W").alias("Week")
     ).partition_by("Week", as_dict=True, include_key=False).items()}
 # %%
 
 for week, df in doorstatus.items():
-    if week.find("2024") == -1:
+    if week.find("2025") == -1:
         continue
-    if int(week[-2:]) < 10 or int(week[-2:]) > 15:
+    if int(week[-2:]) < 6:# or int(week[-2:]) > 35:
         continue
     if week in licor.keys():
         door_open = df.filter(pl.col("DoorStatus").eq(1))
         door_closed = df.filter(pl.col("DoorStatus").eq(0))
         week_plot = (
-            hv.VLines(door_open["FTC_DateTime"]).opts(color="green")
-            * hv.VLines(door_closed["FTC_DateTime"]).opts(color="red")
+            hv.VLines(door_open["UTC_DateTime"]).opts(color="green")
+            * hv.VLines(door_closed["UTC_DateTime"]).opts(color="red")
             )
         week_plot = week_plot * licor[week].filter(
             pl.col("CO2_ppm").is_between(0, 5000)
             ).hvplot.line(
-                x="FTC_DateTime",
+                x="UTC_DateTime",
                 y="CO2_ppm"
                 )
         hvplot.show(week_plot)
