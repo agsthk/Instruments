@@ -4,3 +4,9 @@
 - Finished, but need to check and be sure it matches
 	- Also finding a fair number of gaps in Aranet data which I didn't expect
 		- Actually maybe I'm stupid I have the raw data but didn't structure it lol
+- Reran structuring script to get updated data through when I care about it (1/19 really)
+- Visualizing occupancy against CO2
+	- I think I'm missing some stuff from before Jan 12 2024, but not overly concerned with correcting it
+	- Also some missing in Feb 2024 - again, not really worried
+- Seems to be good enough! Will generate an R0 file and then obviously can do other revisions as needed
+	- Do want to combine some of the consecutive occupancies - if they're less than 5 minutes apart maybe?

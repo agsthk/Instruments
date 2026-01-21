@@ -36,6 +36,11 @@ door_path = os.path.join(data_dir,
                          "Instruments_DerivedData",
                          "TempRHDoor_DerivedData",
                          "TempRHDoor_DoorStatus.csv")
+# Full path to occupancy status file
+occ_path = os.path.join(data_dir,
+                         "Instruments_ManualData",
+                         "Instruments_Occupancy",
+                         "OccupancyStatus.txt")
 # %% Reads and processes data
 # Reads in LI-COR CO2 files
 licor = []
@@ -103,22 +108,38 @@ doorstatus = pl.scan_csv(door_path).with_columns(
 doorstatus = {key[0]: df for key, df in doorstatus.with_columns(
     pl.col("FTC_DateTime").dt.strftime("%Y%W").alias("Week")
     ).partition_by("Week", as_dict=True, include_key=False).items()}
+# Reads in OccupancyStatus file
+occstatus = pl.scan_csv(occ_path).with_columns(
+    cs.contains("UTC").str.to_datetime(time_zone="UTC")
+    ).with_columns(
+        cs.contains("UTC").dt.convert_time_zone("America/Denver")
+        .name.map(lambda x: x.replace("UTC", "FTC"))
+        ).sort(
+            by=cs.contains("UTC")
+            ).collect()
+occstatus = {key[0]: df for key, df in occstatus.with_columns(
+    pl.col("FTC_Start").dt.strftime("%Y%W").alias("Week")
+    ).partition_by("Week", as_dict=True, include_key=False).items()}
 # %%
 
-for week, df in aranet.items():
-    if week.find("2026") == -1:
+for week, df in licor.items():
+    if week.find("2024") == -1:
         continue
     
-    co2_cols = [col for col in df.columns if col.find("RH") != -1]
+    # co2_cols = [col for col in df.columns if col.find("CO2") != -1]
     
     week_plot = df.hvplot.scatter(
-        x="UTC_DateTime",
-        y=co2_cols
+        x="FTC_DateTime",
+        y="CO2_ppm"
         )
-    if week in licor.keys():
-        week_plot = week_plot * licor[week].hvplot.scatter(
-            x="UTC_DateTime",
-            y="CO2_ppm"
+    if week in occstatus.keys():
+        occ_df = occstatus[week].with_columns(
+            cs.contains("FTC").dt.replace_time_zone(None)
+            )
+        week_plot = (
+            week_plot
+            * hv.VLines(occ_df["FTC_Start"]).opts(color="Red")
+            * hv.VLines(occ_df["FTC_Stop"]).opts(color="Green")
             )
     hvplot.show(week_plot)
 
