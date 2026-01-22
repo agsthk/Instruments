@@ -43,6 +43,13 @@ occ_path = os.path.join(data_dir,
                          "Instruments_ManualData",
                          "Instruments_Occupancy",
                          "OccupancyStatus.txt")
+# Path to occupancy ICARTT data
+occ_ict_path = os.path.join(
+    data_dir,
+    "Instruments_ICARTTData",
+    "Occupancy_ICARTTData",
+    "Occupancy_ICARTTData_R0"
+    )
 # %% Reads and processes data
 # Reads in LI-COR CO2 files
 licor = []
@@ -167,12 +174,166 @@ occstatus_merged = pl.concat(
             cs.contains("Start", "Stop")
             )
 
-occstatus_merged = {key[0]: df for key, df in occstatus_merged.with_columns(
-    pl.col("FTC_Start").dt.strftime("%Y%W").alias("Week")
-    ).partition_by("Week", as_dict=True, include_key=False).items()}
+# occstatus_merged = {key[0]: df for key, df in occstatus_merged.with_columns(
+#     pl.col("FTC_Start").dt.strftime("%Y%W").alias("Week")
+#     ).partition_by("Week", as_dict=True, include_key=False).items()}
 
 # %%
 
+occupied = occstatus_merged.with_columns(OccupancyStatus=1)
+# Determines unoccupied times as gaps between occupied times
+unoccupied = occstatus_merged.with_columns(
+    UTC_Start=pl.col("UTC_Stop").dt.offset_by("1s"),
+    UTC_Stop=pl.col("UTC_Start").shift(-1).dt.offset_by("-1s"),
+    FTC_Start=pl.col("FTC_Stop").dt.offset_by("1s"),
+    FTC_Stop=pl.col("FTC_Start").shift(-1).dt.offset_by("-1s")
+    ).drop_nulls().with_columns(OccupancyStatus=0)
+# Full occupancy file
+occupancy = pl.concat([occupied, unoccupied]).sort(cs.contains("Start"))
+# %%
+# Beginning and end times for Keck phases
+camp_endpoints = {
+    1: {"start": datetime(2024, 3, 1,
+                          tzinfo=pytz.timezone("America/Denver")),
+        "stop": datetime(2024, 8, 16, 23, 59, 59,
+                         tzinfo=pytz.timezone("America/Denver"))},
+    2: {"start": datetime(2025, 1, 17,
+                          tzinfo=pytz.timezone("America/Denver")),
+        "stop": datetime(2025, 5, 5, 23, 59, 59,
+                               tzinfo=pytz.timezone("America/Denver"))},
+    3: {"start": datetime(2026, 1, 13, 2,
+                          tzinfo=pytz.timezone("America/Denver")),
+        "stop": datetime(2026, 1, 31, 23, 59, 59,
+                         tzinfo=pytz.timezone("America/Denver"))},
+    }
+camp_occ = {}
+
+for camp, endpoints in camp_endpoints.items():
+    camp_occ[camp] = occupancy.filter(
+        pl.any_horizontal(
+            cs.contains("FTC").is_between(
+                endpoints["start"], endpoints["stop"]
+                )
+            )
+        ).with_columns(
+            FTC_Start=pl.when(
+                pl.col("FTC_Start").lt(endpoints["start"])
+                )
+            .then(pl.lit(endpoints["start"]))
+            .otherwise(pl.col("FTC_Start")),
+            FTC_Stop=pl.when(
+                pl.col("FTC_Stop").gt(endpoints["stop"])
+                )
+            .then(pl.lit(endpoints["stop"]))
+            .otherwise(pl.col("FTC_Stop")),
+            ).with_columns(
+                cs.contains("FTC").dt.convert_time_zone("UTC")
+                .name.map(lambda x: x.replace("FTC", "UTC"))
+                )
+
+# %%
+# Common ICARTT header for occupancy data
+header = "36,1001,V02_2016\n\
+Willis, Megan\n\
+Colorado State University\n\
+CAMPAIGNINST\n\
+CAMPAIGNNAME\n\
+1,1\n\
+BEGINDATE,REVISDATE\n\
+0\n\
+UTC_Start,seconds,Time_Start,seconds_from_utc_midnight\n\
+4\n\
+1,1,1,1\n\
+-9999,-9999,-9999,-9999\n\
+UTC_Stop,seconds,Time_Stop,seconds_from_utc_midnight\n\
+FTC_Start,seconds,Time_Start_local,seconds_from_local_midnight\n\
+FTC_Stop,seconds,Time_Stop_local,seconds_from_local_midnight\n\
+OccupancyStatus,Occupancy_Status\n\
+0\n\
+18\n\
+PI_CONTACT_INFO: Email: Megan.Willis@colostate.edu; Address: Colorado State University, Chemistry Department, Fort Collins, CO\n\
+PLATFORM: Chemistry C200\n\
+LOCATION: Chemistry C200\n\
+ASSOCIATED_DATA: N/A\n\
+INSTRUMENT_INFO: CAMPINSTINFO\n\
+DATA_INFO: OccupancyStatus 1 for occupied, 0 for unoccupied\n\
+UNCERTAINTY: No associated uncertainty\n\
+ULOD_FLAG: -7777\n\
+ULOD_VALUE: N/A\n\
+LLOD_FLAG: -8888\n\
+LLOD_VALUE: N/A\n\
+DM_CONTACT_INFO: Allison Salamone, Colorado State University, Allison.Salamone@colostate.edu\n\
+PROJECT_INFO: PROJINFO\n\
+STIPULATIONS_ON_USE: Use of these data requires prior permission from PI\n\
+OTHER_COMMENTS: Room was considered occupied when people were present or when the door was left open.\n\
+REVISION: R0\n\
+R0: Final data."
+
+camp_inst = {1: "SparkFun Magnetic Door Switch Set, Documentation",
+             2: "SparkFun Magnetic Door Switch Set, Documentation",
+             3: "Documentation"}
+camp_inst_info = {1: "Occupany determined using lab notes and door status",
+                  2: "Occupany determined using lab notes and door status where available",
+                  3: "Occupany determined using lab notes"}
+camp_name = {1: "Keck CITRUS",
+             2: "Keck O3",
+             3: "Keck Phase 3"}
+proj_info = {1: "Indoor Biogeochemistry Project - CITRUS",
+             2: "Indoor Biogeochemistry Project - O3",
+             3: "Indoor Biogeochemistry Project - Phase 3"}
+camp_icartt = {}
+# %%
+# Converts from timestamp to seconds since midnight and fills in variable header information
+for camp, df in camp_occ.items():
+    camp_header = header.replace("CAMPAIGNINST", 
+                                 camp_inst[camp]).replace("CAMPAIGNNAME", 
+                                                          camp_name[camp]).replace("CAMPINSTINFO", 
+                                                                                   camp_inst_info[camp]).replace("PROJINFO", 
+                                                                                                            proj_info[camp])
+    # Midnight of the first day of data
+    ftc_start = df.select(
+        (cs.contains("FTC") & ~cs.contains("Stop")).min()
+        .dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        )
+    # Midnight of the last day of data
+    ftc_stop = df.select(
+        (cs.contains("FTC") & ~cs.contains("Stop")).max()
+        .dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        )
+    # Converts from local timezone to UTC timezone
+    utc_start = ftc_start.select(
+        pl.all().dt.replace_time_zone("UTC")
+        ).item()
+    utc_stop = ftc_stop.select(
+        pl.all().dt.replace_time_zone("UTC")
+        ).item()
+    ftc_start = ftc_start.item()
+    ftc_stop = ftc_stop.item()
+    
+    camp_header = camp_header.replace("BEGINDATE", ftc_start.strftime("%Y,%m,%d")).replace("REVISDATE", ftc_stop.strftime("%Y,%m,%d"))
+
+    # Converts from DateTime format into seconds from midnight of start
+    # date
+    df = df.with_columns(
+        cs.contains("UTC").sub(utc_start).dt.total_microseconds()
+        .truediv(1e6).round(1),
+        cs.contains("FTC").sub(ftc_start).dt.total_microseconds()
+        .truediv(1e6).round(1)
+        )
+    
+    camp_icartt = camp_header + "\n" + df.write_csv()
+    
+    camp_ict_title = "Keck-Occupancy_C200_" + ftc_start.strftime("%Y%m%d") + "_R0.ict"
+    
+    ict_path = os.path.join(occ_ict_path, camp_ict_title)
+    
+    with open(ict_path, "w+") as f:
+        f.write(camp_icartt)
+    
+# %%
+
+
+# %%
 for week, df in licor.items():
     if week.find("2025") == -1:
         continue
