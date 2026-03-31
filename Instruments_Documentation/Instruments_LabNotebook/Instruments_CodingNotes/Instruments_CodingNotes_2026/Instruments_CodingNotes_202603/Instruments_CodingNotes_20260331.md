@@ -1,0 +1,18 @@
+- After retrieving data from trace gas hub, ran structure_rawdata.py
+- Then ran clean_rawdata.py
+	- Not necessary my bad
+- Then tried to run calibrate_instruments.py, but threw an error
+	- Float value uncertainty is breaking function because it's trying to read as integer
+	- Added infer_schema_length=500 to read in and that fixed it
+		- Changed to infer_schema_length=None so I don't have to change it in the future
+- Threw a different error saying that asof_join argument was not sorted
+	- Added sort function
+- THEN threw an error about float division by zero
+	- Not sure why
+	- MAYBE! Because my timezones are wrong - should be -0600 bc DST
+		- Fixing and trying again
+		- Still threw error
+			- Not sure what's going on here, but when I look at the figure it makes no sense so I suspect something with my cal inputs?
+			- Issue is that when the variable is NO, only calibrating a zero?
+	- Okay that's 100% my bad the NO2 cal times were never fixed (12 instead of 13)
+- Removed sort function because that error should tell me that something is wrong with the cal inputs

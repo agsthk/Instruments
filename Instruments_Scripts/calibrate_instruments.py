@@ -176,7 +176,8 @@ for root, dirs, files in (os.walk(CAL_DIR)):
         if inst == file:
             continue
         inst_cal_inputs = pl.read_csv(
-            os.path.join(root, file), comment_prefix="#"
+            os.path.join(root, file), comment_prefix="#",
+            infer_schema_length=None
             ).with_columns(
                 pl.col("Start", "Stop")
                 .str.to_datetime()
@@ -245,7 +246,6 @@ for inst, inst_cal_inputs in cal_inputs.items():
                 cal_input_data = cal_plot_data.filter(
                     pl.col(stop_compare).lt(pl.col("Stop"))
                     )
-                cal_input_data.columns
                 cal_data = cal_input_data.group_by(
                     cs.ends_with("Delivered"),
                     pl.col("Mid"),
