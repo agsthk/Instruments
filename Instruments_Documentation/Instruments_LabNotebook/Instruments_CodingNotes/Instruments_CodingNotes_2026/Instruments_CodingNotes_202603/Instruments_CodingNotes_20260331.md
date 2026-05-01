@@ -16,3 +16,5 @@
 			- Issue is that when the variable is NO, only calibrating a zero?
 	- Okay that's 100% my bad the NO2 cal times were never fixed (12 instead of 13)
 - Removed sort function because that error should tell me that something is wrong with the cal inputs
+- Ran calibrate_cleandata.py without any other changes, calibrations are relatively consistent
+- Set complete = false in ICARTT inputs and ran icartt_data.py

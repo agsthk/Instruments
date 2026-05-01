@@ -1,0 +1,13 @@
+- Retrieved all data from Keck Phase III
+- Ran structure_rawdata.py
+- Ran clean_rawdata.py
+- Ran calibrate_cleandata.py
+- Ran combine_aranet.py
+	- Missing data from 4/13-4/27.... may be an issue
+- Updated ICARTT files and ran icartt_data.py
+	- For unknown reason not generating NOx files past week of 4/6? Will need to go back and look at why that may be but not current priority
+		- In calibrated files there is plenty of data so I'm really not sure
+		- It's a sampling location issue - probably low flow/high pressure causing it all to read as null
+			- There are some that aren't null locations though so a little weird - maybe because it's dropping overlapping intervals before it checks location?
+			- Okay actually looking back and the sample flow is consistently ~0.001 for weeks starting ~8PM 4/14 so dropping is valid
+				- Just won't have NOx data for end of campaign RIP
