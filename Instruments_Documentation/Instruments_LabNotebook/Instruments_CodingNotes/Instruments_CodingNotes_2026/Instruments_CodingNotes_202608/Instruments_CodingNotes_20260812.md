@@ -1,0 +1,24 @@
+# Virtual environment
+- Updating Spyder broke my Anaconda distribution so I had to reinstall and remake environments
+	- Pulled from exported casa_venv to recreate (hopefully) working environment
+# Scripts
+- Determining what the data processing steps were and which scripts can be deleted
+- I think process in general is as follows
+	- structure_rawdata.py
+	- clean_rawdata.py
+	- calibrate_cleandata.py
+	- icartt_data.py
+- Other scripts that should be kept
+	- interpret_solenoidvalve.py - uses Picarro solenoid valve state to determine zeroing and sampling times
+	- interpret_doorstatus.py - housekeeping to determine when door is open/closed
+	- align_timestamps.py - Phase I timestamp alignment before instruments on DAQ
+	- calibrate_instruments.py - runs calibrations
+	- characterize_zeros.py - determines zero characteristics and drift based on temperature and such (offset and LOD)
+	- combine_aranet.py - does what it says
+	- evaluate_offset.py - determines zero and related quantities from calibrations? this doesn't seem to export anything so maybe the calibration just does this?
+		- calibrate_instruments.py seems to have this role
+		- so evaluate_offset.py may not need to be kept
+	- evaluate_leak.py - keeping this because I'm pretty sure it's important but not entirely sure what script does
+	- interpret_additionvalves.py - O3 and CO2 automated additions
+	- select_projectdata.py I think needs to me adjusted because I changed my mind about how I want it to work, but keep for now
+	- 
