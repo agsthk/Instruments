@@ -62,7 +62,7 @@ for spec, df in add_times.items():
             [df, man_add_times[spec]]
             ).sort(by="UTC_Start")
 
-insts = [#"2BTech_202",
+insts = ["2BTech_202",
          "2BTech_205_A"]#,
          # "2BTech_205_B",
          # "2BTech_405nm",
@@ -296,7 +296,7 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 break
         if path.find(inst) == -1:
             continue
-        if inst != "2BTech_205_A":
+        if inst not in ["2BTech_205_A", "2BTech_202"]:
             continue
         _, source = file[:-17].split("_Structured")
         date = file.rsplit("_", 1)[-1][:-4]
