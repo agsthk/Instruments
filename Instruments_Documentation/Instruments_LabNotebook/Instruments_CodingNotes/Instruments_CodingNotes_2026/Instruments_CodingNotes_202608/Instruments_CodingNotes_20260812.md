@@ -21,4 +21,22 @@
 	- evaluate_leak.py - keeping this because I'm pretty sure it's important but not entirely sure what script does
 	- interpret_additionvalves.py - O3 and CO2 automated additions
 	- select_projectdata.py I think needs to me adjusted because I changed my mind about how I want it to work, but keep for now
-	- 
+- Deleting delete.py and evaluate_offset.py
+# examine_interferences.py
+- Creating new script to investigate ocimene/sabinene interferences and see if I can separate interference from real measurement
+- Starting out by just plotting together
+	- I think there's a time offset, but beyond that there is also some amount of O3 data removed at addition start times since I don't have the automated data unfortunately
+		- Should be logged by computer, just didn't retrieve it, going to try to go in now and get it
+	- I don't think I have any of the addition times after 2025! Fixing I hope
+		- Has to do with pulling from structured vs raw and me making things hard for myself rip
+		- After fixing the automated addition valves, rerunning clean_rawdata for room O3 only and calibrate_rawdata after that
+			- Not going to remake ICARTT files, so going to read in the clean data only I think
+	- Now have them plotted together for real, definitely still a time offset
+		- Going to adjust the VOCUS time by 10 minutes to start with
+		- I'm sill missing O3 data right at the start of additions?
+			- After spending a billion hours trying to figure this out I finally realized the issue was that I had it not overwriting - only writing when the file doesn't exist
+				- When I overwrote existing data, it worked and no data is missing
+					- And some data that may not be real is in there now too so need to check that
+						- April 14 is weird, need to confirm that those measurements are real and the sampling location is correct - later though
+						- March 31 there's a calibration that's not labeled as such - also fix later
+	- I'm nauseous so gonna leave this where I'm at and come back tomorrow

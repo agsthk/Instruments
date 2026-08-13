@@ -62,19 +62,19 @@ for spec, df in add_times.items():
             [df, man_add_times[spec]]
             ).sort(by="UTC_Start")
 
-insts = ["2BTech_202",
-         "2BTech_205_A",
+insts = [#"2BTech_202",
+         "2BTech_205_A"]#,
          # "2BTech_205_B",
          # "2BTech_405nm",
-         "Aranet4_1F15B",
-         "Aranet4_1F16F",
-         "Aranet4_1F168",
-         "Aranet4_1FB20",
+         # "Aranet4_1F15B",
+         # "Aranet4_1F16F",
+         # "Aranet4_1F168",
+         # "Aranet4_1FB20",
          # "LI-COR_LI-840A_A",
          # "LI-COR_LI-840A_B",
          # "Picarro_G2307",
          # "TempRHDoor",
-         "ThermoScientific_42i-TL"]
+         # "ThermoScientific_42i-TL"]
 
 sampling_locs = {}
 for sampling_locs_file in os.listdir(SAMPLING_LOC_DIR):
@@ -296,10 +296,14 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 break
         if path.find(inst) == -1:
             continue
+        if inst != "2BTech_205_A":
+            continue
         _, source = file[:-17].split("_Structured")
         date = file.rsplit("_", 1)[-1][:-4]
         if date.find("2022") != -1:
             continue
+        # if date.find("2026") == -1:
+        #     continue
         if inst == "2BTech_405nm":
             lf = pl.scan_csv(path, infer_schema_length=None)
         else:
@@ -434,6 +438,8 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                 pl.col("SamplingLocation").str.contains("C200")
                 )
             h0 = lf_room.collect().height
+            if h0 == 0:
+                continue
             lf_start = lf_room.select("UTC_Start").min().collect().item()
             lf_stop = lf_room.select("UTC_Stop").max().collect().item()
             lf_adds = add_times["O3"].filter(
@@ -494,13 +500,15 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
                         strategy="nearest",
                         coalesce=True
                         ).sort(by="UTC_Start")
+            lf_room.collect()
+            lf_room.filter(pl.col("KeepDefault").eq(True)).collect()
             lf_room = lf_room.with_columns(
                 pl.when(
                     (pl.col("O3_ppb").sub(pl.col("median")).abs()
                      .lt(pl.col("MAD").mul(3))
                     | pl.col("d/dt").lt(pl.col("d/dt_lim"))
                     | pl.col("KeepDefault"))
-                    & pl.col("O3_ppb").is_between(-8, 150)
+                    & pl.col("O3_ppb").is_between(-8, 300)
                     )
                 .then(pl.col("SamplingLocation"))
                 .otherwise(pl.lit(None))
@@ -593,8 +601,8 @@ for root, dirs, files in tqdm(os.walk(STRUCT_DATA_DIR)):
             os.makedirs(f_dir)
         path = os.path.join(f_dir,
                             f_name)
-        if not os.path.exists(path):
-            df.write_csv(path)
+        # if not os.path.exists(path):
+        df.write_csv(path)
 #%%
 for inst, sources in wrong_dates.items():
     for source, dates in sources.items():
