@@ -1,0 +1,35 @@
+- I think there is an issue specifically with Aranet ICARTT processing because when I look at the ICARTT files they have no data, even though the clean data they are based on isn't empty
+	- Just kidding I'm stupid, data was missing and that's why it wasn't there
+# examine_interferences.py
+- Back to working on this, first thing I need to do is figure out when O3 monitor wasn't in the room because it's currently not denoted correctly
+	- Time zone issue for calibration - had it in MST instead of MDT on March 31
+	- Just going to manually remove April 14 from 20:15 - April 15 00:00 because I'm not sure what it is but there is a large interference for some reason (instrument freaked out maybe? Filter automatically removed some points up to 80,000 ppb(!) so can assume it's non real I believe) (could this have something to do with the NOx box? When did that stop working?)
+		- It's the NOx box :///// pump broke broke (as in no flow) 4/14 20:16:10, so O3 monitor was probably pulling vent O3 for a while and for the remainder was sampling mix of C200 and vent air which is awesome and I love when that happens
+		- This is a problem for later, going to handle the R0 data through April 14 when it breaks and get that up before I address the leak correction
+		- Quickly checking what the vent O3 looks like relative to the room O3 pre and post leak introduction (if we have it even)
+			- Should have vent through 5/1 I think
+			- Yes we do but wow the 202 is garbage! Why is the standard deviation so high! May need to rely on outdoor measurements which is a later problem
+			- There are some periods where the data is seemingly meaningless so that's cool
+	- Rerunning clean_rawdata.py for 2BTech_205_A and 2BTech_202 to fix calibration times as previously indicated
+- Additions to look at for interference
+	- a-pinene - interferences aren't noticeable if they are there
+		- 3/24 09:00 (midway through decay?)
+		- 3/24 11:00
+		- jk these are probably not interferences, lab notebook has 11:00 AM addition as manual because automated didn't work, that may be why O3 was much higher
+			- Could review, but I think it's probably real
+	- b-pinene, g-terpinene, and limonene also don't have noticeable interferences
+	- ocimene
+		- some small interference 4/1 09:00 I think? hard to say for sure
+		- Really obvious interference 4/1 16:55, not sure why it's so different from one earlier in the day
+			- Looks like a lot more ocimene added, not sure why since procedure is written the same for both
+	- sabinene
+		- 4/2 8:55 and 16:55 - very obvious
+	- 4/3 there is maybe small b-pinene interference, then large ocimene interference
+	- 4/6 16:55 sabinene
+	- 4/7 08:55 small limonene interference
+		- and 16:55 but in other direction?
+	- 4/8 ocimene
+	- 4/9 sabinene, don't have Vocus data for 8:55
+	- 4/9 small limonene interference 16:55
+- At some point may need to review all terpene interferences if they are non-zero for all data - TBD
+- Going to try to figure out magnitude of interference from the non O3 additions
