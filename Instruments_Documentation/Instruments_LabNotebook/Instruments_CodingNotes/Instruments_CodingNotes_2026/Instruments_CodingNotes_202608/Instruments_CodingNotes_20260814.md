@@ -1,0 +1,12 @@
+# examine_interferences.py
+- Before I can determine interference magnitude, need to background subtract the O3 signal
+- Adding code to scrape CDPHE site for O3 data
+- Trying to get background O3 but there's some confusion in how this is working
+	- Need to take out 3/31 12:39-12:42, from when TG line was disconnected to get NOx calibrated
+	- 4/2 08:55 needs to start earlier
+	- 4/3 08:55 and 4/3 16:55 not showing up
+	- 4/9 08:55 is weird - maybe some unintentionally removed by cleaning? 
+	- Also missing several from pre Jan 14 that I need to figure out
+	- Okay some of this was just because I failed to sort after combining interferences
+- Having some trouble with how I might do this because I don't know that the interference is linear
+- Done for now
