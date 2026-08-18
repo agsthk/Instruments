@@ -1,0 +1,33 @@
+# examine_interferences.py
+- Reviewing this again, but thinking I will move forward and just remove the interference periods and take the L on the missing data
+- Just took a quick look, now going to move to revise sampling period times for room O3 to eliminate interferences
+- Modified sampling locations for 2BTech_205_A, going to re-run clean_rawdata.py to update them and then check what C200 only looks like
+	- Looks good, but beyond this need to add O3 additions from 1/13 because they aren't in there for some reason?
+		- It's because the O2 tank was empty so the MFC was reading zero and there was an error - just going to add these to manual addition times
+- After adding "manual" O3 additions and removing interferences, clean O3 looks good in general
+	- Checking calibrations now to confirm that any is fine really
+		- Looked at what Tyson sent me from June calibration, pretty consistent with the 2026-01-12 cals I was working with, going to call that cal the same, especially since I think O3 monitors were out of the room for June cal
+			- Maybe 3/31 is best to use then? I think they were out of the room on 1/12 also
+				- Actually that's not the reason - I think it has to do with the range of concentrations calibrated for
+					- Yea for sure this - if calibrated up to 400 ppb, get a more negative intercept
+						- That is the case for 1/12 and Tyson's cal, 3/31 only goes to 150
+						- With this in mind, going to keep using 1/12 because honestly it's easier and derived values are more certain
+							- When I do this though, the measurements never go to zero because offset correction is so negative - let me try with other calibration
+								- I think this offset looks better for the room - it actually hits zero at night the way it should
+								- For the vent too, though I need to go in and remove periods in vent O3 where the measurements are seemingly meaningless
+									- 3/4 22:00 - 3/6 06:00, scattered from ~0-100
+									- 3/7 15:00 - 3/8 01:00, scattered from ~0-100
+									- 3/8 11:00 - 3/9 011:00, scattered from ~0-200
+									- 3/12 08:00 - 3/13 08:00, scattered from ~0-100
+									- 3/16 22:00 - 3/17 16:00, scattered from ~0-100
+									- After 4/29 14:00, data scattered from 0-200 ppb
+									- also as a side note, suddenly got way noisier starting March 4 ~22:00
+										- Maybe not a side note - maybe do multiple ICARTT versions splitting with 1/12 version for initial period and 3/31 for final period since it changes
+									- Removing these times, will end up just using the FTC outdoor data if it's needed
+		- Choosing 3/31 calibration for final data
+- After using this script to confirm data cleaning and calibration were reasonable, making final ICARTT files
+	- Creating two separate R0 input files for 205 A to get pre and post leak, not doing during leak right now
+	- Creating two separate R0 input files for 202 to split low noise and high noise periods
+# calibrate_cleandata.py
+- Modified this to use the calibration date SNR for 2BTech_202 since the instrument behavior changed so much
+- Also modified to apply fixed uncertainty if SNR slope is zero

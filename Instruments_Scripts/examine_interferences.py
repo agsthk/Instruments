@@ -65,10 +65,10 @@ data_dir = os.path.join(data_dir, "Instruments_Data")
 VOCUS_PATH = os.path.join(data_dir, "Instruments_ICARTTData",
                           "Vocus_ICARTTData", "Vocus_ICARTTData_RC",
                           "Keck-VocusCIMS_C200_20260323_RC.ict")
-O3_DIR = os.path.join(data_dir, "Instruments_CleanData",
-                      "2BTech_205_A_CleanData", "2BTech_205_A_CleanHubData")
-VENT_DIR = os.path.join(data_dir, "Instruments_CleanData",
-                      "2BTech_202_CleanData", "2BTech_202_CleanHubData")
+O3_DIR = os.path.join(data_dir, "Instruments_CalibratedData",
+                      "2BTech_205_A_CalibratedData", "2BTech_205_A_CalibratedHubData")
+VENT_DIR = os.path.join(data_dir, "Instruments_CalibratedData",
+                      "2BTech_202_CalibratedData", "2BTech_202_CalibratedHubData")
 
 # %% Addition times
 sab_adds = pl.DataFrame(
@@ -215,6 +215,8 @@ vocus = read_ict(VOCUS_PATH).select(
     ).drop_nulls()
 o3 = []
 for file in os.listdir(O3_DIR):
+    if file.find("20260331") == -1:
+        continue
     path = os.path.join(O3_DIR, file)
     o3.append(
         pl.read_csv(path).with_columns(
@@ -223,18 +225,20 @@ for file in os.listdir(O3_DIR):
         )
 o3 = pl.concat(o3).sort(by="FTC_Start").select(
     (~cs.contains("UTC")).name.map(lambda x: x.replace("FTC_", ""))
-    ).filter(
-        pl.col("SamplingLocation").eq("C200")
-        & ~pl.any_horizontal(
-            pl.col("Start", "Stop").is_between(
-                datetime(2026, 3, 31, 12, 40, tzinfo=pytz.timezone("America/Denver")),
-                datetime(2026, 3, 31, 12, 44, tzinfo=pytz.timezone("America/Denver"))
-                )
-            )
-        & pl.col("Start").lt(datetime(2026, 4, 14, 20, tzinfo=pytz.timezone("America/Denver")))
-        )
+     )#.filter(
+    #     pl.col("SamplingLocation").eq("C200")
+    #     & ~pl.any_horizontal(
+    #         pl.col("Start", "Stop").is_between(
+    #             datetime(2026, 3, 31, 12, 40, tzinfo=pytz.timezone("America/Denver")),
+    #             datetime(2026, 3, 31, 12, 44, tzinfo=pytz.timezone("America/Denver"))
+    #             )
+    #         )
+    #     # & pl.col("Start").lt(datetime(2026, 4, 14, 20, tzinfo=pytz.timezone("America/Denver")))
+    #     )
 vent_o3 = []
 for file in os.listdir(VENT_DIR):
+    if file.find("20260331") == -1:
+        continue
     path = os.path.join(VENT_DIR, file)
     vent_o3.append(
         pl.read_csv(path).with_columns(
@@ -246,6 +250,16 @@ vent_o3 = pl.concat(vent_o3).sort(by="FTC_Start").select(
     ).filter(
         pl.col("SamplingLocation").eq("C200_Vent")
         )
+# %%
+hvplot.show(
+    vent_o3.filter(
+       pl.col("SamplingLocation").eq("C200_Vent")
+       # | pl.col("SamplingLocation").eq("C200/B203/Exhaust")
+       ).hvplot.scatter(
+        x="Start",
+        y="O3_ppb"
+        )
+    )
 # %% Defines BG room O3 at 30 minute time resolution
 # Times to consider ozone perturbed
 perturbed_o3_t = pl.concat(
@@ -317,13 +331,13 @@ hvplot.show(
         y="O3_ppb"
         ) * bg_o3.hvplot.scatter(
             x="Start",
-            y="O3_ppb"
+            y="BG"
             )
     )
 
 # %%
 
-for start in sab_adds:
+for start in sab_adds["Start"]:
     stop = start + timedelta(hours=6)
     o3_adds = add_times["O3"].filter(
         pl.any_horizontal(
@@ -365,7 +379,7 @@ for start in sab_adds:
         )
     add_bg = bg_o3.filter(
         pl.any_horizontal(
-            pl.col("Start", "Stop").is_between(start - timedelta(minutes=10),
+            pl.col("Start").is_between(start - timedelta(minutes=10),
                                                stop + timedelta(minutes=10))
         )
     )
@@ -388,7 +402,7 @@ for start in sab_adds:
     
 # %%
 
-for start in sab_adds:
+for start in sab_adds["Start"]:
     stop = start + timedelta(hours=6)
     add_o3 = o3.filter(
         pl.any_horizontal(

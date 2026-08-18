@@ -31,8 +31,8 @@ ZERO_RESULTS_DIR = os.path.join(data_dir, "Instruments_DerivedData")
 # Year to calibrate data for
 year = 2026
 # Date to use calibration factor from
-cal_dates = {"2BTech_202": "20260112",
-             "2BTech_205_A": "20260112",
+cal_dates = {"2BTech_202": "20260331",
+             "2BTech_205_A": "20260331",
              "2BTech_205_B": "20240604",
              "2BTech_405nm": "20241216",
              "Picarro_G2307": "20250625",
@@ -57,7 +57,7 @@ lod_snr_factors = {}
 for inst, factors in cal_factors.items():
     # Gets information on all noise-to-signal regressions from calibrations
     inst_cal_snrs = factors.select(
-        pl.col("AveragingTime"),
+        pl.col("AveragingTime", "CalDate"),
         (cs.contains("NoiseSignal")
          & ~cs.contains("Uncertainty")).name.suffix("_Cal")
         )
@@ -68,7 +68,7 @@ for inst, factors in cal_factors.items():
         )
     # Identifies variables calibrated for
     cal_vars = {"_".join(col.split("_")[:2]) for col in inst_cal_snrs.columns
-                if col !="AveragingTime"}
+                if col !="AveragingTime" and col != "CalDate"}
     # Identifies averaging times with only one noise-to-signal regression
     unique_cal_snrs = inst_cal_snrs.filter(
         ~pl.col("AveragingTime").is_duplicated()
@@ -86,6 +86,19 @@ for inst, factors in cal_factors.items():
             )
         # Identifies regressions with greatest R2 value for each variable
         for i, var in enumerate(cal_vars):
+            # Sets negative slope to zero so uncertainty doesn't decrease
+            unique_cal_snrs = unique_cal_snrs.with_columns(
+                pl.when(
+                    pl.col(var + "_NoiseSignal_Slope_Cal").ge(0)
+                    )
+                .then(pl.col(var + "_NoiseSignal_Slope_Cal"))
+                .otherwise(pl.lit(0))
+                )
+            # Manually selects SNR from calibration date used for 2026 vent O3
+            if inst == "2BTech_202" and year == 2026:
+                avgt_snrs = avgt_snrs.filter(
+                    pl.col("CalDate").eq(cal_dates[inst])
+                    )
             var_cal_snrs = avgt_snrs.select(
                 pl.col("AveragingTime"),
                 cs.contains(var)
@@ -93,7 +106,13 @@ for inst, factors in cal_factors.items():
                     pl.col(var + "_NoiseSignal_R2_Cal").eq(
                         pl.max(var + "_NoiseSignal_R2_Cal")
                         )
-                    )
+                    ).with_columns(
+                        pl.when(
+                            pl.col(var + "_NoiseSignal_Slope_Cal").ge(0)
+                            )
+                        .then(pl.col(var + "_NoiseSignal_Slope_Cal"))
+                        .otherwise(pl.lit(0))
+                        )
             if i == 0:
                 best_snr = var_cal_snrs
             # Adds best SNR for subsequent variable to that for first
