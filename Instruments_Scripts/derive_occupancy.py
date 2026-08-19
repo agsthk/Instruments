@@ -326,7 +326,8 @@ for camp, df in camp_occ.items():
     camp_ict_title = "Keck-Occupancy_C200_" + ftc_start.strftime("%Y%m%d") + "_R0.ict"
     
     ict_path = os.path.join(occ_ict_path, camp_ict_title)
-    
+    if os.path.exists(ict_path):
+        continue
     with open(ict_path, "w+") as f:
         f.write(camp_icartt)
     
@@ -334,12 +335,14 @@ for camp, df in camp_occ.items():
 
 
 # %%
-for week, df in licor.items():
-    if week.find("2025") == -1:
+for week, df in aranet.items():
+    if week.find("2026") == -1:
         continue
     
     # co2_cols = [col for col in df.columns if col.find("CO2") != -1]
-    
+    df = df.with_columns(
+        CO2_ppm=pl.mean_horizontal(cs.contains("CO2"))
+        )
     week_plot = df.hvplot.scatter(
         x="FTC_DateTime",
         y="CO2_ppm"
