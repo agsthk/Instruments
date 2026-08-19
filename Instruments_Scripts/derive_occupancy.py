@@ -203,7 +203,7 @@ camp_endpoints = {
                                tzinfo=pytz.timezone("America/Denver"))},
     3: {"start": datetime(2026, 1, 13, 2,
                           tzinfo=pytz.timezone("America/Denver")),
-        "stop": datetime(2026, 1, 31, 23, 59, 59,
+        "stop": datetime(2026, 6, 30, 23, 59, 59,
                          tzinfo=pytz.timezone("America/Denver"))},
     }
 camp_occ = {}
