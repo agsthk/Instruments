@@ -1,0 +1,15 @@
+# icartt_data_phase.py
+- Creating new script to ICARTT data by phase instead of by week
+- Will pull a lot from icartt_data.py, just modifying as needed
+	- Copying and pasting to start
+	- Just deleted the part that splits by week and going to test to confirm it works fine without that
+		- It does
+- Think I need to go back into data cleaning to flag O3 additions and when leak was active?
+	- Perhaps not - I think I can do this and ambient corrections in the ICARTT script to limit how much I'm messing with other things
+- Added code to identify when the leak was active in the TG line based on the sampling location
+	- This worked easily enough
+- Now need to add code to identify when O3 additions are happening and correct leak outside of those times
+	- IDs from addition start to 1h20m after addition end as O3 perturbed, and for all other times multiplies O3 by 0.6 to get a corrected value
+		- Changed to use a factor depending on campaign year since it seems 2025 was very different
+- Pretty sure this works how it should!
+- Ran through all instruments for which combined ICARTT files needed

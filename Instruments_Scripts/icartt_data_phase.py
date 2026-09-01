@@ -1,0 +1,527 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Aug 31 17:05:57 2026
+
+@author: agsthk
+"""
+
+# %% Package imports, dictionary definitions
+import os
+import polars as pl
+import polars.selectors as cs
+from datetime import datetime, timedelta
+import pytz
+import yaml
+# from calibrate_instruments import set_ax_ticks
+# Declares full path to Instruments_Data/ directory
+data_dir = os.getcwd()
+# Starts in Instruments/ directory
+if "Instruments" in os.path.dirname(data_dir):
+    data_dir = os.path.dirname(data_dir)
+data_dir = os.path.join(data_dir, "Instruments_Data")
+
+# Full path to directory containing all calibrated clean data
+CALIBRATED_DATA_DIR = os.path.join(data_dir, "Instruments_CalibratedData")
+# Full path to directory containing all cleaned data
+CLEAN_DATA_DIR = os.path.join(data_dir, "Instruments_CleanData")
+ICARTT_DATA_DIR = os.path.join(data_dir, "Instruments_ICARTTData")
+if not os.path.exists(ICARTT_DATA_DIR):
+    os.makedirs(ICARTT_DATA_DIR)
+# Full path to directory containing all YAML files with ICARTT headers
+ICARTT_HEADER_DIR = os.path.join(data_dir,
+                                 "Instruments_ManualData",
+                                 "Instruments_ICARTTInputs")
+# Reads in O3 addition times so they can be flagged
+# Full path to automated addition times
+ADD_TIMES_PATH = os.path.join(data_dir,
+                              "Instruments_DerivedData",
+                              "AdditionValves_DerivedData",
+                              "AdditionValves_AutomatedAdditionTimes.csv")
+add_times = pl.read_csv(ADD_TIMES_PATH).with_columns(
+    pl.selectors.contains("UTC").str.to_datetime()
+    )
+add_times = {key[0]: df for key, df in 
+             add_times.partition_by(
+                 "Species", as_dict=True, include_key=False
+                 ).items()}
+# Full path to manual addition times
+MAN_ADDS_PATH = os.path.join(data_dir,
+                             "Instruments_ManualData",
+                             "Instruments_ManualExperiments",
+                             "ManualAdditionTimes - Copy.csv")
+man_add_times = pl.read_csv(MAN_ADDS_PATH).with_columns(
+    pl.selectors.contains("UTC").str.to_datetime()
+    )
+man_add_times = {key[0]: df for key, df in 
+             man_add_times.partition_by(
+                 "Species", as_dict=True, include_key=False
+                 ).items()}
+for spec, df in add_times.items():
+    if spec in man_add_times.keys():
+        add_times[spec] = pl.concat(
+            [df, man_add_times[spec]]
+            ).sort(by="UTC_Start")
+# Determines times O3 is considered perturbed (addition start to 1h20m after
+# addition end)
+o3_perturbed_times = add_times["O3"].with_columns(
+    pl.col("UTC_Stop").dt.offset_by("1h20m")
+    )
+# Combines overlapping O3 perturbed time
+o3_perturbed_times = o3_perturbed_times.sort("UTC_Start").with_columns(
+    # Identifies as new interval if start time is after any previous stop time
+    (pl.col("UTC_Start").ge(
+        pl.col("UTC_Stop").cum_max().shift(1, fill_value=0)
+        ))
+    .cum_sum()
+    .alias("IntvID")
+    ).group_by(
+        # Identifies first start and last stop of overlapping intervals
+        "IntvID"
+        ).agg(
+            pl.min("UTC_Start"),
+            pl.max("UTC_Stop")
+            # Converts to LazyFrame
+            ).sort("UTC_Start").drop("IntvID").lazy()
+
+headers = {}
+for header_file in os.listdir(ICARTT_HEADER_DIR):
+    # Reads in ICARTT YAML files
+    inst = header_file.split("_ICARTTInputs")[0]
+    header_path = os.path.join(ICARTT_HEADER_DIR, header_file)
+    with open(header_path, "r") as file:
+        header = yaml.load(file, Loader=yaml.Loader) 
+    # Doesn't process if ICARTT file labeled as complete
+    if header["Complete"]:
+        continue
+    # Start of ICARTT file as datetime
+    camp_start = datetime.strptime(
+        header["Campaign Start"], "%Y%m%d%H%M%S"
+        ).replace(
+            tzinfo=pytz.timezone("America/Denver")
+            )
+    # End of ICARTT file as datetime
+    camp_stop = datetime.strptime(
+        header["Campaign Stop"], "%Y%m%d%H%M%S"
+        ).replace(
+            tzinfo=pytz.timezone("America/Denver")
+            )
+    # Creates ICARTT directory for instrument and revision if one doesn't exist
+    inst_icartt_data_dir = os.path.join(
+        ICARTT_DATA_DIR,
+        inst + "_ICARTTData",
+        inst + "_ICARTTData_" + header["REVISION"]
+        )
+    if not os.path.exists(inst_icartt_data_dir):
+        os.makedirs(inst_icartt_data_dir)
+    # Determines folder to pull calibrated data from
+    if "Calibration" in header.keys():
+        # DAQ active in 2025
+        if camp_start.year == 2025:
+            inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
+                                             inst + "_CalibratedData",
+                                             inst + "_CalibratedDAQData")
+        # TG hub active in 2026
+        elif camp_start.year == 2026:
+            inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
+                                             inst + "_CalibratedData",
+                                             inst + "_CalibratedHubData")
+        # Pulled SD where available, otherwise internal logger
+        elif camp_start.year == 2024:
+            inst_cal_data_dir = os.path.join(CALIBRATED_DATA_DIR,
+                                             inst + "_CalibratedData")
+            # SD available
+            if (inst + "_CalibratedSDData") in os.listdir(inst_cal_data_dir):
+                inst_cal_data_dir = os.path.join(inst_cal_data_dir,
+                                                 inst + "_CalibratedSDData")
+            # SD not available
+            else:
+                inst_cal_data_dir = os.path.join(
+                    inst_cal_data_dir,
+                    inst + "_CalibratedLoggerData"
+                    )
+        # Date for calibration
+        cal_date = header["Calibration"]
+        # Identifies all files with desired calibration applied
+        correct_cal_files = [file for file in os.listdir(inst_cal_data_dir)
+                             if (file.find(cal_date + "Calibration") != -1)]
+    # Determines folder to pull clean data from if no calibration applied
+    else:
+        inst_cal_data_dir = os.path.join(CLEAN_DATA_DIR,
+                                         inst + "_CleanData")
+        if camp_start.year == 2026:
+            # Identifies whether to use TG hub or internal logger (Aranet?)
+            for source in ["Hub", "Logger"]:
+                if (inst + "_Clean" + source + "Data") in (
+                        os.listdir(inst_cal_data_dir)
+                        ):
+                    break
+            # Directory containing appropriate clean data
+            inst_cal_data_dir = os.path.join(inst_cal_data_dir,
+                                             inst + "_Clean" + source + "Data")
+        # If there are no "Hub"/"Logger" sources, picks first/only directory
+        elif os.listdir(inst_cal_data_dir)[0].find(".csv") == -1:
+            inst_cal_data_dir = os.path.join(inst_cal_data_dir,
+                                             os.listdir(inst_cal_data_dir)[0])
+        # Identifies all files in desired directory
+        correct_cal_files = [file for file in os.listdir(inst_cal_data_dir)]
+
+    # Gets all data collected between campaign start and stop
+    camp_files = []
+    for file in correct_cal_files:
+        # Date of current file in datetime format
+        file_date = datetime.strptime(file[-12:-4], "%Y%m%d").replace(
+            hour=0, minute=0, second=0, tzinfo=pytz.timezone("America/Denver")
+            )
+        # Skips reading files outside of campaign duration
+        if file_date >= camp_start and file_date <= camp_stop:
+            # Reads data from date file
+            path = os.path.join(inst_cal_data_dir, file)
+            data = pl.scan_csv(path).with_columns(
+                cs.contains("UTC").str.to_datetime(time_zone="UTC")
+                .dt.round(every="100ms"),
+                cs.contains("FTC").str.to_datetime(time_zone="America/Denver")
+                .dt.round(every="100ms")
+                )
+            # Columns to keep
+            keep_cols = (
+                [header["ivar"]["shortname"]] 
+                + list(header["dvars"].keys())
+                )
+            # Adds SamplingLocation column to keep if present
+            if "SamplingLocation" in data.collect_schema().names():
+                keep_cols = keep_cols + ["SamplingLocation"]
+            data = data.select(
+                # Keeps only the variables described in the ICARTT header
+                # and SamplingLocation
+                pl.col(keep_cols)
+                )
+            # Adds read-in file to camp_files
+            camp_files.append(data)
+    # Concatenates all data from campaign
+    camp_data = pl.concat(camp_files, how="diagonal_relaxed")
+    # Adds "LeakActive" column for trace gas instruments on shared line to
+    # identify when the leak was present
+    if inst in ["2BTech_205_A", "ThermoScientific_42i-TL", "Picarro_G2307"]:
+        # Adds "LeakActive" column to identify when the leak was present
+        camp_data = camp_data.with_columns(
+            # Leak active when sampling location is not only "C200"
+            pl.when(pl.col("SamplingLocation").eq("C200"))
+            .then(0)
+            .otherwise(1)
+            .alias("LeakActive")
+            )
+        # Adds "LeakActive" to ICARTT dependent variables
+        header["dvars"]["LeakActive"] = {"scale": "1",
+                                         "missingflag": "-9999",
+                                         "unit": "NoUnits",
+                                         "standardname": "Leak_Active"}
+        # Adds info to interpret "LeakActive"
+        header["DATA_INFO"] = (
+            header["DATA_INFO"] + ". LeakActive 1 for leak, 0 for no leak"
+            )
+        
+    if inst == "2BTech_205_A":
+        camp_data = camp_data.join_asof(
+            o3_perturbed_times,
+            on="UTC_Start",
+            suffix="_Pert",
+            strategy="backward"
+            ).with_columns(
+                pl.when(pl.col("UTC_Stop").le(pl.col("UTC_Stop_Pert")))
+                .then(pl.lit(1))
+                .otherwise(pl.lit(0))
+                .alias("O3Perturbed")
+                ).select(
+                    ~cs.contains("_Pert")
+                    )
+        # Known factor to multiply ambient O3 by for campaign years
+        if camp_start.year == 2024:
+            o3_factor = 0.6
+        elif camp_start.year == 2025:
+            o3_factor = 0.1
+        # FACTOR FOR 2026 NOT YET KNOWN!!!!!
+        else:
+            o3_factor = 1
+        # Corrects leak for ambient O3 times
+        camp_data = camp_data.with_columns(
+            pl.when(pl.col("O3Perturbed").eq(0) & pl.col("LeakActive").eq(1))
+            # Ambient O3 ~60% of reported measurement
+            .then(pl.col("O3_ppb").mul(o3_factor))
+            .otherwise(pl.col("O3_ppb"))
+            .alias("O3_ppb")
+            )
+        # Adds "O3Perturbed" to ICARTT dependent variables
+        header["dvars"]["O3Perturbed"] = {"scale": "1",
+                                          "missingflag": "-9999",
+                                          "unit": "NoUnits",
+                                          "standardname": "ozone_perturbed"}
+        # Adds info to interpret "LeakActive"
+        header["DATA_INFO"] = (
+            header["DATA_INFO"] + ". O3Perturbed is 1 from start of O3 additions to 1h20m after end of O3 additions, 0 elsewhere"
+            )
+    if inst == "Picarro_G2307":
+        # Known factor to multiply ambient CH2O by for campaign years
+        ch2o_factor = 1.7
+        # Corrects leak for ambient O3 times
+        camp_data = camp_data.with_columns(
+            pl.when(pl.col("LeakActive").eq(1))
+            # Ambient CH2O ~170% of reported measurement
+            .then(pl.col("CH2O_ppb").mul(ch2o_factor))
+            .otherwise(pl.col("CH2O_ppb"))
+            .alias("CH2O_ppb")
+            )
+    if "SamplingLocation" in camp_data.collect_schema().names():
+        # Removes non-C200 data
+        camp_data = camp_data.filter(
+            pl.col("SamplingLocation").str.contains("C200")
+            ).select(
+                pl.exclude("SamplingLocation")
+                ).collect()
+    else:
+        camp_data = camp_data.collect()
+
+    # Shift start times so that they don't overlap with previous intervals
+    start_cols = [col for col in camp_data.columns if col.find("Start") != -1]
+    for start_col in start_cols:
+        stop_col = start_col.replace("Start", "Stop")
+        camp_data = camp_data.with_columns(
+            pl.when(
+                pl.col(start_col).lt(pl.col(stop_col).shift(1))
+                )
+            .then(pl.col(stop_col).shift(1))
+            .otherwise(pl.col(start_col))
+            .alias(start_col)
+            )
+    # Adjusts timestamps to be no more than 1 second apart for continuous data
+    if len(start_cols) == 0:
+        # Rounds timestamps to nearest tenth of a second
+        camp_data = camp_data.with_columns(
+            cs.contains("DateTime").dt.round(every="1s")
+            )
+        # Timestamp to compare to
+        prev_ts = camp_data["UTC_DateTime"][0]
+        # List of adjusted timestamps
+        adjusted = [prev_ts]
+        for ts in camp_data["UTC_DateTime"][1:]:
+            # Replaces timestamp if it isn't exactly 1 second after the
+            # previous provided it isn't a true gap
+            if (ts < prev_ts + timedelta(seconds=3)):
+                ts = prev_ts + timedelta(seconds=1)
+            # Adds adjusted timestamp to adjusted and sets it as prev_ts
+            adjusted.append(ts)
+            prev_ts = ts
+        # Replaces UTC timestamps with adjusted ones
+        camp_data = camp_data.with_columns(
+            pl.Series("UTC_DateTime", adjusted)
+            )
+        # Identifies times needed to fill measurement gaps
+        missing_times = camp_data.select(
+            pl.datetime_ranges(
+                start=pl.col("UTC_DateTime"), end=pl.col("UTC_DateTime")
+                .shift(-1),
+                interval="1s", closed="none").list.explode().drop_nulls()
+            )
+        # Adds missing times to camp_data DataFrame
+        camp_data = pl.concat(
+            [camp_data, missing_times],
+            how="diagonal_relaxed"
+            ).sort(
+                by="UTC_DateTime"
+                ).with_columns(
+                    # Gets adjusted FTC_DateTimes
+                    pl.col("UTC_DateTime")
+                    .dt.convert_time_zone("America/Denver")
+                    .alias("FTC_DateTime")
+                    )
+    # Columns that were created as intermediates
+    drop_cols = []
+    # Rounds values to appropriate precision based on manual input
+    for dvar, chars in header["dvars"].items():
+        if "precision" in chars.keys():
+            # Uncertainty calculation from percent uncertainty
+            if isinstance(chars["precision"], str):
+                perc_unc = float(chars["precision"].split("%")[0]) / 100
+                # Calculates uncertainty as percentage of measurement as new 
+                # temporary column
+                camp_data = camp_data.with_columns(
+                    pl.col(dvar).mul(perc_unc).abs()
+                    .alias(dvar + "_Uncertainty")
+                    )
+                # Adds temporary column name to drop_cols
+                drop_cols.append(dvar + "_Uncertainty")
+            # Fixed uncertainty precision
+            else:
+                camp_data = camp_data.with_columns(
+                    pl.col(dvar)
+                    # Scales so last significant digit is in ones place
+                    .truediv(chars["precision"])
+                    # Rounds to ones place
+                    .round(0)
+                    # Un-scales value after rounding
+                    .mul(chars["precision"])
+                    # Handles odd phenomenon of the 17th digit after the 
+                    # decimal being nonzero
+                    .round(10)
+                    )
+    # Rounds values to appropriate precision based on uncertainties
+    for col in camp_data.columns:
+        if col.find("_Uncertainty") != -1:
+            camp_data = camp_data.with_columns(
+                # Index of first non-zero digit
+                pl.col(col).cast(pl.String).str.find("[1-9]").cast(pl.Int64)
+                .sub(
+                    # Index of decimal point
+                    pl.col(col).cast(pl.String).str.find("\.").cast(pl.Int64)
+                    )
+                # Accounts for rounding to two significant digits
+                .add(1)
+                .alias("Factor")
+                ).with_columns(
+                    # Handles when first non-zero digit is before decimal
+                    pl.when(pl.col("Factor").le(0))
+                    .then(pl.col("Factor").add(1))
+                    .otherwise(pl.col("Factor"))
+                    ).with_columns(
+                        # Factor to multiply then divide by
+                        pl.lit(10.0).pow(pl.col("Factor")).alias("Factor")
+                        ).with_columns(
+                            # Scales value to have final significant digit
+                            # before decimal
+                            pl.col(col2).mul(pl.col("Factor"))
+                            # Rounds scaled value to desired number of
+                            # significant digits
+                            .round(0)
+                            # Un-scales value after rounding
+                            .truediv(pl.col("Factor"))
+                            # Repeats rounding to same precision for all
+                            # columns associated with given uncertainty
+                            for col2 in camp_data.columns 
+                            if col2.find(col.replace("_Uncertainty", "")) != -1
+                            ).select(
+                                pl.exclude("Factor")
+                                )
+    # Drops columns created as intermediates
+    camp_data = camp_data.select(
+        pl.exclude(drop_cols)
+        )
+    # Fills missing values with appropriate flag
+    camp_data = camp_data.with_columns(
+        [pl.col(dvar).fill_null(float(chars["missingflag"]))
+         for dvar, chars in header["dvars"].items()
+         # Doesn't look through datetime columns
+         if dvar.find("TC") == -1]
+        )
+    # Creates line containing independent variable information
+    ivar_line = (
+        header["ivar"]["shortname"]
+        + "," + header["ivar"]["unit"]
+        + "," + header["ivar"]["standardname"]
+        )
+    if "longname" in header["ivar"].keys():
+        ivar_line += ("," + header["ivar"]["longname"])
+        
+    n_dvars = str(len(header["dvars"].keys()))
+    # Creates scales and missing values lines for dependent variables
+    scale_line = ",".join(
+        [value["scale"] for value in header["dvars"].values()]
+        )
+    missing_line = ",".join(
+        [value["missingflag"] for value in header["dvars"].values()]
+        )
+    # Creates descriptor lines for all dependent variables
+    dvar_lines = []
+    for dvar, chars in header["dvars"].items():
+        dvar_line = ",".join([dvar, chars["unit"], chars["standardname"]])
+        if "longname" in chars.keys():
+            dvar_line += ("," + chars["longname"])
+        dvar_lines.append(dvar_line)
+    dvar_lines = "\n".join(dvar_lines)
+    
+    # Creates special comments lines
+    if "Special Comments" in header.keys():
+        spec_coms = "1\n" + header["Special Comments"]
+    else:
+        spec_coms = "0"
+    # Creates normal comments lines
+    norm_coms = [key + ": " + value for key, value in header.items()
+                 if key.isupper() and key != "FFI"]
+    n_norm_coms = len(norm_coms) + 1
+    norm_coms = "\n".join(norm_coms)
+    # Calculates number of lines
+    n_lines = 14 + n_norm_coms + int(n_dvars) + int(spec_coms[0])
+    n_lines = str(n_lines)
+    n_norm_coms = str(n_norm_coms)
+    # Generates header with all known information common to campaign and
+    # placeholders for values that will vary by week
+    fixed_header = (
+        n_lines + "," + header["FFI"] + "," + header["Version Number"] + "\n"
+        + header["PI Name"] + "\n"
+        + header["PI Affiliation"] + "\n"
+        + header["Data Source Description"] + "\n"
+        + header["Mission Name"] + "\n"
+        + header["File Volume Number"] + "," + header["Total Number File Volumes"] + "\n"
+        + "COLLECTIONDATE,REVISIONDATE\n"
+        + header["Data Interval Code"] + "\n"
+        + ivar_line + "\n"
+        + n_dvars + "\n"
+        + scale_line + "\n"
+        + missing_line + "\n"
+        + dvar_lines + "\n"
+        + spec_coms + "\n"
+        + n_norm_coms + "\n"
+        + norm_coms
+        )
+
+    df_header = fixed_header
+    # Midnight of the first day of data
+    ftc_start = camp_data.select(
+        (cs.contains("FTC") & ~cs.contains("Stop")).min()
+        .dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        )
+    # Midnight of the last day of data
+    ftc_stop = camp_data.select(
+        (cs.contains("FTC") & ~cs.contains("Stop")).max()
+        .dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        )
+    # Converts from local timezone to UTC timezone
+    utc_start = ftc_start.select(
+        pl.all().dt.replace_time_zone("UTC")
+        ).item()
+    utc_stop = ftc_stop.select(
+        pl.all().dt.replace_time_zone("UTC")
+        ).item()
+    ftc_start = ftc_start.item()
+    ftc_stop = ftc_stop.item()
+    # Today's date for revision history
+    today = datetime.now(pytz.timezone("America/Denver"))
+    # Converts from DateTime format into seconds from midnight of start
+    # date
+    camp_data = camp_data.with_columns(
+        cs.contains("UTC").sub(utc_start).dt.total_microseconds()
+        .truediv(1e6).round(1),
+        cs.contains("FTC").sub(ftc_start).dt.total_microseconds()
+        .truediv(1e6).round(1)
+        )
+    # Gets collection and revision date from start and stop times
+    df_header = df_header.replace(
+        "COLLECTIONDATE", ftc_start.strftime("%Y,%m,%d")
+        ).replace(
+            "REVISIONDATE", today.strftime("%Y,%m,%d")
+            )
+    # Combines header with data
+    header_with_data = df_header + "\n" + camp_data.write_csv()
+    # Creates ICARTT file name
+    fname = "_".join([header["dataID"],
+                      header["locationID"],
+                      ftc_start.strftime("%Y%m%d"),
+                      header["REVISION"]]) + ".ict"
+    # Exports ICARTT file
+    fpath = os.path.join(inst_icartt_data_dir,
+                         fname)
+    with open(fpath, "w+") as file:
+        file.write(header_with_data)
+    # Changes complete to True after creating ICARTT files
+    header["Complete"] = True
+    with open(header_path, "w+") as file:
+        yaml.dump(header, file, sort_keys=False)
+
