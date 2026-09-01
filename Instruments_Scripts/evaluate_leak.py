@@ -26,7 +26,7 @@ data_dir = os.path.join(data_dir, "Instruments_Data")
 # Full path to directory containing all structured raw data
 CAL_DATA_DIR = os.path.join(data_dir, "Instruments_CalibratedData")
 # Full path to automated addition times
-ADD_TIMES_PATH = os.path.join(data_dir, "Instruments_ManualData", "Instruments_ManualExperiments", "ManualAdditionTimes - Copy.csv")
+ADD_TIMES_PATH = os.path.join(data_dir, "Instruments_ManualData", "Instruments_ManualExperiments", "ManualAdditionTimes.csv")
 add_times = pl.read_csv(ADD_TIMES_PATH).with_columns(
     pl.selectors.contains("UTC").str.to_datetime(time_zone="UTC")
     )

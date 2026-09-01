@@ -48,7 +48,7 @@ add_times = {key[0]: df for key, df in
 MAN_ADDS_PATH = os.path.join(data_dir,
                              "Instruments_ManualData",
                              "Instruments_ManualExperiments",
-                             "ManualAdditionTimes - Copy.csv")
+                             "ManualAdditionTimes.csv")
 man_add_times = pl.read_csv(MAN_ADDS_PATH).with_columns(
     pl.selectors.contains("UTC").str.to_datetime()
     )
