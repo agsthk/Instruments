@@ -1,0 +1,30 @@
+# calculate_acrs.py
+- This is the script that straight up broke my computer last time so need to be somewhat cautious with it - don't need to be outputting every figure in existence
+- Running the script up until the point where the fit begins, then will run a few at a time
+	- Looking at the fit images:
+		- 2024-03-20 19:00 cuts off later than it should - something to do with cutoff time determination me thinks
+		- 2024-03-25 18:45 same deal
+		- 2024-03-28 07:33 same deal but also way funkier and warrants more looking into
+	- Current way I have cutoff time determined is last time \[CO2\] sustained above cutoff concentration, but doesn't end up working when there is a late spike way after cutoff but still in data range
+	- What happens if I just switch it to first time it drops below? I think there was a reason I wasn't but let's see
+		- That does appear to work a lot better with the exception of 3/28 but I think that's more a background subtraction issue? Unclear, will investigate soon
+	- May 2024 has issue where it's starting the fit too soon it seems
+		- See this a bit in some of the June fits also
+		- Also June 29 11:21 is not normal
+		- Maybe try just cutting off first minute?
+			- I think this is sufficient! What if I go lower?
+				- 30 seconds works
+				- Actually maybe not
+- Some issues: several days where the fit_co2 df is too small despite there being visually enough data
+	- Might have to do with spikes at the end now that I'm looking at it - change to not look for max CO2 after 1 hour?
+		- This may be better
+		- Something weird with 2024-05-23 18:00 - doesn't have any data for first 2.5 hours?
+			- This might have been the one where the tank was accidentally fully emptied - it is! Maybe just skip fitting this one? It's may so we weren't doing much anyway
+			- Also looked at 5/9 11:51 and 11:52 cause they were a little weird, CO2 tank was empty for that one
+	- Added time constraint for determining start time because it was selecting start that was corresponding to next addition spikes - must be within 1 hour of CO2 addition
+- Taking a step back here - need to make sure I'm selecting data appropriately before any fitting occurs
+- Some slightly weird stuff with occupancy, I think I'm failing to account for that when determining background
+	- How to fix this?
+	- We consider CO2 at background when no additions and no occupants, otherwise perturbed
+		- Can we just remove any perturbed times and create a background that way instead of using the CO2 addition times? Say CO2 perturbed from CO2 add (maybe 1 min before start) to 5.5 h later, and from occupant enter/door open (maybe 5 min before start) to also 5.5h later?
+			- 2 min before CO2 add start to be safe
