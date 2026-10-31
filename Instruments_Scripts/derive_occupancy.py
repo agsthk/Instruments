@@ -48,8 +48,10 @@ occ_ict_path = os.path.join(
     data_dir,
     "Instruments_ICARTTData",
     "Occupancy_ICARTTData",
-    "Occupancy_ICARTTData_R0"
+    "Occupancy_ICARTTData_R1"
     )
+if not os.path.exists(occ_ict_path):
+    os.makedirs(occ_ict_path)
 # %% Reads and processes data
 # Reads in LI-COR CO2 files
 licor = []
@@ -120,16 +122,14 @@ doorstatus = {key[0]: df for key, df in doorstatus.with_columns(
 # Reads in OccupancyStatus file
 occstatus = pl.scan_csv(occ_path).with_columns(
     cs.contains("UTC").str.to_datetime(time_zone="UTC")
-    ).with_columns(
-        cs.contains("UTC").dt.convert_time_zone("America/Denver")
-        .name.map(lambda x: x.replace("UTC", "FTC"))
-        ).sort(
+    ).sort(
             by=cs.contains("UTC")
             ).collect()
 
-# Combines intervals that are less than 10 minutes apart
+# Combines occupancy intervals that are less than 10 minutes apart
 occstatus = occstatus.with_columns(
-    # Identifies as new interval if start time is after any previous stop time
+    # Identifies as new interval if start time is more than 10 minutes after
+    # any previous stop time
     (pl.col("UTC_Start").ge(
         pl.col("UTC_Stop").dt.offset_by("10m").cum_max().shift(1, fill_value=0)
         ))
@@ -143,65 +143,58 @@ occstatus = occstatus.with_columns(
             pl.max("UTC_Stop"),
             pl.min("Occupancy")
             ).sort("UTC_Start").drop("IntvID")
-# occstatus = {key[0]: df for key, df in occstatus.with_columns(
-#     pl.col("FTC_Start").dt.strftime("%Y%W").alias("Week")
-#     ).partition_by("Week", as_dict=True, include_key=False).items()}
-# %
 
-# %%
+# Adds unoccupied time to occstatus 
+occstatus = pl.concat(
+    [occstatus,
+     occstatus.with_columns(
+         UTC_Start=pl.col("UTC_Stop").dt.offset_by("1s"),
+         UTC_Stop=pl.col("UTC_Start").shift(-1).dt.offset_by("-1s"),
+         ).drop_nulls().with_columns(Occupancy=0)
+     ],
+    how="vertical_relaxed"
+    ).sort("UTC_Start")
 
-
-# %%
-
-occupied = occstatus_merged.with_columns(OccupancyStatus=1)
-# Determines unoccupied times as gaps between occupied times
-unoccupied = occstatus_merged.with_columns(
-    UTC_Start=pl.col("UTC_Stop").dt.offset_by("1s"),
-    UTC_Stop=pl.col("UTC_Start").shift(-1).dt.offset_by("-1s"),
-    FTC_Start=pl.col("FTC_Stop").dt.offset_by("1s"),
-    FTC_Stop=pl.col("FTC_Start").shift(-1).dt.offset_by("-1s")
-    ).drop_nulls().with_columns(OccupancyStatus=0)
-# Full occupancy file
-occupancy = pl.concat([occupied, unoccupied]).sort(cs.contains("Start"))
 # %%
 # Beginning and end times for Keck phases
 camp_endpoints = {
-    1: {"start": datetime(2024, 3, 1,
-                          tzinfo=pytz.timezone("America/Denver")),
-        "stop": datetime(2024, 8, 16, 23, 59, 59,
-                         tzinfo=pytz.timezone("America/Denver"))},
-    2: {"start": datetime(2025, 1, 17,
-                          tzinfo=pytz.timezone("America/Denver")),
-        "stop": datetime(2025, 5, 5, 23, 59, 59,
-                               tzinfo=pytz.timezone("America/Denver"))},
-    3: {"start": datetime(2026, 1, 13, 2,
-                          tzinfo=pytz.timezone("America/Denver")),
-        "stop": datetime(2026, 6, 30, 23, 59, 59,
-                         tzinfo=pytz.timezone("America/Denver"))},
+    1: {"start": datetime(2024, 3, 1, 7,
+                          tzinfo=pytz.utc),
+        "stop": datetime(2024, 8, 17, 5, 59, 59,
+                         tzinfo=pytz.utc)},
+    2: {"start": datetime(2025, 1, 17, 7,
+                          tzinfo=pytz.utc),
+        "stop": datetime(2025, 5, 6, 5, 59, 59,
+                               tzinfo=pytz.utc)},
+    3: {"start": datetime(2026, 1, 13, 9,
+                          tzinfo=pytz.utc),
+        "stop": datetime(2026, 7, 1, 5, 59, 59,
+                         tzinfo=pytz.utc)},
     }
 camp_occ = {}
 
 for camp, endpoints in camp_endpoints.items():
-    camp_occ[camp] = occupancy.filter(
+    camp_occ[camp] = occstatus.filter(
         pl.any_horizontal(
-            cs.contains("FTC").is_between(
+            cs.contains("UTC").is_between(
                 endpoints["start"], endpoints["stop"]
                 )
             )
-        ).with_columns(
-            FTC_Start=pl.when(
-                pl.col("FTC_Start").lt(endpoints["start"])
+        ).select(
+            UTC_Start=pl.when(
+                pl.col("UTC_Start").lt(endpoints["start"])
                 )
             .then(pl.lit(endpoints["start"]))
-            .otherwise(pl.col("FTC_Start")),
-            FTC_Stop=pl.when(
-                pl.col("FTC_Stop").gt(endpoints["stop"])
+            .otherwise(pl.col("UTC_Start")),
+            UTC_Stop=pl.when(
+                pl.col("UTC_Start").gt(endpoints["stop"])
                 )
             .then(pl.lit(endpoints["stop"]))
-            .otherwise(pl.col("FTC_Stop")),
+            .otherwise(pl.col("UTC_Stop")),
+            Occupancy=pl.col("Occupancy")
             ).with_columns(
-                cs.contains("FTC").dt.convert_time_zone("UTC")
-                .name.map(lambda x: x.replace("FTC", "UTC"))
+                cs.contains("UTC").dt.convert_time_zone("America/Denver")
+                .name.map(lambda x: x.replace("UTC", "FTC"))
                 )
 
 # %%
@@ -239,7 +232,8 @@ DM_CONTACT_INFO: Allison Salamone, Colorado State University, Allison.Salamone@c
 PROJECT_INFO: PROJINFO\n\
 STIPULATIONS_ON_USE: Use of these data requires prior permission from PI\n\
 OTHER_COMMENTS: Room was considered occupied when people were present or when the door was left open.\n\
-REVISION: R0\n\
+REVISION: R1\n\
+R1: Corrected erroneous time interval determinations\n\
 R0: Final data."
 
 camp_inst = {1: "SparkFun Magnetic Door Switch Set, Documentation",
@@ -296,7 +290,7 @@ for camp, df in camp_occ.items():
     
     camp_icartt = camp_header + "\n" + df.write_csv()
     
-    camp_ict_title = "Keck-Occupancy_C200_" + ftc_start.strftime("%Y%m%d") + "_R0.ict"
+    camp_ict_title = "Keck-Occupancy_C200_" + ftc_start.strftime("%Y%m%d") + "_R1.ict"
     
     ict_path = os.path.join(occ_ict_path, camp_ict_title)
     if os.path.exists(ict_path):
@@ -304,31 +298,4 @@ for camp, df in camp_occ.items():
     with open(ict_path, "w+") as f:
         f.write(camp_icartt)
     
-# %%
-
-
-# %%
-for week, df in aranet.items():
-    if week.find("2026") == -1:
-        continue
-    
-    # co2_cols = [col for col in df.columns if col.find("CO2") != -1]
-    df = df.with_columns(
-        CO2_ppm=pl.mean_horizontal(cs.contains("CO2"))
-        )
-    week_plot = df.hvplot.scatter(
-        x="FTC_DateTime",
-        y="CO2_ppm"
-        )
-    if week in occstatus_merged.keys():
-        occ_df = occstatus_merged[week].with_columns(
-            cs.contains("FTC").dt.replace_time_zone(None)
-            )
-        week_plot = (
-            week_plot
-            * hv.VLines(occ_df["FTC_Start"]).opts(color="Red")
-            * hv.VLines(occ_df["FTC_Stop"]).opts(color="Green")
-            )
-    hvplot.show(week_plot)
-
 

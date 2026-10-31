@@ -8,3 +8,5 @@
 # derive_occupancy.py
 - Trying to fix whatever is wrong with my occupancy file that has the room occupied for a week straight despite that not being in the source file
 - Revised how I combine occupied periods that are less than 10 minutes apart
+- Double checked times being determined and they look good at first glance
+- Revised ICARTT generation to be R1
