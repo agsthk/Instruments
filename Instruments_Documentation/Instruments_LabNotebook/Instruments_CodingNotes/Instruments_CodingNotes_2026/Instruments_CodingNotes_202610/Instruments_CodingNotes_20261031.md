@@ -7,3 +7,4 @@
 	- There's something wrong with my occupancy file - going to try to fix if I can? have to go into derive_occupancy.py
 # derive_occupancy.py
 - Trying to fix whatever is wrong with my occupancy file that has the room occupied for a week straight despite that not being in the source file
+- Revised how I combine occupied periods that are less than 10 minutes apart

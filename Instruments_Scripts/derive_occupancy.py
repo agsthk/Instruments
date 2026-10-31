@@ -126,57 +126,30 @@ occstatus = pl.scan_csv(occ_path).with_columns(
         ).sort(
             by=cs.contains("UTC")
             ).collect()
+
+# Combines intervals that are less than 10 minutes apart
+occstatus = occstatus.with_columns(
+    # Identifies as new interval if start time is after any previous stop time
+    (pl.col("UTC_Start").ge(
+        pl.col("UTC_Stop").dt.offset_by("10m").cum_max().shift(1, fill_value=0)
+        ))
+    .cum_sum()
+    .alias("IntvID")
+    ).group_by(
+        # Identifies first start and last stop of overlapping intervals
+        "IntvID"
+        ).agg(
+            pl.min("UTC_Start"),
+            pl.max("UTC_Stop"),
+            pl.min("Occupancy")
+            ).sort("UTC_Start").drop("IntvID")
 # occstatus = {key[0]: df for key, df in occstatus.with_columns(
 #     pl.col("FTC_Start").dt.strftime("%Y%W").alias("Week")
 #     ).partition_by("Week", as_dict=True, include_key=False).items()}
-# %%
-phase1_start = datetime(2024, 3, 1, tzinfo=pytz.timezone("America/Denver"))
-phase1_stop = datetime(2024, 8, 16, 23, 59, 59,
-                       tzinfo=pytz.timezone("America/Denver"))
-phase2_start = datetime(2025, 1, 17, tzinfo=pytz.timezone("America/Denver"))
-phase2_stop = datetime(2025, 5, 5, 23, 59, 59,
-                       tzinfo=pytz.timezone("America/Denver"))
-phase3_start = datetime(2026, 1, 13, 2, tzinfo=pytz.timezone("America/Denver"))
+# %
 
 # %%
 
-occstatus = occstatus.with_columns(
-    follow_gap=pl.col("UTC_Start").shift(-1).sub(pl.col("UTC_Stop"))
-    ).with_columns(
-        merge=pl.when(
-            # Time gap between stop and next row start <= 10 min
-            pl.col("follow_gap").le(timedelta(minutes=10))
-            # Time gap between prev row stop and start <= 10 min
-            | pl.col("follow_gap").shift(1).le(timedelta(minutes=10))
-            )
-        .then(True)
-        .otherwise(False)
-        ).with_columns(
-            # Interval number unique to group of rows needing to be merged
-            intv=pl.col("merge").rle_id()
-            )
-# Rows not being merged
-unique = occstatus.filter(~pl.col("merge"))
-# Merges consecutive rows that are close together
-merged = occstatus.filter(
-    pl.col("merge")
-    ).group_by("intv").agg(
-        cs.contains("Start").min(),
-        cs.contains("Stop").max()
-        )
-
-occstatus_merged = pl.concat(
-    [unique, merged],
-    how="diagonal"
-    ).sort(
-        cs.contains("Start")
-        ).select(
-            cs.contains("Start", "Stop")
-            )
-
-# occstatus_merged = {key[0]: df for key, df in occstatus_merged.with_columns(
-#     pl.col("FTC_Start").dt.strftime("%Y%W").alias("Week")
-#     ).partition_by("Week", as_dict=True, include_key=False).items()}
 
 # %%
 
