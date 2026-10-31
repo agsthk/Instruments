@@ -84,7 +84,7 @@ for root, dirs, files in os.walk(ICARTT_DIR):
             licor_data.append(read_ict(os.path.join(root, file)))
         if file in aranet_files:
             aranet_data.append(read_ict(os.path.join(root, file)))
-        if file.find("Occupancy") != -1:
+        if file.find("Occupancy") != -1 and file.find("R1") != -1:
             occ_data.append(read_ict(os.path.join(root, file)))
 # Concatenates data for all phases
 licor_data = pl.concat(licor_data).sort(by="UTC_DateTime")
@@ -173,31 +173,46 @@ for spec, df in add_times.items():
             [df, man_add_times[spec]]
             ).sort(by="UTC_Start")
 # %% Defines times that CO2 is perturbed
+occ_data.filter(
+    pl.col("UTC_Stop").dt.year().eq(2025)
+    & pl.col("UTC_Stop").dt.day().gt(17)
+    )
 co2_pert = pl.concat(
     [add_times["CO2"].select(
         pl.col("UTC_Start").dt.offset_by("-2m"),
         UTC_Stop=pl.when(
             pl.any_horizontal(
                 cs.contains("UTC").is_between(
-                    datetime(2025, 1, 18, tzinfo=utc),
-                    datetime(2025, 1, 28, tzinfo=utc)
-                    )
-                )
-            | pl.any_horizontal(
-                cs.contains("UTC").is_between(
-                    datetime(2025, 1, 18, tzinfo=utc),
+                    datetime(2025, 1, 22, tzinfo=utc),
                     datetime(2025, 1, 28, tzinfo=utc)
                     )
                 )
             )
-            .then(pl.col("UTC_Stop").dt.offset_by("2h"))
+            .then(pl.col("UTC_Stop").dt.offset_by("3h30m"))
+            .when(
+                pl.any_horizontal(
+                    cs.contains("UTC").is_between(
+                        datetime(2024, 6, 27, tzinfo=utc),
+                        datetime(2024, 7, 30, tzinfo=utc)
+                        )
+                    )
+                )
+            .then(pl.col("UTC_Stop").dt.offset_by("3h")).when(
+                pl.any_horizontal(
+                    cs.contains("UTC").is_between(
+                        datetime(2024, 8, 7, 16, tzinfo=utc),
+                        datetime(2024, 12, 21, tzinfo=utc)
+                        )
+                    )
+                )
+            .then(pl.col("UTC_Stop").dt.offset_by("2h30m"))
             .otherwise(pl.col("UTC_Stop").dt.offset_by("4h45m"))
         ),
     occ_data.filter(
         pl.col("OccupancyStatus").eq(1)
         ).select(
             pl.col("UTC_Start").dt.offset_by("-10m"),
-            UTC_Stop=pl.col("UTC_Stop").dt.offset_by("10m")
+            UTC_Stop=pl.col("UTC_Stop").dt.offset_by("2h")
             )]
             ).sort(by="UTC_Start")
 # Combines overlapping intervals
@@ -215,7 +230,8 @@ co2_pert = co2_pert.with_columns(
             pl.min("UTC_Start"),
             pl.max("UTC_Stop")
             ).sort("UTC_Start").drop("IntvID")
-# 
+# %% Defines CO2 background
+# Determines background LI-COR CO2 concentrations
 licor_bg = licor_data.join_asof(
     co2_pert,
     left_on="UTC_DateTime",
@@ -225,68 +241,11 @@ licor_bg = licor_data.join_asof(
     ).filter(
         # Keeps only CO2 measured in unperturbed times
         pl.col("UTC_DateTime").lt(pl.col("UTC_Start"))
-        )
-licor_bymonth = licor_data.with_columns(
-    Year=pl.col("FTC_DateTime").dt.year(),
-    Month=pl.col("FTC_DateTime").dt.week()
-    ).partition_by("Year", "Month", as_dict=True, include_key=False)
-
-licor_bg_bymonth = licor_bg.with_columns(
-    Year=pl.col("FTC_DateTime").dt.year(),
-    Month=pl.col("FTC_DateTime").dt.week()
-    ).partition_by("Year", "Month", as_dict=True, include_key=False)
-for (y, m), df in licor_bymonth.items():
-    
-    fig, ax = plt.subplots()
-    ax.plot(df["FTC_DateTime"], df["CO2_ppm"])
-    try:
-        df_bg = licor_bg_bymonth[(y, m)]
-    except: pass
-    ax.plot(df_bg["FTC_DateTime"], df_bg["CO2_ppm"])
-
-# %% Defines background CO2 for background subtraction
-# 10 minutes before CO2 additions
-bg_begin = add_times["CO2"].select(
-    pl.col("UTC_Start").dt.offset_by("-10m"),
-    UTC_Stop=pl.col("UTC_Start")
-    ).with_row_index()
-# 10 minutes after 5.5 hours following CO2 addition end
-bg_end = add_times["CO2"].select(
-    UTC_Start=pl.col("UTC_Stop").dt.offset_by("5h30m"),
-    UTC_Stop=pl.col("UTC_Stop").dt.offset_by("5h40m"),
-    ).with_row_index(offset=1)
-# Removes end background times if next CO2 addition occurs < 5.5 hours after
-# previous end (covered by bg_begin)
-bg_end = bg_end.join(
-    bg_begin,
-    on="index",
-    suffix="_Next",
-    how="left"
-    ).filter(
-        pl.col("UTC_Stop").lt(pl.col("UTC_Start_Next"))
-        ).drop(cs.contains("Next"))
-# Combines all times to consider as background
-bg_times = pl.concat(
-    [bg_begin, bg_end]
-    ).select(
-        pl.exclude("index")
-        ).sort(
-            by="UTC_Start"
-            )
-# Calculates LI-COR CO2 during background times
-licor_bg = licor_data.join_asof(
-    bg_times,
-    left_on="UTC_DateTime",
-    right_on="UTC_Stop",
-    strategy="forward" # For CO2 datetime, IDs next BG time 
-    ).filter(
-        # Removes data outside of background times
-        pl.col("UTC_DateTime").gt(pl.col("UTC_Start"))
-        ).group_by(
-            # Groups by background interval
-            "UTC_Start"
+        ).group_by_dynamic(
+            # Resamples background LI-COR CO2 at 10 minute time resolution
+            "UTC_DateTime",
+            every="10m"
             ).agg(
-                pl.max("UTC_Stop"),
                 BG_CO2_ppm=pl.mean("CO2_ppm"),
                 BG_CO2_ppm_Unc=pl.max_horizontal(
                     pl.std("CO2_ppm"),
@@ -294,21 +253,27 @@ licor_bg = licor_data.join_asof(
                         pl.col("CO2_ppm_Unc").drop_nulls().len()
                         )
                     )
-                ).sort(by="UTC_Start")
-# Calculates Aranet CO2 during background times
+                ).select(
+                    pl.col("UTC_DateTime").alias("UTC_Start"),
+                    pl.col("UTC_DateTime").dt.offset_by("10m")
+                    .alias("UTC_Stop"),
+                    cs.contains("CO2")
+                    ).sort(by="UTC_Start")
+# Determines background Aranet CO2 concentrations
 aranet_bg = aranet_data.join_asof(
-    bg_times,
+    co2_pert,
     left_on="UTC_DateTime",
     right_on="UTC_Stop",
-    strategy="forward" # For CO2 datetime, IDs next BG time 
+    strategy="forward" # For CO2 datetime, IDs next perturbed time end (could
+    # be in perturbed period if after start but before end)
     ).filter(
-        # Removes data outside of background times
-        pl.col("UTC_DateTime").gt(pl.col("UTC_Start"))
-        ).group_by(
-            # Groups by background interval
-            "UTC_Start"
+        # Keeps only CO2 measured in unperturbed times
+        pl.col("UTC_DateTime").lt(pl.col("UTC_Start"))
+        ).group_by_dynamic(
+            # Resamples background Aranet CO2 at 10 minute time resolution
+            "UTC_DateTime",
+            every="10m"
             ).agg(
-                pl.max("UTC_Stop"),
                 BG_CO2_ppm=pl.mean("CO2_ppm"),
                 BG_CO2_ppm_Unc=pl.max_horizontal(
                     pl.std("CO2_ppm"),
@@ -316,7 +281,12 @@ aranet_bg = aranet_data.join_asof(
                         pl.col("CO2_ppm_Unc").drop_nulls().len()
                         )
                     )
-                ).sort(by="UTC_Start")
+                ).select(
+                    pl.col("UTC_DateTime").alias("UTC_Start"),
+                    pl.col("UTC_DateTime").dt.offset_by("10m")
+                    .alias("UTC_Stop"),
+                    cs.contains("CO2")
+                    ).sort(by="UTC_Start")
 # %% Adds background CO2 to LI-COR and Aranet datasets
 # Adds BG CO2 to LI-COR
 licor_w_bg = licor_data.join_asof(

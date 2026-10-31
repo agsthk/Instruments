@@ -10,3 +10,8 @@
 - Revised how I combine occupied periods that are less than 10 minutes apart
 - Double checked times being determined and they look good at first glance
 - Revised ICARTT generation to be R1
+# calculate_acrs.py
+- Now that I fixed occupancy files, looks much better
+- Finally decided the time interval to cut out after additions and occupancy, varies with time in the campaign a little bit but mostly consistent, need to stop it with the background and move on
+- Resampled background at 10 minute time resolution
+- Applied background modeling method to Aranet data
