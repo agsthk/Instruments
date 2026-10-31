@@ -191,7 +191,7 @@ for camp, endpoints in camp_endpoints.items():
                 )
             .then(pl.lit(endpoints["stop"]))
             .otherwise(pl.col("UTC_Stop")),
-            Occupancy=pl.col("Occupancy")
+            OccupancyStatus=pl.col("Occupancy")
             ).with_columns(
                 cs.contains("UTC").dt.convert_time_zone("America/Denver")
                 .name.map(lambda x: x.replace("UTC", "FTC"))
