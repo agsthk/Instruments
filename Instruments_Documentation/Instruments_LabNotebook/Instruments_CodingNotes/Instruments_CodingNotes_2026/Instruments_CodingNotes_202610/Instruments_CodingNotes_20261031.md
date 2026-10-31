@@ -1,0 +1,9 @@
+# calculate_acrs.py
+- Continuing with this script, first will be checking background
+	- Making weekly plots to see if I can define a background easily enough - looks fairly reasonable for the time periods where I do have perturbation times defined (aka not 2023-early 2024)
+		- Also missing a week in March 2024? Whatever
+	- The background definition works well enough, my issue now is that I'm torn between using data from tail end of decay or missing regular backgrounds when the additions are very close
+		- Perhaps can set offset depending on time period? It seems to be 1/18 1/28 2025 ish that I need to use closer ones, everything else appears fine at 4h(?)
+	- There's something wrong with my occupancy file - going to try to fix if I can? have to go into derive_occupancy.py
+# derive_occupancy.py
+- Trying to fix whatever is wrong with my occupancy file that has the room occupied for a week straight despite that not being in the source file

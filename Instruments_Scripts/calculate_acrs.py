@@ -12,6 +12,7 @@ import polars as pl
 import polars.selectors as cs
 from polars.exceptions import ComputeError
 from datetime import datetime
+from pytz import utc
 import hvplot.polars
 import holoviews as hv
 import matplotlib.pyplot as plt
@@ -172,18 +173,76 @@ for spec, df in add_times.items():
             [df, man_add_times[spec]]
             ).sort(by="UTC_Start")
 # %% Defines times that CO2 is perturbed
-co2_pert =pl.concat(
+co2_pert = pl.concat(
     [add_times["CO2"].select(
         pl.col("UTC_Start").dt.offset_by("-2m"),
-        UTC_Stop=pl.col("UTC_Stop").dt.offset_by("5h30m")
+        UTC_Stop=pl.when(
+            pl.any_horizontal(
+                cs.contains("UTC").is_between(
+                    datetime(2025, 1, 18, tzinfo=utc),
+                    datetime(2025, 1, 28, tzinfo=utc)
+                    )
+                )
+            | pl.any_horizontal(
+                cs.contains("UTC").is_between(
+                    datetime(2025, 1, 18, tzinfo=utc),
+                    datetime(2025, 1, 28, tzinfo=utc)
+                    )
+                )
+            )
+            .then(pl.col("UTC_Stop").dt.offset_by("2h"))
+            .otherwise(pl.col("UTC_Stop").dt.offset_by("4h45m"))
         ),
     occ_data.filter(
         pl.col("OccupancyStatus").eq(1)
         ).select(
-            pl.col("UTC_Start").dt.offset_by("-5m"),
-            UTC_Stop=pl.col("UTC_Stop").dt.offset_by("5h30m")
+            pl.col("UTC_Start").dt.offset_by("-10m"),
+            UTC_Stop=pl.col("UTC_Stop").dt.offset_by("10m")
             )]
             ).sort(by="UTC_Start")
+# Combines overlapping intervals
+co2_pert = co2_pert.with_columns(
+    # Identifies as new interval if start time is after any previous stop time
+    (pl.col("UTC_Start").ge(
+        pl.col("UTC_Stop").cum_max().shift(1, fill_value=0)
+        ))
+    .cum_sum()
+    .alias("IntvID")
+    ).group_by(
+        # Identifies first start and last stop of overlapping intervals
+        "IntvID"
+        ).agg(
+            pl.min("UTC_Start"),
+            pl.max("UTC_Stop")
+            ).sort("UTC_Start").drop("IntvID")
+# 
+licor_bg = licor_data.join_asof(
+    co2_pert,
+    left_on="UTC_DateTime",
+    right_on="UTC_Stop",
+    strategy="forward" # For CO2 datetime, IDs next perturbed time end (could
+    # be in perturbed period if after start but before end)
+    ).filter(
+        # Keeps only CO2 measured in unperturbed times
+        pl.col("UTC_DateTime").lt(pl.col("UTC_Start"))
+        )
+licor_bymonth = licor_data.with_columns(
+    Year=pl.col("FTC_DateTime").dt.year(),
+    Month=pl.col("FTC_DateTime").dt.week()
+    ).partition_by("Year", "Month", as_dict=True, include_key=False)
+
+licor_bg_bymonth = licor_bg.with_columns(
+    Year=pl.col("FTC_DateTime").dt.year(),
+    Month=pl.col("FTC_DateTime").dt.week()
+    ).partition_by("Year", "Month", as_dict=True, include_key=False)
+for (y, m), df in licor_bymonth.items():
+    
+    fig, ax = plt.subplots()
+    ax.plot(df["FTC_DateTime"], df["CO2_ppm"])
+    try:
+        df_bg = licor_bg_bymonth[(y, m)]
+    except: pass
+    ax.plot(df_bg["FTC_DateTime"], df_bg["CO2_ppm"])
 
 # %% Defines background CO2 for background subtraction
 # 10 minutes before CO2 additions
