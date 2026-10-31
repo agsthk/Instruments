@@ -199,7 +199,7 @@ for camp, endpoints in camp_endpoints.items():
 
 # %%
 # Common ICARTT header for occupancy data
-header = "36,1001,V02_2016\n\
+header = "37,1001,V02_2016\n\
 Willis, Megan\n\
 Colorado State University\n\
 CAMPAIGNINST\n\
