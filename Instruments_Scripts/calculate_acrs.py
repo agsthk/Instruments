@@ -93,7 +93,7 @@ occ_data = pl.concat(occ_data).sort(by="UTC_Start")
 # Calculates uncertainty in CO2 measurements
 licor_data = licor_data.with_columns(
     CO2_ppm_Unc=pl.col("CO2_ppm").mul(0.015)
-    )
+    ).drop_nulls("CO2_ppm")
 aranet_data = aranet_data.with_columns(
     cs.contains("CO2_ppm").mul(0.03).add(30).name.suffix("_Unc")
     )
@@ -135,7 +135,7 @@ aranet_data = aranet_data.group_by_dynamic(
                         pl.col("CO2_ppm_STD"),
                         pl.col("CO2_ppm_Unc")
                         )
-                    )
+                    ).drop_nulls("CO2_ppm")
 # %% Reads automated and manual addition times 
 add_times = pl.read_csv(
     os.path.join(data_dir,
@@ -463,7 +463,7 @@ licor_decay = licor_w_bg.join_asof(
     # IDs most recent CO2 addition start
     add_times["CO2"],
     left_on="UTC_DateTime",
-    right_on="UTC_Stop",
+    right_on="UTC_Start",
     strategy="backward"
     ).join_asof(
         # IDs closest following occupant entering
@@ -478,7 +478,7 @@ licor_decay = licor_w_bg.join_asof(
             # For each addition, selects only data between addition end and the
             # soonest of 5.5h after addition end, next addition start, and next
             # occupant entering
-            pl.col("UTC_DateTime").gt(pl.col("UTC_Stop"))
+            pl.col("UTC_DateTime").gt(pl.col("UTC_Start"))
             & pl.col("UTC_DateTime").lt(
                 pl.col("UTC_Stop").dt.offset_by("5h30m")
                 )
@@ -498,15 +498,11 @@ licor_decay = licor_w_bg.join_asof(
                     include_key=False,
                     as_dict=True
                     )
-occ_data.filter(
-    pl.col("OccupancyStatus").eq(1)
-    & pl.col("UTC_Start").dt.day().eq(28)
-    ).sort(by="UTC_Start")
 aranet_decay = aranet_w_bg.join_asof(
     # IDs most recent CO2 addition start
     add_times["CO2"],
     left_on="UTC_DateTime",
-    right_on="UTC_Stop",
+    right_on="UTC_Start",
     strategy="backward"
     ).join_asof(
         # IDs closest following occupant entering
@@ -521,7 +517,7 @@ aranet_decay = aranet_w_bg.join_asof(
             # For each addition, selects only data between addition end and the
             # soonest of 5.5h after addition end, next addition start, and next
             # occupant entering
-            pl.col("UTC_DateTime").gt(pl.col("UTC_Stop"))
+            pl.col("UTC_DateTime").gt(pl.col("UTC_Start"))
             & pl.col("UTC_DateTime").lt(
                 pl.col("UTC_Stop").dt.offset_by("5h30m")
                 )
@@ -541,17 +537,12 @@ aranet_decay = aranet_w_bg.join_asof(
                     include_key=False,
                     as_dict=True
                     )
-# %% Fits CO2 decays
+# %% Fits LI-COR CO2 decays
 acrs = []
 for (add_id,), add_df in licor_decay.items():
-    # if "2024-03" in add_id:
-    #     continue
-    if "2024-06" in add_id:
-        break
-    # Skips fitting if CO2 range is small (no addition?)
-    if (add_df["BGSub_CO2_ppm"].max() 
-        - add_df["BGSub_CO2_ppm"].min()) < 200:
+    if "2024" not in add_id:
         continue
+
     # Skips fitting if time range is small (insufficient time?)
     if add_df["Time_h"].max() < 1 or add_df["Time_h"].min() > 1:
         continue
@@ -561,7 +552,9 @@ for (add_id,), add_df in licor_decay.items():
         pl.col("Time_h").is_between(1/120, 1)
         )["BGSub_CO2_ppm"].max()
     if max_co2 is None: continue
-    
+    # Skips fitting if CO2 range is small (no addition?)
+    if (max_co2 - add_df["BGSub_CO2_ppm"].min()) < 200:
+        continue
     # CO2 concentration to start decay fit at
     thresh_co2 = 0.8 * max_co2
     # Identifies time CO2 decays below 80% of max
@@ -578,10 +571,10 @@ for (add_id,), add_df in licor_decay.items():
     # Identifies last time CO2 is above 2 e-folds decay
     dec_end_t = add_df.filter(
         pl.col("BGSub_CO2_ppm").lt(dec_end_co2)
+        & pl.col("Time_h").gt(dec_start_t)
         )["Time_h"].first()
     if dec_end_t is None:
-        print(add_id)
-    # continue
+        continue
     # Selects data to fit
     fit_co2 = add_df.filter(
         pl.col("Time_h").is_between(dec_start_t, dec_end_t)
@@ -620,8 +613,8 @@ for (add_id,), add_df in licor_decay.items():
     ax.grid()
     ax.set_xlabel("Hours from CO$_2$ Addition End")
     ax.set_ylabel("CO$_2$ (ppm)")
-    ax.set_xlim(0, add_df["Time_h"].max())
-    # %%
+    # ax.set_xlim(0, add_df["Time_h"].max())
+    # ax.set_ylim(-100, max_co2)
     if fit_co2.height < 5:
         print(add_id, thresh_co2, dec_end_co2)
         continue
@@ -636,7 +629,7 @@ for (add_id,), add_df in licor_decay.items():
         np.e ** log_lin_result.params["intercept"].value
         ))
     exp_params.add("k", value=-log_lin_result.params["slope"].value)
-    exp_params.add("c0", value=0, min=-3, max=3)
+    exp_params.add("c0", value=0, min=-50, max=50)
     # First order exponential decay model
     exp_model = lmfit.models.ExpressionModel(
         "A * exp(-k * t) + c0",

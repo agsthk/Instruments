@@ -15,3 +15,22 @@
 - Finally decided the time interval to cut out after additions and occupancy, varies with time in the campaign a little bit but mostly consistent, need to stop it with the background and move on
 - Resampled background at 10 minute time resolution
 - Applied background modeling method to Aranet data
+- Now checking the actual decay fits and seeing if there are any remaining issues
+	- Revising modeled background fixed most of it
+	- 2024-03-26 22:16 isn't selecting data to fit?
+		- Need to add a qualifier that the time to stop decay must be greater than the time to end decay - fixed it!
+	- 2024-08-07 16:00 doesn't have the data?
+	- Rest of 2024 looks fine
+	- 2025-01-27 08:00 door was opened mid decay, cannot retrieve decay rate
+	- 2025-02-26 07:00 something odd - spike late, maybe someone entered the room? why not caught if so?
+	- 2025-04-14 12:00 also weird
+	- Those were all that looked a little funky on the LI-COR, will need to check Aranet too but so far so good
+- Making minor revisions on data selection to hopefully get rid of the late spikes that are sometimes showing up
+	- Worked fine
+- Checking that the code actually fits the decay, certainly seems to
+	- Except 2025-02-13 10:00 and 2025-02-12 11:00 and I'm not sure why because the curve looks nice visually and it fits a lot uglier stuff soooo
+		- Wonder if it has to do with bounds of c0? they were -3 to 3 as a carryover from O3 code, fixed and we will see
+			- That's not why - seems to be a background subtraction uncertainty issue
+			- It's because there were nulls in the original data that I didn't remove rip, revised and now seeing if it works
+				- It does! Problem solved! Rejoice!
+	- Running all 2024 decays to make sure they fit appropriately
