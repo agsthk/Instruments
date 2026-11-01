@@ -34,3 +34,8 @@
 			- It's because there were nulls in the original data that I didn't remove rip, revised and now seeing if it works
 				- It does! Problem solved! Rejoice!
 	- Running all 2024 decays to make sure they fit appropriately
+		- Yes, could make some revisions to max selection if I'd like to, need to think a little more about that - task for later
+			- I notice it being an issue pretty much exclusively with the fast decays which seem less important but certainly still worth looking at
+- Added code to calculate Aranet decays, those also look good, though I forgot I'm missing 2026 stuff because no full ICARTT file I guess
+- Quick plot to compare Aranet and LI-COR, mostly just to confirm linear relationship
+	- Yes!
