@@ -73,7 +73,8 @@ ICARTT_DIR = os.path.join(data_dir, "Instruments_ICARTTData")
 # Names of files containing CO2 data
 licor_files = ["Keck-CO2_C200_20231214_R1.ict",
                "Keck-CO2_C200_20250109_R2.ict"]
-aranet_files = ["Keck-AranetCO2_C200_20250321_R1.ict"]
+aranet_files = ["Keck-AranetCO2_C200_20250321_R1.ict",
+                "Keck-AranetCO2_C200_20260114_R1.ict"]
 
 licor_data = []
 aranet_data = []
@@ -88,7 +89,8 @@ for root, dirs, files in os.walk(ICARTT_DIR):
             occ_data.append(read_ict(os.path.join(root, file)))
 # Concatenates data for all phases
 licor_data = pl.concat(licor_data).sort(by="UTC_DateTime")
-aranet_data = pl.concat(aranet_data).sort(by="UTC_DateTime")
+aranet_data = pl.concat(aranet_data,
+                        how="diagonal_relaxed").sort(by="UTC_DateTime")
 occ_data = pl.concat(occ_data).sort(by="UTC_Start")
 # Calculates uncertainty in CO2 measurements
 licor_data = licor_data.with_columns(
