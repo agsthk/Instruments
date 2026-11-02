@@ -2,3 +2,42 @@
 - Working on finishing this up and getting ICARTT files posted
 	- Quickly, created ICARTT file with all phase 3 Aranet data since I need the phase 3 file to calculate ACRs
 	- Added Phase 3 ICARTT file to read in and changed concatenation to use diagonal relaxed method
+- Made some plotting adjustments to make things more visible on Aranet sensors
+	- Will apply to LI-COR fits also
+	- Going to save these figures here rather than open them all at once because of RAM and stuff
+		- Not actually a huge issue with the Aranet fits, but since the LI-COR is 1 Hz resolution it takes a hot second to plot them
+	- Also modified somewhat to take out the try and except and some continue statements since I think those may have been hiding code errors - 2025 runs fine, need to see about 2024
+		- Yea some were in there for a reason lol
+			- ACTUALLY this is an issue with whatever is going on with the really high CO2 spikes
+			- Maybe for the LI-COR have it start just a little bit later? Seem to get better results if I start the max CO2 after 1/120 h (30 seconds) - this shouldn't be so much time as to mess with the maxs without spikes
+		- Slight revision to not fitting if there are gap - accidental full cylinder addition (2024-05-23 18:00) doesn't really start showing until after 2 hours, previously had split differently so was seeing a minimum time below 0
+			- Now changed to check the minimum time AFTER zero only
+			- Once I fixed this, all ran no issue as far as I can tell
+	- Adjusted y limits to zoom in for plots with weird spikes so the decay is actually visible
+		- Works for the most part, but some concerns in August 2024 when decay was much faster - assuming ACR ~10 /h, end up starting fit at 73% of max instead of 80% of max - how much does this end up mattering?
+	- I think some times are wayyyy off - particularly 2024-06-07 08:01, 17:00 also off but not by as much
+		- 08:01 is manually stated and also has no end time?
+		- Maybe also 2024-06-20 09:52
+		- 2024-06-21 17:00 and before does need 30 second wait
+		- 2024-11-15 16:00
+		- 2024-07-12 13:00
+		- In part because I arbitrarily define stop times if they aren't given - let me check notebook
+			- 2024-03-07 12:30 no end time, seems 20 minutes is a good definition, going to go ahead and document it
+			- 2024-05-23 18:00 no end time because this was the accidental complete tank injection, don't need to revise because no real reasonable way to fit this one
+			- 2024-06-07 08:00 no reported end time, but definitely way off from reality
+				- Going to make it similar in time length to previous additions since it should've been the same since automated script used  - estimating end at 08:03:00, will see how that goes
+					- That fixed it, looks good now
+			- 2024-06-07 17:00 is odd, but that's an automated one?
+				- Automated add says addition from 17:05 - 17:07:32, but notebook does not say that (17:00-17:01:03)
+				- AdditionValves data suggests it should be 00:00-03:40 - why doesn't it?
+					- When I run interpret_additionvalves.py it shows as going from 00:00-07:32.......weird
+						- I'm just going to change this manually at least for now I have too much to do to spend any time on this
+						- Actually lowkey this might be the wrong one hold up - it's 23:00 UTC time
+							- Okay no I was correct
+			- Early automated I think used a different program so had like 6 CO2 closed shortly after the opening and I think my code didn't account for that - manually changing 6/7 times to reflect that and seeing what it does to fits
+				- This makes them look good!
+	- I don't think I need that 30 second wait time except in the case of the known spikes, which are generally quite early
+		- Has to do with addition method changes
+		- Need to wait pre 6/26 ish (call it 6/22)
+			- Added line to make wait time 1/120 if before 6/22, otherwise it's zero - going to see what that looks like
+				- Like this much better! Stopping here and these are the final ACRs (obvi without correction for Aranet ones)

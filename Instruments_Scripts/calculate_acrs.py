@@ -13,8 +13,6 @@ import polars.selectors as cs
 from polars.exceptions import ComputeError
 from datetime import datetime
 from pytz import utc
-import hvplot.polars
-import holoviews as hv
 import matplotlib.pyplot as plt
 # %% User-defined functions
 def read_ict(path):
@@ -69,6 +67,17 @@ if "Instruments" in os.path.dirname(data_dir):
 data_dir = os.path.join(data_dir, "Instruments_Data")
 # Absolute path to Instruments_ICARTTData/ directory
 ICARTT_DIR = os.path.join(data_dir, "Instruments_ICARTTData")
+# Path to save figures to
+today = datetime.now() # Today's date
+fig_dir = os.path.join(os.path.dirname(data_dir),
+                       "Instruments_Documentation",
+                       "Instruments_LabNotebook",
+                       "Instruments_CodingFigures",
+                       "Instruments_CodingFigures_" + today.strftime("%Y"),
+                       "Instruments_CodingFigures_" + today.strftime("%Y%m"),
+                       "Instruments_CodingFigures_" + today.strftime("%Y%m%d"))
+if not os.path.exists(fig_dir):
+    os.makedirs(fig_dir)
 # %% Reads ICARTT data
 # Names of files containing CO2 data
 licor_files = ["Keck-CO2_C200_20231214_R1.ict",
@@ -174,11 +183,8 @@ for spec, df in add_times.items():
         add_times[spec] = pl.concat(
             [df, man_add_times[spec]]
             ).sort(by="UTC_Start")
+add_times["CO2"].filter(pl.col("UTC_Start").dt.month().eq(6))
 # %% Defines times that CO2 is perturbed
-occ_data.filter(
-    pl.col("UTC_Stop").dt.year().eq(2025)
-    & pl.col("UTC_Stop").dt.day().gt(17)
-    )
 co2_pert = pl.concat(
     [add_times["CO2"].select(
         pl.col("UTC_Start").dt.offset_by("-2m"),
@@ -542,18 +548,19 @@ aranet_decay = aranet_w_bg.join_asof(
 # %% Fits LI-COR CO2 decays
 licor_acrs = []
 for (add_id,), add_df in licor_decay.items():
-    if "2025" not in add_id:
-        continue
-
+    if datetime.strptime(add_id, "%Y-%m-%d %H:%M") < datetime(2024, 6, 22):
+        wait = 1/120
+    else:
+        wait = 0
     # Skips fitting if time range is small (insufficient time?)
-    if add_df["Time_h"].max() < 1 or add_df["Time_h"].min() > 1:
+    if (add_df["Time_h"].max() < 1
+        or add_df.filter(pl.col("Time_h").gt(0))["Time_h"].min() > 1):
         continue
     # Highest post addition end CO2 concentration
     max_co2 = add_df.filter(
         # Requires it to actually be after addition
-        pl.col("Time_h").is_between(1/120, 1)
+        pl.col("Time_h").is_between(wait, 1)
         )["BGSub_CO2_ppm"].max()
-    if max_co2 is None: continue
     # Skips fitting if CO2 range is small (no addition?)
     if (max_co2 - add_df["BGSub_CO2_ppm"].min()) < 200:
         continue
@@ -575,8 +582,6 @@ for (add_id,), add_df in licor_decay.items():
         pl.col("BGSub_CO2_ppm").lt(dec_end_co2)
         & pl.col("Time_h").gt(dec_start_t)
         )["Time_h"].first()
-    if dec_end_t is None:
-        continue
     # Selects data to fit
     fit_co2 = add_df.filter(
         pl.col("Time_h").is_between(dec_start_t, dec_end_t)
@@ -587,39 +592,6 @@ for (add_id,), add_df in licor_decay.items():
             # parameter estimates
             LogCO2=pl.col("BGSub_CO2_ppm").log()
             )
-    # # Plots decay fit to visually check fit
-    # fig, ax = plt.subplots()
-    # # Full decay data with uncertainty
-    # ax.errorbar(add_df["Time_h"],
-    #             add_df["BGSub_CO2_ppm"],
-    #             yerr=add_df["BGSub_CO2_ppm_Unc"],
-    #             linestyle="",
-    #             marker=".",
-    #             label="Decay Data"
-    #             )
-    # # Portion of decay fit
-    # ax.scatter(fit_co2["Time_h"],
-    #            fit_co2["BGSub_CO2_ppm"],
-    #            color="orange",
-    #            zorder=20,
-    #            s=1,
-    #            label="Fit Data"
-    #            )
-    # ax.axhline(y=max_co2)
-    # ax.axhline(y=thresh_co2)
-    # ax.axvline(x=dec_start_t)
-    # ax.axvline(x=dec_end_t)
-    # # Figure formatting
-    # ax.set_title(spec + " " + add_id)
-    # ax.legend()
-    # ax.grid()
-    # ax.set_xlabel("Hours from CO$_2$ Addition End")
-    # ax.set_ylabel("CO$_2$ (ppm)")
-    # ax.set_xlim(0, add_df["Time_h"].max())
-    # ax.set_ylim(-100, max_co2)
-    if fit_co2.height < 5:
-        print(add_id, thresh_co2, dec_end_co2)
-        continue
     lin_model = lmfit.models.LinearModel()
     # Linear regression of log-transformed data to estimate initial
     # exponential parameters
@@ -637,23 +609,15 @@ for (add_id,), add_df in licor_decay.items():
         "A * exp(-k * t) + c0",
         independent_vars=["t"]
         )
-    try:
-        # Fits data to exponential model
-        exp_result = exp_model.fit(
-            fit_co2.drop_nans("BGSub_CO2_ppm")["BGSub_CO2_ppm"],
-            **exp_params,
-            t=fit_co2["Time_h"],
-            weights=np.array(fit_co2.drop_nans("BGSub_CO2_ppm")["Weights"])
-            )
-    # Moves on when fit fails
-    except ValueError:
-        continue
+    # Fits data to exponential model
+    exp_result = exp_model.fit(
+        fit_co2.drop_nans("BGSub_CO2_ppm")["BGSub_CO2_ppm"],
+        **exp_params,
+        t=fit_co2["Time_h"],
+        weights=np.array(fit_co2.drop_nans("BGSub_CO2_ppm")["Weights"])
+        )
     acr = exp_result.params["k"].value
     acr_unc = exp_result.params["k"].stderr
-    if acr_unc is None:
-        continue
-    if acr_unc / acr > 0.2:
-        continue
     # Saves calculated ACR and associated uncertainty
     licor_acrs.append(
         [add_id, acr, acr_unc]
@@ -662,21 +626,60 @@ for (add_id,), add_df in licor_decay.items():
     fit_co2 = fit_co2.with_columns(
         Fit=exp_result.best_fit
         )
-
-    # # Portion of decay fit
-    # ax.scatter(fit_co2["Time_h"],
-    #            fit_co2["BGSub_CO2_ppm"],
-    #            color="orange",
-    #            zorder=20,
-    #            label="Fit Data"
-    #            )
-    # # Best fit line
-    # ax.plot(fit_co2["Time_h"],
-    #         fit_co2["Fit"],
-    #         color="black",
-    #         zorder=30,
-    #         label="Best Fit"
-    #         )
+    # Plots decay fit to visually check fit
+    fig, ax = plt.subplots()
+    # Full decay data with uncertainty
+    ax.errorbar(add_df["Time_h"],
+                add_df["BGSub_CO2_ppm"],
+                yerr=add_df["BGSub_CO2_ppm_Unc"],
+                linestyle="",
+                marker=".",
+                mec="black",
+                mew=0.4,
+                c="gray",
+                mfc="white",
+                lw=0.5,
+                capsize=2,
+                label="All Data"
+                )
+    # Portion of decay fit (no uncertainty plotted)
+    ax.errorbar(fit_co2["Time_h"],
+                fit_co2["BGSub_CO2_ppm"],
+                linestyle="",
+                marker=".",
+                c="tomato",
+                mew=0.4,
+                mfc="tomato",
+                lw=0.5,
+                label="Fit Data"
+                )
+    # Best fit line
+    ax.plot(fit_co2["Time_h"],
+            fit_co2["Fit"],
+            color="black",
+            zorder=30,
+            label="Best Fit"
+            )
+    # Plots lines showing time and CO2 concentrations for fit begin and end
+    ax.axhline(y=max_co2, linestyle=":", color="slategrey")
+    ax.axhline(y=thresh_co2, linestyle=":", color="slategrey")
+    ax.axhline(y=dec_end_co2, linestyle=":", color="slategrey")
+    ax.axvline(x=dec_start_t, linestyle=":", color="slategrey")
+    ax.axvline(x=dec_end_t, linestyle=":", color="slategrey")
+    # Figure formatting
+    ax.set_title("LI-COR " + add_id + f"\nACR = {acr:.3f} +/- {acr_unc:.3f}")
+    ax.set_xlabel("Hours from CO$_2$ Addition End")
+    ax.set_ylabel("Background-Subtracted CO$_2$ (ppm)")
+    ax.grid()
+    ax.legend()
+    if ax.get_ylim()[1] / max_co2 > 2:
+        ax.set_ylim(-150, max_co2 * 1.5)
+    # Saves figure
+    add_dt = datetime.strptime(add_id, "%Y-%m-%d %H:%M")
+    fig_name = "LI-COR_ACR_" + add_dt.strftime("%Y%m%d_%H%M.png")
+    fig_path = os.path.join(fig_dir, fig_name)
+    fig.savefig(fig_path)
+    plt.close()
 # Converts list of ACRs to DataFrame
 licor_acrs = pl.DataFrame(licor_acrs, orient="row", 
                           schema=["AddTime", "ACR_h", "ACR_h_Unc"])
@@ -689,7 +692,7 @@ for (add_id,), add_df in aranet_decay.items():
     # Highest post addition end CO2 concentration
     max_co2 = add_df.filter(
         # Requires it to actually be after addition
-        pl.col("Time_h").is_between(1/120, 1)
+        pl.col("Time_h").is_between(0, 1)
         )["BGSub_CO2_ppm"].max()
     if max_co2 is None: continue
     # Skips fitting if CO2 range is small (no addition?)
@@ -725,39 +728,6 @@ for (add_id,), add_df in aranet_decay.items():
             # parameter estimates
             LogCO2=pl.col("BGSub_CO2_ppm").log()
             )
-    # Plots decay fit to visually check fit
-    fig, ax = plt.subplots()
-    # Full decay data with uncertainty
-    ax.errorbar(add_df["Time_h"],
-                add_df["BGSub_CO2_ppm"],
-                yerr=add_df["BGSub_CO2_ppm_Unc"],
-                linestyle="",
-                marker=".",
-                label="Decay Data"
-                )
-    # Portion of decay fit
-    ax.scatter(fit_co2["Time_h"],
-               fit_co2["BGSub_CO2_ppm"],
-               color="orange",
-               zorder=20,
-               s=1,
-               label="Fit Data"
-               )
-    ax.axhline(y=max_co2)
-    ax.axhline(y=thresh_co2)
-    ax.axvline(x=dec_start_t)
-    ax.axvline(x=dec_end_t)
-    # Figure formatting
-    ax.set_title(spec + " " + add_id)
-    ax.legend()
-    ax.grid()
-    ax.set_xlabel("Hours from CO$_2$ Addition End")
-    ax.set_ylabel("CO$_2$ (ppm)")
-    # ax.set_xlim(0, add_df["Time_h"].max())
-    # ax.set_ylim(-100, max_co2)
-    if fit_co2.height < 5:
-        print(add_id, thresh_co2, dec_end_co2)
-        continue
     lin_model = lmfit.models.LinearModel()
     # Linear regression of log-transformed data to estimate initial
     # exponential parameters
@@ -775,23 +745,15 @@ for (add_id,), add_df in aranet_decay.items():
         "A * exp(-k * t) + c0",
         independent_vars=["t"]
         )
-    try:
-        # Fits data to exponential model
-        exp_result = exp_model.fit(
-            fit_co2.drop_nans("BGSub_CO2_ppm")["BGSub_CO2_ppm"],
-            **exp_params,
-            t=fit_co2["Time_h"],
-            weights=np.array(fit_co2.drop_nans("BGSub_CO2_ppm")["Weights"])
-            )
-    # Moves on when fit fails
-    except ValueError:
-        continue
+    # Fits data to exponential model
+    exp_result = exp_model.fit(
+        fit_co2.drop_nans("BGSub_CO2_ppm")["BGSub_CO2_ppm"],
+        **exp_params,
+        t=fit_co2["Time_h"],
+        weights=np.array(fit_co2.drop_nans("BGSub_CO2_ppm")["Weights"])
+        )
     acr = exp_result.params["k"].value
     acr_unc = exp_result.params["k"].stderr
-    if acr_unc is None:
-        continue
-    if acr_unc / acr > 0.2:
-        continue
     # Saves calculated ACR and associated uncertainty
     aranet_acrs.append(
         [add_id, acr, acr_unc]
@@ -800,14 +762,33 @@ for (add_id,), add_df in aranet_decay.items():
     fit_co2 = fit_co2.with_columns(
         Fit=exp_result.best_fit
         )
-
-    # Portion of decay fit
-    ax.scatter(fit_co2["Time_h"],
-               fit_co2["BGSub_CO2_ppm"],
-               color="orange",
-               zorder=20,
-               label="Fit Data"
-               )
+    # Plots decay fit to visually check fit
+    fig, ax = plt.subplots()
+    # Full decay data with uncertainty
+    ax.errorbar(add_df["Time_h"],
+                add_df["BGSub_CO2_ppm"],
+                yerr=add_df["BGSub_CO2_ppm_Unc"],
+                linestyle="",
+                marker=".",
+                mec="black",
+                mew=0.4,
+                c="gray",
+                mfc="white",
+                lw=0.5,
+                capsize=2,
+                label="All Data"
+                )
+    # Portion of decay fit (no uncertainty plotted)
+    ax.errorbar(fit_co2["Time_h"],
+                fit_co2["BGSub_CO2_ppm"],
+                linestyle="",
+                marker=".",
+                mec="black",
+                mew=0.4,
+                mfc="tomato",
+                lw=0.5,
+                label="Fit Data"
+                )
     # Best fit line
     ax.plot(fit_co2["Time_h"],
             fit_co2["Fit"],
@@ -815,6 +796,24 @@ for (add_id,), add_df in aranet_decay.items():
             zorder=30,
             label="Best Fit"
             )
+    # Plots lines showing time and CO2 concentrations for fit begin and end
+    ax.axhline(y=max_co2, linestyle=":", color="slategrey")
+    ax.axhline(y=thresh_co2, linestyle=":", color="slategrey")
+    ax.axhline(y=dec_end_co2, linestyle=":", color="slategrey")
+    ax.axvline(x=dec_start_t, linestyle=":", color="slategrey")
+    ax.axvline(x=dec_end_t, linestyle=":", color="slategrey")
+    # Figure formatting
+    ax.set_title("Aranet " + add_id + f"\nACR = {acr:.3f} +/- {acr_unc:.3f}")
+    ax.set_xlabel("Hours from CO$_2$ Addition End")
+    ax.set_ylabel("Background-Subtracted CO$_2$ (ppm)")
+    ax.grid()
+    ax.legend()
+    # Saves figure
+    add_dt = datetime.strptime(add_id, "%Y-%m-%d %H:%M")
+    fig_name = "Aranet4_ACR_" + add_dt.strftime("%Y%m%d_%H%M.png")
+    fig_path = os.path.join(fig_dir, fig_name)
+    fig.savefig(fig_path)
+    plt.close()
 # Converts list of ACRs to DataFrame
 aranet_acrs = pl.DataFrame(aranet_acrs, orient="row", 
                            schema=["AddTime", "ACR_h", "ACR_h_Unc"])
