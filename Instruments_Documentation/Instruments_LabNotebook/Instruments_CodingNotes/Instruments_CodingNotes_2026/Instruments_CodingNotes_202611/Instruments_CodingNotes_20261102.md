@@ -41,3 +41,47 @@
 		- Need to wait pre 6/26 ish (call it 6/22)
 			- Added line to make wait time 1/120 if before 6/22, otherwise it's zero - going to see what that looks like
 				- Like this much better! Stopping here and these are the final ACRs (obvi without correction for Aranet ones)
+- Now that I have all the ACRs calculated, need to filter based on uncertainties to get rid of the ones that are poor fits
+- Found some additional automated addition times that seem to be wrong for unknown reason, correcting manually
+	- 2024-08-08 10:10 - 10:19:31 (currently through 10:23:01 which is very different when ACR fast!)
+		- Worked well
+	- 2024-10-23 15:00
+		- There's a couple around here that are very odd and might need revision rip
+		- It appears from the addition valves that closing CO2 valve failed several times 10/23 and was left open for a hot second?
+			- Several duplicate end times with different start times?
+			- Going to try to go based on set position instead of read position and see what that does? Removed following lines
+			- 2024-10-23T18:07:55.000000+0000,2024-10-23T19:24:23.000000+0000,CO2
+			- 2024-10-23T19:24:21.000000+0000,2024-10-23T19:24:23.000000+0000,CO2
+			- Reviewing data on these: 11:32 has no actual addition, there is an addition at 14:15, wasn't fit because cutoff criteria not good for high ACR! must fix
+				- No addition pre 19:24:23
+				- Have condition now that only requires 15 minutes of decay from addition end when ACR high
+	- 2024-11-15 16:00 IDd latest close instead of first final close, 23:14:48 to 23:11:31
+		- Worked well to fix issue
+	- Reviewing the high ACR fits to ensure I'm not missing anything
+		- I think this works? Now need to check to see what got skipped when fitting and if there were any that should've been fit
+			- 2025-03-23 18:00 looks like it maybe should have been fit?
+				- No jk there's a good 1.5 hours missing from the beginning - but will check the others to make sure it's not an issue with CO2 addition time definitions
+				- It's because there's missing data - nothing in LICOR data from ~3/18-3/24 (Aranet should have filled this gap) - consistent with what I remember having happened
+			- For the most part, skipped fits seem to be reasonable
+			- 2024-05-09 11:51 is followed immediately by 2024-05-09 11:52 (which is fit) - combine? Does it matter?
+			- 2024-06-14 09:18 followed by 2024-06-14 10:00, but also doesn't look like there's actually any kind of addition pre 10:00
+			- 2024-06-21 12:59 followed by 13:42 which was fit
+				- Notebook off compared to valve states for some reason
+			- 2024-06-29 11:21 & 11:43(?) followed by 11:59, which was fit?
+				- The non fit ones were from a time period where troubleshooting a leak in the addition line was happening - expected that it isn't fit
+			- Missing some data at start of 2024-08-07 16:00, that's why filtered out (CO2 range too small)
+			- 2025-04-07 18:00 seems like addition was too small? Maybe tank was empty or something
+				- Seems likely, or maybe issue with delivery pressure, notebook has delivery pressure adjusted on 4/9 after changing tank on 4/7 (but tank change not in notebook?)
+				- But yes I think tank empty for 4/8 00:00 as well so that makes sense
+	- Reviewing the Aranet ones that didn't fit
+		- 2025-03-25 08:00: Not sure why this one didn't fit, looks like it should've, but have LI-COR fit sooo
+		- 2025-03-28 18:00: Missing first ~2h of decay, LI-COR fit for this addition worked
+		- 2025-04-13 18:00: Missing first ~3.5h of decay, LI-COR fit worked
+		- 2026-01-22 22:00: Missing first ~4h of decay
+		- 2026-01-26 04:00: Missing everything after decay
+		- 2026-03-08 04:00: Missing first ~3.5h after decay
+		- 2026-03-19 21:00: Missing first ~1.5h of decay and also anything after 2.8 h
+		- 2026-03-23 09:00: No addition recorded in lab notebook, certainly seems like there isn't an addition sooooo it's fine
+		- 2026-03-31 06:00: Missing first ~4.5h, don't have anything after ~5h
+		- 2026-04-10 00:00: Missing first ~3h of decay, nothing after ~5.5h
+	- All around reasonable with respect to decays that weren't fit, no remaining concerns there

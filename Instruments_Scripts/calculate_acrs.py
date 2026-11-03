@@ -548,12 +548,23 @@ aranet_decay = aranet_w_bg.join_asof(
 # %% Fits LI-COR CO2 decays
 licor_acrs = []
 for (add_id,), add_df in licor_decay.items():
+    # Path for saving figure
+    add_dt = datetime.strptime(add_id, "%Y-%m-%d %H:%M")
+    fig_name = "LI-COR_ACR_" + add_dt.strftime("%Y%m%d_%H%M.png")
+    fig_path = os.path.join(fig_dir, fig_name)
+    # if os.path.exists(fig_path): continue
+    # Defines earliest time to look for max CO2
     if datetime.strptime(add_id, "%Y-%m-%d %H:%M") < datetime(2024, 6, 22):
         wait = 1/120
     else:
         wait = 0
+    # Defines minimum duration of decay needed
+    if datetime(2025, 1, 1) > add_dt > datetime(2024, 8, 7, 13):
+        lasts = 0.25 # Must last 15 minutes
+    else:
+        lasts = 1 # Must last 1 hour
     # Skips fitting if time range is small (insufficient time?)
-    if (add_df["Time_h"].max() < 1
+    if (add_df["Time_h"].max() < lasts
         or add_df.filter(pl.col("Time_h").gt(0))["Time_h"].min() > 1):
         continue
     # Highest post addition end CO2 concentration
@@ -620,7 +631,7 @@ for (add_id,), add_df in licor_decay.items():
     acr_unc = exp_result.params["k"].stderr
     # Saves calculated ACR and associated uncertainty
     licor_acrs.append(
-        [add_id, acr, acr_unc]
+        [add_id, dec_start_t, dec_end_t, acr, acr_unc]
         )
     # Adds modeled fit results
     fit_co2 = fit_co2.with_columns(
@@ -675,17 +686,21 @@ for (add_id,), add_df in licor_decay.items():
     if ax.get_ylim()[1] / max_co2 > 2:
         ax.set_ylim(-150, max_co2 * 1.5)
     # Saves figure
-    add_dt = datetime.strptime(add_id, "%Y-%m-%d %H:%M")
-    fig_name = "LI-COR_ACR_" + add_dt.strftime("%Y%m%d_%H%M.png")
-    fig_path = os.path.join(fig_dir, fig_name)
     fig.savefig(fig_path)
     plt.close()
 # Converts list of ACRs to DataFrame
-licor_acrs = pl.DataFrame(licor_acrs, orient="row", 
-                          schema=["AddTime", "ACR_h", "ACR_h_Unc"])
+licor_acrs = pl.DataFrame(
+    licor_acrs,
+    orient="row", 
+    schema=["AddTime", "FitStartTime", "FitEndTime", "ACR_h", "ACR_h_Unc"]
+    )
 # %% Fits Aranet CO2 decays
 aranet_acrs = []
 for (add_id,), add_df in aranet_decay.items():
+    # Path for saving figure
+    add_dt = datetime.strptime(add_id, "%Y-%m-%d %H:%M")
+    fig_name = "Aranet4_ACR_" + add_dt.strftime("%Y%m%d_%H%M.png")
+    fig_path = os.path.join(fig_dir, fig_name)
     # Skips fitting if time range is small (insufficient time?)
     if add_df["Time_h"].max() < 1 or add_df["Time_h"].min() > 1:
         continue
@@ -756,7 +771,7 @@ for (add_id,), add_df in aranet_decay.items():
     acr_unc = exp_result.params["k"].stderr
     # Saves calculated ACR and associated uncertainty
     aranet_acrs.append(
-        [add_id, acr, acr_unc]
+        [add_id, dec_start_t, dec_end_t, acr, acr_unc]
         )
     # Adds modeled fit results
     fit_co2 = fit_co2.with_columns(
@@ -809,14 +824,52 @@ for (add_id,), add_df in aranet_decay.items():
     ax.grid()
     ax.legend()
     # Saves figure
-    add_dt = datetime.strptime(add_id, "%Y-%m-%d %H:%M")
-    fig_name = "Aranet4_ACR_" + add_dt.strftime("%Y%m%d_%H%M.png")
-    fig_path = os.path.join(fig_dir, fig_name)
     fig.savefig(fig_path)
     plt.close()
 # Converts list of ACRs to DataFrame
-aranet_acrs = pl.DataFrame(aranet_acrs, orient="row", 
-                           schema=["AddTime", "ACR_h", "ACR_h_Unc"])
+aranet_acrs = pl.DataFrame(
+    aranet_acrs,
+    orient="row", 
+    schema=["AddTime", "FitStartTime", "FitEndTime", "ACR_h", "ACR_h_Unc"]
+    )
+# %%
+
+licor_decay.keys()
+
+
+all_adds = [add_id for (add_id, ) in aranet_decay.keys()]
+fit_adds = [add_id for [add_id, _, _] in aranet_acrs]
+not_fit = [add_id for add_id in all_adds if add_id not in fit_adds]
+
+for add_id in not_fit:
+    test = aranet_decay[(add_id,)]
+    fig, ax = plt.subplots()
+    ax.scatter(test["Time_h"], test["BGSub_CO2_ppm"])
+    ax.set_title(add_id)
+
+licor_data.filter(
+    pl.col("UTC_DateTime").dt.month().eq(3)
+    & pl.col("UTC_DateTime").dt.year().eq(2025)
+    & pl.col("UTC_DateTime").dt.day().lt(19)
+    )
+licor_acrs
+test = licor_decay[('2024-10-23 11:32',)]
+fig, ax = plt.subplots()
+ax.plot(test["Time_h"], test["BGSub_CO2_ppm"])
+licor_decay[('2024-10-23 11:32',)]
+add_times["CO2"].filter(pl.col("UTC_Start").dt.year().eq(2024)
+                        & pl.col("UTC_Start").dt.month().eq(10)
+                                                )
+licor_acrstest = licor_acrs.with_columns(
+    ACR_h_RelUnc=pl.col("ACR_h_Unc").truediv(pl.col("ACR_h"))
+    )
+
+ulim = 3 * licor_acrstest["ACR_h_Unc"].quantile(0.75) - 2 * licor_acrstest["ACR_h_Unc"].quantile(0.25)
+
+licor_acrstest.filter(
+    pl.col("ACR_h_Unc").gt(ulim)
+    )
+
 # %%
 
 compare = licor_acrs.join(
