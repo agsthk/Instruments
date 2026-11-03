@@ -85,3 +85,21 @@
 		- 2026-03-31 06:00: Missing first ~4.5h, don't have anything after ~5h
 		- 2026-04-10 00:00: Missing first ~3h of decay, nothing after ~5.5h
 	- All around reasonable with respect to decays that weren't fit, no remaining concerns there
+- NOW moving on to uncertainty based filtering if I can
+	- First just seeing where the cutoffs may be approximately
+		- Challenging to reconcile differences between high and low ACR (10 ish as high) bc the high ACR intrinsically has greater uncertainty due to fewer points used to define the fit
+	- Only low ACR with uncertainty >0.01 is when room was entered
+	- 3 clearly poor fits removed with cutoff of 0.005
+	- Cutoff of 0.004 Gets a number of fits where ACR visually changed mid decay
+		- Same with 0.003
+		- 0.002 is actually appearing to be a decent cutoff, there are maybe 2 that I would argue shouldn't be lost
+		- Cutoff of 0.0017 works reasonably well and it took me a very long time to come with that so not changing it
+	- Reviewing uncertainty for high ACR conditions
+		- Not quite clear in part because high ACR plots don't show things so well, but just gonna say they're all valid lowkey
+			- 10/23 has very low uncertainty but other days with similar ACR don't? idk 
+		- AKA either uncertainty should be <0.0017 or ACR >3 as the filter
+			- Removes 24 ACRs over all three campaigns so that seems reasonable
+	- Now going to check on the Aranet ones, I think the resolution on these isn't high enough to really see much
+		- Stand by this - they all look fine, maybe 2 on 2025-04-14 that are a little funky, but uncertainty is generally consistent with others that look normal
+			- Me when I make things up it seems, it's only 12:00 looks weird - but also not confident enough that it's odd to remove it entirely
+- 

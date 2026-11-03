@@ -694,6 +694,11 @@ licor_acrs = pl.DataFrame(
     orient="row", 
     schema=["AddTime", "FitStartTime", "FitEndTime", "ACR_h", "ACR_h_Unc"]
     )
+# Filters poor LI-COR fits based on uncertainties
+licor_acrs = licor_acrs.filter(
+    pl.col("ACR_h_Unc").lt(0.0017)
+    | pl.col("ACR_h").gt(3)
+    )
 # %% Fits Aranet CO2 decays
 aranet_acrs = []
 for (add_id,), add_df in aranet_decay.items():
@@ -832,43 +837,7 @@ aranet_acrs = pl.DataFrame(
     orient="row", 
     schema=["AddTime", "FitStartTime", "FitEndTime", "ACR_h", "ACR_h_Unc"]
     )
-# %%
-
-licor_decay.keys()
-
-
-all_adds = [add_id for (add_id, ) in aranet_decay.keys()]
-fit_adds = [add_id for [add_id, _, _] in aranet_acrs]
-not_fit = [add_id for add_id in all_adds if add_id not in fit_adds]
-
-for add_id in not_fit:
-    test = aranet_decay[(add_id,)]
-    fig, ax = plt.subplots()
-    ax.scatter(test["Time_h"], test["BGSub_CO2_ppm"])
-    ax.set_title(add_id)
-
-licor_data.filter(
-    pl.col("UTC_DateTime").dt.month().eq(3)
-    & pl.col("UTC_DateTime").dt.year().eq(2025)
-    & pl.col("UTC_DateTime").dt.day().lt(19)
-    )
-licor_acrs
-test = licor_decay[('2024-10-23 11:32',)]
-fig, ax = plt.subplots()
-ax.plot(test["Time_h"], test["BGSub_CO2_ppm"])
-licor_decay[('2024-10-23 11:32',)]
-add_times["CO2"].filter(pl.col("UTC_Start").dt.year().eq(2024)
-                        & pl.col("UTC_Start").dt.month().eq(10)
-                                                )
-licor_acrstest = licor_acrs.with_columns(
-    ACR_h_RelUnc=pl.col("ACR_h_Unc").truediv(pl.col("ACR_h"))
-    )
-
-ulim = 3 * licor_acrstest["ACR_h_Unc"].quantile(0.75) - 2 * licor_acrstest["ACR_h_Unc"].quantile(0.25)
-
-licor_acrstest.filter(
-    pl.col("ACR_h_Unc").gt(ulim)
-    )
+# %% 
 
 # %%
 
