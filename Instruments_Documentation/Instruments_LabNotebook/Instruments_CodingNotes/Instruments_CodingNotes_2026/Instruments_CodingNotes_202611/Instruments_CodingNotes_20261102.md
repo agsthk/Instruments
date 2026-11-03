@@ -102,4 +102,4 @@
 	- Now going to check on the Aranet ones, I think the resolution on these isn't high enough to really see much
 		- Stand by this - they all look fine, maybe 2 on 2025-04-14 that are a little funky, but uncertainty is generally consistent with others that look normal
 			- Me when I make things up it seems, it's only 12:00 looks weird - but also not confident enough that it's odd to remove it entirely
-- 
+- Added code to correct Aranet ACR fits based on relationship between simultaneous fits
