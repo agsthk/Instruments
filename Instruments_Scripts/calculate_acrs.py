@@ -905,20 +905,29 @@ aranet_acrs = aranet_acrs.with_columns(
         ).with_columns(
             Corr_ACR_h_Unc=pl.col("Corr_ACR_h").mul("Corr_ACR_h_RelUnc")
             )
-# %%
-
-
-            # %%
-
-
-# licor_acrs.join(
-#     add_times["CO2"],
-#     on=""
-
-
-add_times["CO2"]
-fig, ax = plt.subplots()
-ax.hist(aranet_acrs["Corr_ACR_h"], alpha=0.5)
-ax.hist(aranet_acrs["ACR_h"], alpha=0.5)
-ax.hist(licor_acrs.filter(pl.col("ACR_h").lt(3))["ACR_h"], alpha=0.5)
+# %% Combines LI-COR and corrected Aranet ACRs
+# Identifies Aranet decays without any simultaneous LI-COR decays
+no_licor = aranet_acrs.join(
+    licor_acrs,
+    on="AddTime",
+    how="anti"
+    ).select(
+        cs.contains("UTC"),
+        cs.contains("UTC").dt.convert_time_zone("America/Denver")
+        .name.map(lambda x: x.replace("UTC", "FTC")),
+        ACR_h=pl.col("Corr_ACR_h"),
+        ACR_h_Unc=pl.col("Corr_ACR_h_Unc")
+        )
+# Combines valid LI-COR decays with Aranet decays that aren't already
+# represented in LI-COR decays
+all_acrs = pl.concat(
+    [licor_acrs.select(
+        cs.contains("UTC"),
+        cs.contains("UTC").dt.convert_time_zone("America/Denver")
+        .name.map(lambda x: x.replace("UTC", "FTC")),
+        cs.contains("ACR")
+        ),
+    no_licor]
+    ).sort("UTC_Start")
+   
 

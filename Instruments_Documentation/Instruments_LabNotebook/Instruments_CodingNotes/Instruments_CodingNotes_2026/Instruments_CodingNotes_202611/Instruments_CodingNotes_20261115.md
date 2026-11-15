@@ -12,3 +12,5 @@
 	- Also going to test establishing the Add ID in UTC instead of converting to local time to make the ICARTTing more straightforward I think
 	- This worked well enough, adding code to get from fit start/end time in hours to a UTC datetime
 		- Requires some casting and converting from hours to seconds
+- Combined LI-COR ACRs with missing Aranet ACRs
+	- Because LI-COR has lower uncertainty, use LI-COR ACR unless it's not available or valid, then use Aranet ACR
