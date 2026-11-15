@@ -1,0 +1,14 @@
+# calculate_acrs.py
+- Finally going to actually get these exported to ICARTT format (I hope)
+- Quickly checking where I left off, then will export these to derived data folder
+	- Actually, may be worth just exporting to ICARTT directly?
+	- Will need to modify ICARTT script if I export to derived data
+	- Just going to directly export to ICARTT like I do with occupancy
+- Evidently never actually implemented uncertainty-based filtering
+	- Not necessary for Aranet decays, can't ID with confidence decays that obviously aren't first order
+	- Wait yes I did - I'm just stupid
+		- Got confused because the filtering is only for LI-COR (as it should be)
+- To get times figured out (want the times to be the range over which decay was fit if I can), changing the CO2 add ID to be the fit end time to make it easier
+	- Also going to test establishing the Add ID in UTC instead of converting to local time to make the ICARTTing more straightforward I think
+	- This worked well enough, adding code to get from fit start/end time in hours to a UTC datetime
+		- Requires some casting and converting from hours to seconds
