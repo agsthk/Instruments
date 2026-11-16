@@ -12,7 +12,7 @@ import polars as pl
 import polars.selectors as cs
 from polars.exceptions import ComputeError
 from datetime import datetime
-from pytz import utc
+from pytz import utc, timezone
 import matplotlib.pyplot as plt
 # %% User-defined functions
 def read_ict(path):
@@ -70,7 +70,7 @@ ICARTT_DIR = os.path.join(data_dir, "Instruments_ICARTTData")
 # Absolute path to AirChangeRates_ICARTTData/ directory
 ACR_DIR = os.path.join(ICARTT_DIR, "AirChangeRates_ICARTTData")
 # # Path to save figures to
-# today = datetime.now() # Today's date
+today = datetime.now() # Today's date
 # fig_dir = os.path.join(os.path.dirname(data_dir),
 #                        "Instruments_Documentation",
 #                        "Instruments_LabNotebook",
@@ -929,5 +929,194 @@ all_acrs = pl.concat(
         ),
     no_licor]
     ).sort("UTC_Start")
-   
-
+all_acrs.filter(
+    pl.col("UTC_Start").dt.year().eq(2026)
+    )
+# %% Defines phase constraints
+# Start and end dates for each phase
+camp_dates = {1: ["20240307", "20241219"],
+              2: ["20250109", "20250421"],
+              3: ["20260114", "20260411"]}
+# Name of campaign
+camp_name = {1: "Keck CITRUS",
+             2: "Keck O3",
+             3: "Keck Phase 3"}
+# Project info for each campaign
+proj_info = {1: "Indoor Biogeochemistry Project - CITRUS",
+             2: "Indoor Biogeochemistry Project - O3",
+             3: "Indoor Biogeochemistry Project - Phase 3"}
+# Instrument used to derive ACRs for each campaign
+camp_inst = {1: "LI-COR LI-840A CO2/H2O Gas Analyzer",
+             2: "LI-COR LI-840A CO2/H2O Gas Analyzer, Aranet4 CO2 Sensors",
+             3: "Aranet4 CO2 Sensors"}
+# Additional instrument information for each campaign
+camp_inst_info = {1: "Air change rates determined from decay of LI-COR CO2 measurements following CO2 additions",
+                  2: "Air change rates determined from decay of LI-COR CO2 measurements, or minute averaged Aranet CO2 measurements if LI-COR unavailable, following CO2 additions",
+                  3: "Air change rates determined from decay of minute averaged Aranet CO2 measurements following CO2 additions"}
+# Information on how ACRs were calculated
+camp_data_info = {1: "Fit background-subtracted CO2 decay from 80% of post-addition max through 2 e-folds of decay, taking ACR as the decay constant. Removed highly uncertain fits.",
+                  2: "Fit background-subtracted CO2 decay from 80% of post-addition max through 2 e-folds of decay, taking ACR as the decay constant. Removed highly uncertain fits. Preferred ACRs based on LI-COR measurements where available. Corrected Aranet ACRs for known bias.",
+                  3: "Fit background-subtracted CO2 decay from 80% of post-addition max through 2 e-folds of decay, taking ACR as the decay constant. Corrected ACRs for known bias."}
+# Uncertainty determination method for each campaign
+camp_uncertainty = {1: "ACR_h_Unc; Standard error of decay constant from first order exponential decay fit",
+                    2: "ACR_h_Unc; Standard error of decay constant from first order exponential decay fit, corrected for Aranet bias where applicable",
+                    3: "ACR_h_Unc; Standard error of decay constant from first order exponential decay fit, corrected for Aranet bias"}
+# Additional important information for each campaign
+camp_other_comments = {1: "Start and stop times correspond to range of data fit for each decay.",
+                       2: "Start and stop times correspond to range of data fit for each decay. Linear regression of relationship between 22 simultaneous LI-COR and Aranet decays used to determine Aranet bias. Multiplied Aranet ACRs and relative uncertainties by 1.33 to correct for known bias.",
+                       3: "Start and stop times correspond to range of data fit for each decay. Linear regression of relationship between 22 simultaneous LI-COR and Aranet decays used to determine Aranet bias. Multiplied ACRs and relative uncertainties by 1.33 to correct for known bias."}
+# Revision for each campaign
+camp_rev = {1: "R0\nR0: Final calculated air change rates",
+            2: "R2\nR2: Final calculated air change rates for whole phase\nR1: Final data. Modified reported values to indicate appropriate precision.\nR0: Final data",
+            3: "R0\nR0: Final calculated air change rates",}
+# %% Defines common ICARTT header for ACR data
+header = "NLINES,1001,V02_2016\n\
+Willis, Megan\n\
+Colorado State University\n\
+CAMPAIGNINST\n\
+CAMPAIGNNAME\n\
+1,1\n\
+BEGINDATE,REVISDATE\n\
+0\n\
+UTC_Start,seconds,Time_Start,seconds_from_utc_midnight\n\
+5\n\
+1,1,1,1,1\n\
+-9999,-9999,-9999,-9999,-9999\n\
+UTC_Stop,seconds,Time_Stop,seconds_from_utc_midnight\n\
+FTC_Start,seconds,Time_Start_local,seconds_from_local_midnight\n\
+FTC_Stop,seconds,Time_Stop_local,seconds_from_local_midnight\n\
+ACR_h,per_hour,Air_change_rate\n\
+ACR_h_Unc,per_hour,Air_change_rate_uncertainty\n\
+0\n\
+NCOMMENTS\n\
+PI_CONTACT_INFO: Email: Megan.Willis@colostate.edu; Address: Colorado State University, Chemistry Department, Fort Collins, CO\n\
+PLATFORM: Chemistry C200\n\
+LOCATION: Chemistry C200\n\
+ASSOCIATED_DATA: N/A\n\
+INSTRUMENT_INFO: CAMPINSTINFO\n\
+DATA_INFO: CAMPDATAINFO\n\
+UNCERTAINTY: CAMPAIGNUNCERTAINTY\n\
+ULOD_FLAG: -7777\n\
+ULOD_VALUE: N/A\n\
+LLOD_FLAG: -8888\n\
+LLOD_VALUE: N/A\n\
+DM_CONTACT_INFO: Allison Salamone, Colorado State University, Allison.Salamone@colostate.edu\n\
+PROJECT_INFO: PROJINFO\n\
+STIPULATIONS_ON_USE:  Users are strongly encouraged to contact PI before using these data\n\
+OTHER_COMMENTS: CAMPAIGNOTHERCOMMENTS\n\
+REVISION: CAMPREV"
+# %% Exports ICARTT files
+for camp, [start, stop] in camp_dates.items():    
+    # Converts campaign date strings to DateTime format
+    start_dt = datetime.strptime(start, "%Y%m%d").replace(tzinfo=utc)
+    stop_dt = datetime.strptime(stop, "%Y%m%d").replace(tzinfo=utc)
+    start_ftc = datetime.strptime(start, "%Y%m%d").replace(tzinfo=timezone("America/Denver"))
+    # Selects only campaign data
+    camp_df = all_acrs.filter(
+        pl.all_horizontal(cs.contains("UTC").is_between(start_dt, stop_dt))
+        )
+    # Converts DateTimes to seconds since midnight of start date
+    camp_df = camp_df.with_columns(
+        cs.contains("UTC").sub(start_dt).dt.total_microseconds().truediv(1e6)
+        .round(1),
+        cs.contains("FTC").sub(start_ftc).dt.total_microseconds().truediv(1e6)
+        .round(1)
+        )
+    # Columns that were created as intermediates
+    drop_cols = []
+    # Rounds values to appropriate precision based on uncertainties
+    for col in camp_df.columns:
+        if col.find("_Unc") != -1:
+            camp_df = camp_df.with_columns(
+                # Index of first non-zero digit
+                pl.col(col).cast(pl.String).str.find("[1-9]").cast(pl.Int64)
+                .sub(
+                    # Index of decimal point
+                    pl.col(col).cast(pl.String).str.find("\.").cast(pl.Int64)
+                    )
+                # Accounts for rounding to two significant digits
+                .add(1)
+                .alias("Factor")
+                ).with_columns(
+                    # Handles when first non-zero digit is before decimal
+                    pl.when(pl.col("Factor").le(0))
+                    .then(pl.col("Factor").add(1))
+                    .otherwise(pl.col("Factor"))
+                    ).with_columns(
+                        # Factor to multiply then divide by
+                        pl.lit(10.0).pow(pl.col("Factor")).alias("Factor")
+                        ).with_columns(
+                            # Scales value to have final significant digit
+                            # before decimal
+                            pl.col(col2).mul(pl.col("Factor"))
+                            # Rounds scaled value to desired number of
+                            # significant digits
+                            .round(0)
+                            # Un-scales value after rounding
+                            .truediv(pl.col("Factor"))
+                            # Repeats rounding to same precision for all
+                            # columns associated with given uncertainty
+                            for col2 in camp_df.columns 
+                            if col2.find(col.replace("_Unc", "")) != -1
+                            ).select(
+                                pl.exclude("Factor")
+                                )
+    # Relaces placeholders in ICARTT header
+    beg_date = start_ftc.strftime("%Y,%m,%d")
+    rev_date = today.strftime("%Y,%m,%d")
+    camp_header = header.replace(
+        "CAMPAIGNINST",
+        camp_inst[camp]
+        ).replace(
+            "CAMPAIGNNAME",
+            camp_name[camp]
+            ).replace(
+                "BEGINDATE",
+                beg_date
+                ).replace(
+                    "REVISDATE",
+                    rev_date
+                    ).replace(
+                        "CAMPINSTINFO", 
+                        camp_inst_info[camp]
+                        ).replace(
+                            "CAMPDATAINFO", 
+                            camp_data_info[camp]
+                            ).replace(
+                                "CAMPAIGNUNCERTAINTY", 
+                                camp_uncertainty[camp]
+                                ).replace(
+                                    "PROJINFO",
+                                    proj_info[camp]
+                                    ).replace(
+                                        "CAMPAIGNOTHERCOMMENTS",
+                                        camp_other_comments[camp]
+                                        ).replace(
+                                            "CAMPREV",
+                                            camp_rev[camp]
+                                            )
+    # Number of header lines to skip
+    n_lines = camp_header.count("\n") + 2
+    camp_header = camp_header.replace(
+        "NLINES", str(n_lines)
+        )
+    n_comments = camp_header.split("PI_CONTACT_INFO")[1].count("\n") + 2
+    camp_header = camp_header.replace(
+        "NCOMMENTS", str(n_comments)
+        )
+    # Combines header and data for phase
+    camp_icartt = camp_header + "\n" + camp_df.write_csv()
+    # Gets revision number
+    rev_no = camp_rev[camp][:2]
+    # Defines ICARTT file name
+    camp_ict_name = "Keck-ACR_C200_" + start_ftc.strftime("%Y%m%d_") + rev_no + ".ict"
+    # Defines path to ICARTT directory
+    camp_ict_dir = os.path.join(ACR_DIR,
+                            "AirChangeRates_ICARTTData_" + rev_no)
+    if not os.path.exists(camp_ict_dir):
+        os.makedirs(camp_ict_dir)
+    # Full path to ICARTT file
+    camp_ict_path = os.path.join(camp_ict_dir, camp_ict_name)
+    # Exports ICARTT files
+    with open(camp_ict_path, "w+") as f:
+        f.write(camp_icartt)

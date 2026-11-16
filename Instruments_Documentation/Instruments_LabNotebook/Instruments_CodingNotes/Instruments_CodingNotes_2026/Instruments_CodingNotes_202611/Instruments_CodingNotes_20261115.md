@@ -14,3 +14,8 @@
 		- Requires some casting and converting from hours to seconds
 - Combined LI-COR ACRs with missing Aranet ACRs
 	- Because LI-COR has lower uncertainty, use LI-COR ACR unless it's not available or valid, then use Aranet ACR
+- Defining ICARTT header parameters in the script itself
+	- Best practice? No but it'll work fine
+	- Added code to properly indicate precision
+	- Exported ICARTT files
+	- Checked against NASA checker, all are good after revising how comment number is determined
